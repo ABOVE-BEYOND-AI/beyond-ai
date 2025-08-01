@@ -21,35 +21,7 @@ const processSteps: Step[] = [
   { id: "ready", label: "Ready", description: "Download available", status: "pending" },
 ];
 
-const mockItineraries = [
-  {
-    id: 1,
-    title: "Maldives Luxury Escape",
-    destination: "Maldives",
-    duration: "7 nights",
-    price: "£12,500",
-    image: "https://images.unsplash.com/photo-1514282401047-d79a71a590e8?w=400&h=300&fit=crop",
-    highlights: ["Overwater villa", "Private butler", "Spa treatments"],
-  },
-  {
-    id: 2,
-    title: "Swiss Alps Adventure",
-    destination: "Switzerland",
-    duration: "5 nights",
-    price: "£8,900",
-    image: "https://images.unsplash.com/photo-1530122037265-a5f1f91d3b99?w=400&h=300&fit=crop",
-    highlights: ["Ski-in/ski-out chalet", "Private chef", "Helicopter tours"],
-  },
-  {
-    id: 3,
-    title: "Santorini Romance",
-    destination: "Greece",
-    duration: "4 nights",
-    price: "£6,200",
-    image: "https://images.unsplash.com/photo-1613395877344-13d4a8e0d49e?w=400&h=300&fit=crop",
-    highlights: ["Cave suite", "Private yacht", "Wine tasting"],
-  },
-];
+
 
 const additionalOptionsData: Option[] = [
   { value: "kids-club", label: "Kids Club" },
@@ -107,7 +79,7 @@ export default function ItineraryPage() {
       return;
     }
 
-    setIsGenerating(true);
+
     setShowResults(true);
     setCurrentStep('research');
 
@@ -169,7 +141,6 @@ export default function ItineraryPage() {
             <div className="flex gap-4">
               <Button variant="outline" onClick={() => {
                 setShowResults(false);
-                setIsGenerating(false);
                 resetStream();
               }}>
                 ← Back to Form
