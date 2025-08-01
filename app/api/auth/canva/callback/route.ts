@@ -18,8 +18,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL('/itinerary?error=oauth_failed', request.url))
     }
 
-    if (!code || !state) {
-      return NextResponse.redirect(new URL('/itinerary?error=missing_params', request.url))
+    if (!code) {
+      return NextResponse.redirect(new URL('/itinerary?error=missing_code', request.url))
+    }
+    
+    if (!state) {
+      return NextResponse.redirect(new URL('/itinerary?error=missing_state', request.url))
     }
 
     // Extract user ID from state
