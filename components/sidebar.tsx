@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
@@ -14,8 +15,6 @@ import {
   X,
   Mail,
   Home,
-  Sun,
-  Moon,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -157,9 +156,11 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
                     transition={{ duration: 0.3 }}
                     className="absolute left-6 top-1/2 -translate-y-1/2"
                   >
-                    <img
+                    <Image
                       src="/BeyondAI (6) (1).svg"
                       alt="Above + Beyond AI"
+                      width={120}
+                      height={40}
                       className="h-10 w-auto logo-sidebar"
                     />
                   </motion.div>

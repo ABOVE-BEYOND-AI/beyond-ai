@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { StatusStepper, Step } from "@/components/ui/status-stepper";
 import { JollyDateRangePicker } from "@/components/ui/date-range-picker";
 import MultipleSelector, { Option } from "@/components/ui/multiselect";
-import { Calendar, Download, AlertCircle, Loader2 } from "lucide-react";
+import { Download, AlertCircle, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { CalendarDate } from "@internationalized/date";
 import { useItineraryStream } from "@/hooks/useItineraryStream";
@@ -70,9 +70,9 @@ const additionalOptionsData: Option[] = [
 ];
 
 export default function ItineraryPage() {
-  const [isGenerating, setIsGenerating] = useState(false);
+
   const [showResults, setShowResults] = useState(false);
-  const [guests, setGuests] = useState("2");
+
   const [dateRange, setDateRange] = useState<{start: CalendarDate, end: CalendarDate} | null>(null);
   const [formData, setFormData] = useState({
     destination: "",
@@ -324,24 +324,24 @@ export default function ItineraryPage() {
                       {/* Debug: Show raw content structure */}
                       <ReactMarkdown 
                         components={{
-                          h1: ({node, ...props}) => <h1 className="text-2xl font-bold mb-6 text-white" {...props} />,
-                          h2: ({node, ...props}) => <h2 className="text-xl font-semibold mb-4 text-white" {...props} />,
-                          h3: ({node, ...props}) => <h3 className="text-lg font-medium mb-3 text-white" {...props} />,
-                          p: ({node, ...props}) => <p className="mb-4 text-gray-300 leading-relaxed" {...props} />,
-                          ul: ({node, ...props}) => <ul className="list-disc list-inside mb-4 text-gray-300 space-y-2" {...props} />,
-                          li: ({node, ...props}) => <li className="text-gray-300" {...props} />,
-                          strong: ({node, ...props}) => <strong className="font-semibold text-white" {...props} />,
-                          hr: ({node, ...props}) => <hr className="my-8 border-gray-600" {...props} />,
-                          table: ({node, ...props}) => (
+                          h1: (props) => <h1 className="text-2xl font-bold mb-6 text-white" {...props} />,
+                          h2: (props) => <h2 className="text-xl font-semibold mb-4 text-white" {...props} />,
+                          h3: (props) => <h3 className="text-lg font-medium mb-3 text-white" {...props} />,
+                          p: (props) => <p className="mb-4 text-gray-300 leading-relaxed" {...props} />,
+                          ul: (props) => <ul className="list-disc list-inside mb-4 text-gray-300 space-y-2" {...props} />,
+                          li: (props) => <li className="text-gray-300" {...props} />,
+                          strong: (props) => <strong className="font-semibold text-white" {...props} />,
+                          hr: (props) => <hr className="my-8 border-gray-600" {...props} />,
+                          table: (props) => (
                             <div className="overflow-x-auto mb-6">
                               <table className="w-full border-collapse bg-gray-900/50 backdrop-blur-sm rounded-lg overflow-hidden shadow-lg" {...props}>{props.children}</table>
                             </div>
                           ),
-                          thead: ({node, ...props}) => <thead className="bg-gray-800" {...props} />,
-                          th: ({node, ...props}) => <th className="px-4 py-3 text-white font-semibold text-left border-b border-gray-700" {...props} />,
-                          td: ({node, ...props}) => <td className="px-4 py-3 text-gray-300 border-b border-gray-700/50" {...props} />,
-                          tbody: ({node, ...props}) => <tbody {...props} />,
-                          tr: ({node, ...props}) => <tr className="hover:bg-gray-800/30 transition-colors" {...props} />,
+                          thead: (props) => <thead className="bg-gray-800" {...props} />,
+                          th: (props) => <th className="px-4 py-3 text-white font-semibold text-left border-b border-gray-700" {...props} />,
+                          td: (props) => <td className="px-4 py-3 text-gray-300 border-b border-gray-700/50" {...props} />,
+                          tbody: (props) => <tbody {...props} />,
+                          tr: (props) => <tr className="hover:bg-gray-800/30 transition-colors" {...props} />,
                         }}
                       >
                         {content}
