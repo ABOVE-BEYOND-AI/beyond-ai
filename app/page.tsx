@@ -1,103 +1,153 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { DashboardLayout } from "@/components/dashboard-layout";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { ArrowRight, Globe, Sparkles, Zap, Shield } from "lucide-react";
+import Link from "next/link";
+import { motion } from "framer-motion";
+
+const features = [
+  {
+    title: "AI-Powered Research",
+    description: "Deep research on destinations, accommodations, and activities",
+    icon: Sparkles,
+    gradient: "from-yellow-400 to-orange-500",
+  },
+  {
+    title: "Instant Generation",
+    description: "Transform briefs into polished itineraries in under 30 seconds",
+    icon: Zap,
+    gradient: "from-blue-400 to-purple-500",
+  },
+  {
+    title: "Global Coverage",
+    description: "Access to luxury destinations and experiences worldwide",
+    icon: Globe,
+    gradient: "from-green-400 to-teal-500",
+  },
+  {
+    title: "Enterprise Security",
+    description: "Bank-level encryption and data protection",
+    icon: Shield,
+    gradient: "from-red-400 to-pink-500",
+  },
+];
+
+const container = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+    },
+  },
+};
+
+const item = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0 },
+};
+
+export default function DashboardPage() {
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <DashboardLayout>
+      <div className="p-6 lg:p-12 pl-32">
+        {/* Hero Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="mb-12"
+        >
+          <h1 className="text-4xl lg:text-6xl font-extrabold tracking-tight mb-4">
+            Welcome to{" "}
+            <span className="text-gradient">Above + Beyond</span>
+          </h1>
+          <p className="text-lg lg:text-xl text-muted-foreground max-w-3xl">
+            Transform client briefs into extraordinary travel experiences with AI-powered research 
+            and beautiful Canva templates. Create luxury itineraries that exceed expectations.
+          </p>
+          <div className="flex gap-4 mt-8">
+            <Link href="/itinerary">
+              <Button size="lg" variant="premium" className="group">
+                Create Itinerary
+                <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+              </Button>
+            </Link>
+            <Button size="lg" variant="outline">
+              View Demo
+            </Button>
+          </div>
+        </motion.div>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+        {/* Stats */}
+        <motion.div
+          variants={container}
+          initial="hidden"
+          animate="show"
+          className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12"
         >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+          <motion.div variants={item}>
+            <Card className="glass border-primary/20">
+              <CardContent className="p-6">
+                <div className="text-4xl font-bold text-primary mb-2">3-5</div>
+                <p className="text-sm text-muted-foreground">
+                  Unique trip options per brief
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
+          <motion.div variants={item}>
+            <Card className="glass border-primary/20">
+              <CardContent className="p-6">
+                <div className="text-4xl font-bold text-primary mb-2">30s</div>
+                <p className="text-sm text-muted-foreground">
+                  Average generation time
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
+          <motion.div variants={item}>
+            <Card className="glass border-primary/20">
+              <CardContent className="p-6">
+                <div className="text-4xl font-bold text-primary mb-2">100%</div>
+                <p className="text-sm text-muted-foreground">
+                  Professional PDF output
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </motion.div>
+
+        {/* Features Grid */}
+        <motion.div
+          variants={container}
+          initial="hidden"
+          animate="show"
+          className="grid grid-cols-1 md:grid-cols-2 gap-6"
         >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+          {features.map((feature) => (
+            <motion.div key={feature.title} variants={item}>
+              <Card className="group hover:shadow-glow transition-all duration-300 hover:-translate-y-1">
+                <CardHeader>
+                  <div className="flex items-center gap-4">
+                    <div className={`p-3 rounded-lg bg-gradient-to-br ${feature.gradient} shadow-lg`}>
+                      <feature.icon className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-xl">{feature.title}</CardTitle>
+                      <CardDescription className="mt-1">
+                        {feature.description}
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+              </Card>
+            </motion.div>
+          ))}
+        </motion.div>
+      </div>
+    </DashboardLayout>
   );
 }
