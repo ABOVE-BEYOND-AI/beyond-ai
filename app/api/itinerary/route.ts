@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 
-export const runtime = "edge"; // enables streaming on Vercel Edge
+// Removed edge runtime - using Node.js runtime for longer timeout (5 minutes vs 25 seconds)
+// export const runtime = "edge"; // enables streaming on Vercel Edge
 
 interface ItineraryRequest {
   destination: string;
@@ -127,7 +128,9 @@ export async function POST(req: NextRequest) {
 
     console.log("Sending request to Perplexity API...");
     console.log("Model: sonar-deep-research (expecting 30-90 second response time)");
+    console.log("Runtime: Node.js (5 minute timeout)");
     
+    const startTime = Date.now();
     const perplexityRes = await fetch("https://api.perplexity.ai/chat/completions", {
       method: "POST",
       headers: {
@@ -157,6 +160,11 @@ export async function POST(req: NextRequest) {
 
     // Get the full response from Perplexity
     const responseData = await perplexityRes.json();
+    const endTime = Date.now();
+    const duration = endTime - startTime;
+    
+    console.log(`Perplexity API response received in ${duration}ms (${(duration/1000).toFixed(1)}s)`);
+    
     const content = responseData.choices[0]?.message?.content || '';
     
     // Return the content as a simple JSON response
