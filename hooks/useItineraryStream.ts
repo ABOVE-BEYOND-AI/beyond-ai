@@ -9,6 +9,7 @@ interface ItineraryData {
   budgetFrom: string;
   budgetTo: string;
   additionalOptions: string[];
+  numberOfOptions?: number;
 }
 
 interface StreamState {
