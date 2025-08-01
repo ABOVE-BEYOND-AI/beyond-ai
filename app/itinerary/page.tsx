@@ -54,6 +54,7 @@ export default function ItineraryPage() {
     budgetTo: "",
   });
   const [additionalOptions, setAdditionalOptions] = useState<Option[]>([]);
+  const [numberOfOptions, setNumberOfOptions] = useState(3); // Default to 3 options
   
   // Process state management
   const [currentStep, setCurrentStep] = useState<'research' | 'populate' | 'ready' | 'idle'>('idle');
@@ -98,6 +99,7 @@ export default function ItineraryPage() {
       budgetFrom: formData.budgetFrom,
       budgetTo: formData.budgetTo,
       additionalOptions: additionalOptions.map(opt => opt.label),
+      numberOfOptions: numberOfOptions,
     };
 
     // Start streaming
@@ -281,6 +283,7 @@ export default function ItineraryPage() {
                           budgetFrom: formData.budgetFrom,
                           budgetTo: formData.budgetTo,
                           additionalOptions: additionalOptions.map(opt => opt.label),
+                          numberOfOptions: numberOfOptions,
                         })}
                       >
                         Retry
@@ -562,8 +565,28 @@ export default function ItineraryPage() {
                     />
                   </div>
 
-                  {/* Submit Button */}
-                  <div className="pt-1 flex justify-end">
+                  {/* Submit Button Row */}
+                  <div className="pt-1 flex items-center justify-between">
+                    {/* Number of Options Slider */}
+                    <div className="flex items-center space-x-3">
+                      <Label className="text-sm font-semibold text-white/90 uppercase tracking-wide whitespace-nowrap">
+                        No. of Options
+                      </Label>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xs text-white/70 w-3">{numberOfOptions}</span>
+                        <input
+                          type="range"
+                          min="1"
+                          max="5"
+                          value={numberOfOptions}
+                          onChange={(e) => setNumberOfOptions(parseInt(e.target.value))}
+                          className="slider w-16 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer"
+                        />
+                        <span className="text-xs text-white/50">5</span>
+                      </div>
+                    </div>
+
+                    {/* Submit Button */}
                     <div className="relative">
                       {/* Glassmorphism background pill */}
                       <div className="absolute inset-0 bg-white/10 dark:bg-white/5 backdrop-blur-xl rounded-full transform scale-110 -z-10"></div>

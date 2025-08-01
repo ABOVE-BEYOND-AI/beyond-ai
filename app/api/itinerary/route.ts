@@ -11,6 +11,7 @@ interface ItineraryRequest {
   budgetFrom: string;
   budgetTo: string;
   additionalOptions: string[];
+  numberOfOptions?: number;
 }
 
 function buildPrompt(data: ItineraryRequest): string {
@@ -22,7 +23,8 @@ function buildPrompt(data: ItineraryRequest): string {
     endDate,
     budgetFrom,
     budgetTo,
-    additionalOptions
+    additionalOptions,
+    numberOfOptions = 3
   } = data;
 
   const dateRange = startDate && endDate 
@@ -33,12 +35,12 @@ function buildPrompt(data: ItineraryRequest): string {
     ? additionalOptions.join(", ") 
     : "None specified";
 
-  return `You are a world-class luxury travel planner. Research and create 3-5 detailed travel options for the specified destination. Follow this EXACT structure:
+  return `You are a world-class luxury travel planner. Research and create ${numberOfOptions} detailed travel ${numberOfOptions === 1 ? 'option' : 'options'} for the specified destination. Follow this EXACT structure:
 
 ## Trip Overview
 - **Title**: [Destination, Dates]
 - **Location**: [Specific location details]
-- **Hotel/Resort Options**: 3-5 luxury family-friendly hotels with overview and amenities
+- **Hotel/Resort Options**: ${numberOfOptions} luxury family-friendly hotels with overview and amenities
 - **Room Types**: Different accommodation options
 - **Travel Dates**: ${dateRange}
 - **Ground Transportation**: Private transfers and local transport options
