@@ -35,7 +35,7 @@ function buildPrompt(data: ItineraryRequest): string {
     ? additionalOptions.join(", ") 
     : "None specified";
 
-  return `You are a world-class luxury travel planner. Research and create ${numberOfOptions} detailed travel ${numberOfOptions === 1 ? 'option' : 'options'} for the specified destination. Follow this EXACT structure:
+  return `Create ${numberOfOptions} detailed, realistic, luxury travel itinerary ${numberOfOptions === 1 ? 'option' : 'options'} for: Destination: ${destination}, From: ${departureCity}, Dates: ${dateRange}, Budget: £${budgetFrom}–£${budgetTo}, ${guests} guests. Format as an expert travel planner with actual hotels, real-world pricing, and detailed summaries. Follow this EXACT structure:
 
 ## Trip Overview
 - **Title**: [Destination, Dates]
@@ -126,6 +126,7 @@ export async function POST(req: NextRequest) {
     }
 
     console.log("Sending request to Perplexity API...");
+    console.log("Model: sonar-deep-research (expecting 30-90 second response time)");
     
     const perplexityRes = await fetch("https://api.perplexity.ai/chat/completions", {
       method: "POST",
@@ -134,13 +135,8 @@ export async function POST(req: NextRequest) {
         "Authorization": `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "sonar-reasoning-pro",
-        stream: true,
+        model: "sonar-deep-research",
         messages: [
-          { 
-            role: "system", 
-            content: "You are a world-class luxury travel planner specializing in family-friendly premium experiences. Provide detailed, accurate, and up-to-date travel recommendations with real pricing and availability information." 
-          },
           { role: "user", content: prompt },
         ],
       }),
@@ -159,12 +155,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Stream the response back to the client
-    return new Response(perplexityRes.body, {
+    // Get the full response from Perplexity
+    const responseData = await perplexityRes.json();
+    const content = responseData.choices[0]?.message?.content || '';
+    
+    // Return the content as a simple JSON response
+    return new Response(JSON.stringify({ content }), {
       headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        "Connection": "keep-alive",
+        "Content-Type": "application/json",
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "POST, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type",

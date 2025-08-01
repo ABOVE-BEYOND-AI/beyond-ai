@@ -360,7 +360,10 @@ export default function ItineraryPage() {
                   {isLoading && !content && (
                     <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
                       <Loader2 className="h-8 w-8 animate-spin mb-4" />
-                      <p>Researching destinations and creating your perfect itinerary...</p>
+                      <p className="text-center">
+                        Deep research in progress...<br/>
+                        <span className="text-sm opacity-75">This may take 30-90 seconds for comprehensive results</span>
+                      </p>
                     </div>
                   )}
                   
