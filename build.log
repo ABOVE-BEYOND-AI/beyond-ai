@@ -1,0 +1,34 @@
+
+> above-beyond-ai@0.1.0 build
+> next build
+
+   ▲ Next.js 15.4.5
+   - Environments: .env.local
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 2000ms
+   Linting and checking validity of types ...
+   Collecting page data ...
+ ⚠ Using edge runtime on a page currently disables static generation for that page
+   Generating static pages (0/6) ...
+   Generating static pages (1/6) 
+   Generating static pages (2/6) 
+   Generating static pages (4/6) 
+ ✓ Generating static pages (6/6)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                 Size  First Load JS
+┌ ○ /                                    3.88 kB         159 kB
+├ ○ /_not-found                            988 B         101 kB
+├ ƒ /api/itinerary                         123 B        99.7 kB
+└ ○ /itinerary                            136 kB         291 kB
++ First Load JS shared by all            99.6 kB
+  ├ chunks/4bd1b696-cf72ae8a39fa05aa.js  54.1 kB
+  ├ chunks/964-02efbd2195ef91bd.js       43.5 kB
+  └ other shared chunks (total)          1.93 kB
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

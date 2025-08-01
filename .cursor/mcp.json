@@ -7,6 +7,17 @@
         "@canva/cli@latest",
         "mcp"
       ]
+    },
+    "supabase": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@supabase/mcp-server-supabase@latest",
+        "--project-ref=lfuttbzajwptaxooklyz"
+      ],
+      "env": {
+        "SUPABASE_ACCESS_TOKEN": "sbp_b88a8877a8f14287c3f3861ad4f29a8f1e6476c2"
+      }
     }
   }
 }

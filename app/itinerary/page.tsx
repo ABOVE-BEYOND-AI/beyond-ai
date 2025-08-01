@@ -58,6 +58,11 @@ export default function ItineraryPage() {
   // Process state management
   const [currentStep, setCurrentStep] = useState<'research' | 'populate' | 'ready' | 'idle'>('idle');
   const [isPopulatingCanva, setIsPopulatingCanva] = useState(false);
+  
+  // User and Canva state
+  const [userId, setUserId] = useState<string | null>(null);
+  const [canvaConnected, setCanvaConnected] = useState(false);
+  const [canvaDesignUrl, setCanvaDesignUrl] = useState<string | null>(null);
 
   // Streaming hook
   const { 
@@ -99,6 +104,26 @@ export default function ItineraryPage() {
     streamItinerary(apiData);
   };
 
+  // Initialize user on component mount
+  React.useEffect(() => {
+    // Generate a simple user ID for this session (in production, use proper auth)
+    const sessionUserId = sessionStorage.getItem('userId') || crypto.randomUUID();
+    sessionStorage.setItem('userId', sessionUserId);
+    setUserId(sessionUserId);
+
+    // Check URL parameters for OAuth success/error
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('canva_connected') === 'true') {
+      setCanvaConnected(true);
+      // Clear the URL parameter
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+    if (urlParams.get('error')) {
+      console.error('OAuth error:', urlParams.get('error'));
+      // Handle error states here
+    }
+  }, []);
+
   // Update step when research is complete
   React.useEffect(() => {
     if (isComplete && currentStep === 'research') {
@@ -106,15 +131,60 @@ export default function ItineraryPage() {
     }
   }, [isComplete, currentStep]);
 
-  const handleCreateCanvaTemplate = () => {
+  const handleCreateCanvaTemplate = async () => {
+    if (!userId) {
+      console.error('User ID not available');
+      return;
+    }
+
+    if (!canvaConnected) {
+      // Redirect to OAuth flow
+      window.location.href = `/api/auth/canva?user_id=${userId}`;
+      return;
+    }
+
     setCurrentStep('populate');
     setIsPopulatingCanva(true);
-    
-    // Simulate Canva template creation (placeholder)
-    setTimeout(() => {
+
+    try {
+      // Call our API to create the Canva design
+      const response = await fetch('/api/canva/create-design', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId,
+          itineraryData: {
+            destination: formData.destination,
+            departureCity: formData.departureCity,
+            guests: formData.guests,
+            dateRange: dateRange ? `${dateRange.start.toString()} - ${dateRange.end.toString()}` : '',
+            budget: `£${formData.budgetFrom} - £${formData.budgetTo}`,
+            additionalOptions: additionalOptions.map(opt => opt.label),
+            content: content,
+          },
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setCanvaDesignUrl(result.editUrl);
+        setCurrentStep('ready');
+      } else if (result.needsAuth) {
+        // Token expired or not found, redirect to OAuth
+        setCanvaConnected(false);
+        window.location.href = `/api/auth/canva?user_id=${userId}`;
+      } else {
+        console.error('Failed to create Canva design:', result.error);
+        // Handle error
+      }
+    } catch (error) {
+      console.error('Error creating Canva template:', error);
+    } finally {
       setIsPopulatingCanva(false);
-      setCurrentStep('ready');
-    }, 3000);
+    }
   };
 
   if (showResults) {
@@ -271,7 +341,7 @@ export default function ItineraryPage() {
                         variant="outline"
                         className="bg-white text-gray-900 hover:bg-gray-100"
                       >
-                        Create Canva Template
+                        {canvaConnected ? 'Create Canva Template' : 'Connect to Canva'}
                       </Button>
                     )}
                     {currentStep === 'populate' && isPopulatingCanva && (
@@ -321,7 +391,16 @@ export default function ItineraryPage() {
                   )}
                   
                   {currentStep === 'ready' && content && (
-                    <div className="mt-6 pt-6 border-t border-border/30">
+                    <div className="mt-6 pt-6 border-t border-border/30 space-y-3">
+                      {canvaDesignUrl && (
+                        <Button 
+                          className="w-full" 
+                          variant="outline"
+                          onClick={() => window.open(canvaDesignUrl, '_blank')}
+                        >
+                          Open in Canva Editor
+                        </Button>
+                      )}
                       <Button className="w-full" variant="premium">
                         <Download className="h-4 w-4 mr-2" />
                         Download PDF
