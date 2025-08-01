@@ -28,18 +28,43 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL('/itinerary?error=invalid_state', request.url))
     }
 
-    // Exchange authorization code for access token
+    // Retrieve the stored PKCE data
+    const { data: storedData, error: retrieveError } = await supabase
+      .from('canva_tokens')
+      .select('access_token, refresh_token')
+      .eq('user_id', userId)
+      .eq('scope', 'pending')
+      .single()
+
+    if (retrieveError || !storedData) {
+      console.error('Failed to retrieve PKCE data:', retrieveError)
+      return NextResponse.redirect(new URL('/itinerary?error=session_expired', request.url))
+    }
+
+    // Extract code_verifier and state from temporary storage
+    const codeVerifier = storedData.access_token.replace('temp_verifier:', '')
+    const storedState = storedData.refresh_token.replace('temp_state:', '')
+
+    // Verify state parameter
+    if (stateToken !== storedState) {
+      console.error('State mismatch - possible CSRF attack')
+      return NextResponse.redirect(new URL('/itinerary?error=invalid_state', request.url))
+    }
+
+    // Exchange authorization code for access token using PKCE
+    const credentials = Buffer.from(`${process.env.CANVA_CLIENT_ID}:${process.env.CANVA_CLIENT_SECRET}`).toString('base64')
+    
     const tokenResponse = await fetch('https://api.canva.com/rest/v1/oauth/token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Basic ${credentials}`,
       },
       body: new URLSearchParams({
         grant_type: 'authorization_code',
-        client_id: process.env.CANVA_CLIENT_ID!,
-        client_secret: process.env.CANVA_CLIENT_SECRET!,
-        redirect_uri: process.env.CANVA_REDIRECT_URI!,
         code,
+        redirect_uri: process.env.CANVA_REDIRECT_URI!,
+        code_verifier: codeVerifier,
       }),
     })
 
@@ -55,7 +80,7 @@ export async function GET(request: NextRequest) {
     // Calculate expiration time
     const expiresAt = new Date(Date.now() + expires_in * 1000)
 
-    // Store tokens in database
+    // Store real tokens in database (replacing temporary PKCE data)
     const { error: dbError } = await supabase
       .from('canva_tokens')
       .upsert({
