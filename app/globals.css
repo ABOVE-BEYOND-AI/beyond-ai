@@ -285,38 +285,29 @@
 
   .slider::-webkit-slider-thumb {
     appearance: none;
-    height: 28px;
-    width: 28px;
+    height: 14px;
+    width: 14px;
     border-radius: 50%;
     background: linear-gradient(145deg, #ffffff, #f1f3f4);
     cursor: pointer;
-    box-shadow: 
-      0 8px 16px rgba(0, 0, 0, 0.1),
-      inset 0 1px 0 rgba(255, 255, 255, 1),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.08);
-    border: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: none;
+    border: 1px solid rgba(0, 0, 0, 0.15);
     transition: all 0.2s ease;
   }
 
   .slider::-webkit-slider-thumb:hover {
-    transform: scale(1.1);
-    box-shadow: 
-      0 12px 24px rgba(0, 0, 0, 0.15),
-      inset 0 1px 0 rgba(255, 255, 255, 1),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.05);
+    transform: none;
+    box-shadow: none;
   }
 
   .slider::-moz-range-thumb {
-    height: 28px;
-    width: 28px;
+    height: 14px;
+    width: 14px;
     border-radius: 50%;
     background: linear-gradient(145deg, #ffffff, #f1f3f4);
     cursor: pointer;
-    box-shadow: 
-      0 8px 16px rgba(0, 0, 0, 0.1),
-      inset 0 1px 0 rgba(255, 255, 255, 1),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.08);
-    border: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: none;
+    border: 1px solid rgba(0, 0, 0, 0.15);
     transition: all 0.2s ease;
   }
 
@@ -329,18 +320,12 @@
 
   .dark .slider::-webkit-slider-thumb {
     background: linear-gradient(145deg, #ffffff, #e5e7eb);
-    box-shadow: 
-      0 8px 16px rgba(255, 255, 255, 0.2),
-      inset 0 1px 0 rgba(255, 255, 255, 0.8),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: none;
+    border: 1px solid rgba(255, 255, 255, 0.4);
   }
 
   .dark .slider::-webkit-slider-thumb:hover {
-    box-shadow: 
-      0 12px 24px rgba(255, 255, 255, 0.3),
-      inset 0 1px 0 rgba(255, 255, 255, 0.9),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.05);
+    box-shadow: none;
   }
 
   /* Logo theme adaptation */
