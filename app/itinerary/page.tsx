@@ -196,15 +196,15 @@ export default function ItineraryPage() {
         <div className="w-full max-w-7xl mx-auto space-y-8">
           
           {/* Header with back button */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
             className="flex items-center justify-between"
-          >
+        >
             <div>
               <h1 className="text-4xl font-black tracking-tighter text-foreground">
                 Your Itinerary Options
-              </h1>
+          </h1>
               <p className="text-muted-foreground mt-2">
                 {formData.guests} {parseInt(formData.guests) === 1 ? 'guest' : 'guests'} • {formData.destination} 
                 {dateRange && ` • ${dateRange.start.toString()} - ${dateRange.end.toString()}`}
@@ -224,22 +224,22 @@ export default function ItineraryPage() {
                 </Button>
               )}
             </div>
-          </motion.div>
+        </motion.div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             
             {/* Left Column - Status & Info */}
-            <motion.div
+        <motion.div
               initial={{ opacity: 0, x: -30 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2 }}
               className="space-y-6"
             >
               <Card className="border-border/30 bg-card/30 backdrop-blur-2xl">
-                <CardHeader>
+            <CardHeader>
                   <CardTitle className="text-xl">Generation Status</CardTitle>
-                </CardHeader>
-                <CardContent>
+            </CardHeader>
+            <CardContent>
                   <StatusStepper 
                     steps={processSteps.map((step) => {
                       if (step.id === 'research') {
@@ -311,6 +311,7 @@ export default function ItineraryPage() {
                   {additionalOptions.length > 0 && (
                     <div><strong>Options:</strong> {additionalOptions.map(opt => opt.label).join(", ")}</div>
                   )}
+                  <div><strong>Number of Options:</strong> {numberOfOptions}</div>
                 </CardContent>
               </Card>
             </motion.div>
@@ -477,7 +478,7 @@ export default function ItineraryPage() {
                   
                   {/* Top Row - Destination & Departure */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
+                  <div className="space-y-2">
                       <Label className="text-sm font-semibold text-white/90 uppercase tracking-wide">Where to?</Label>
                       <Input
                         placeholder="Tokyo, Maldives, Swiss Alps..."
@@ -485,9 +486,9 @@ export default function ItineraryPage() {
                         onChange={(e) => setFormData({ ...formData, destination: e.target.value })}
                         className=""
                       />
-                    </div>
+                </div>
 
-                    <div className="space-y-2">
+                  <div className="space-y-2">
                       <Label className="text-sm font-semibold text-white/90 uppercase tracking-wide">From</Label>
                       <Input
                         placeholder="London, New York, Dubai..."
@@ -495,8 +496,8 @@ export default function ItineraryPage() {
                         onChange={(e) => setFormData({ ...formData, departureCity: e.target.value })}
                         className=""
                       />
-                    </div>
                   </div>
+                </div>
 
                   {/* Middle Row - Guests & Dates */}
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
@@ -541,15 +542,15 @@ export default function ItineraryPage() {
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs text-white/70">To</Label>
-                        <Input
+                      <Input
                           placeholder="£15,000"
                           value={formData.budgetTo}
                           onChange={(e) => setFormData({ ...formData, budgetTo: e.target.value })}
                           className=""
                         />
                       </div>
-                    </div>
                   </div>
+                </div>
 
                   {/* Additional Options */}
                   <div className="space-y-2">
@@ -631,14 +632,14 @@ export default function ItineraryPage() {
                           )}
                         </motion.div>
                       </motion.button>
-                    </div>
-                  </div>
+                        </div>
+                      </div>
                 </form>
-              </CardContent>
-            </Card>
-            </motion.div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
           </div>
-        </div>
+            </div>
       </div>
     </DashboardLayout>
   );
