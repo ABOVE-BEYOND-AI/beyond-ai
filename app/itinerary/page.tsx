@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,25 +21,102 @@ const processSteps: Step[] = [
   { id: "ready", label: "Ready", description: "Download available", status: "pending" },
 ];
 
-
-
 const additionalOptionsData: Option[] = [
-  { value: "kids-club", label: "Kids Club" },
-  { value: "business-class", label: "Business Class" },
-  { value: "transfers-included", label: "Transfers Included" },
-  { value: "private-chef", label: "Private Chef" },
-  { value: "spa-treatments", label: "Spa Treatments" },
-  { value: "private-yacht", label: "Private Yacht" },
-  { value: "helicopter-tours", label: "Helicopter Tours" },
-  { value: "wine-tasting", label: "Wine Tasting" },
-  { value: "golf-access", label: "Golf Access" },
-  { value: "ski-equipment", label: "Ski Equipment" },
-  { value: "butler-service", label: "Butler Service" },
-  { value: "airport-lounge", label: "Airport Lounge" },
-  { value: "cultural-guide", label: "Cultural Guide" },
-  { value: "photography", label: "Photography Service" },
-  { value: "fitness-trainer", label: "Personal Fitness Trainer" },
+    { value: "kids-club", label: "Kids Club" },
+    { value: "business-class", label: "Business Class" },
+    { value: "transfers-included", label: "Transfers Included" },
+    { value: "private-chef", label: "Private Chef" },
+    { value: "spa-treatments", label: "Spa Treatments" },
+    { value: "private-yacht", label: "Private Yacht" },
+    { value: "helicopter-tours", label: "Helicopter Tours" },
+    { value: "wine-tasting", label: "Wine Tasting" },
+    { value: "golf-access", label: "Golf Access" },
+    { value: "ski-equipment", label: "Ski Equipment" },
+    { value: "butler-service", label: "Butler Service" },
+    { value: "airport-lounge", label: "Airport Lounge" },
+    { value: "cultural-guide", label: "Cultural Guide" },
+    { value: "photography", label: "Photography Service" },
+    { value: "fitness-trainer", label: "Personal Fitness Trainer" },
 ];
+
+// New component to render each itinerary option with its image
+interface ItineraryOptionProps {
+  optionContent: string;
+  image: {
+    hotelName: string;
+    imageUrl: string | null;
+    contextLink?: string | null;
+  } | null;
+}
+
+const ItineraryOption: React.FC<ItineraryOptionProps> = ({ optionContent, image }) => {
+  if (!optionContent) return null;
+
+  // Preprocess content to remove unwanted sections but preserve hotel names for image matching
+  const processedContent = optionContent
+    // Remove standalone "Images" section headers but keep "Featured Hotel:" lines for image matching
+    .replace(/\n\s*Images\s*\n/g, '\n')
+    .replace(/\n\s*##?\s*Images\s*\n/g, '\n')
+    // Remove "Featured Hotel:" lines from display (but extract them first for images)
+    .replace(/\n\s*\*\*Featured Hotel\*\*:.*?\n/g, '\n');
+
+  // Debug table content
+  if (optionContent.includes('|') && optionContent.includes('Hotel')) {
+    console.log('=== TABLE DEBUG ===');
+    console.log('Original content with table:');
+    const tableSection = optionContent.match(/### Accommodation Details[\s\S]*?(?=###|$)/)?.[0] || optionContent.substring(optionContent.indexOf('|'), optionContent.indexOf('|') + 500);
+    console.log(tableSection);
+    console.log('---');
+    console.log('Processed content:');
+    const processedTableSection = processedContent.match(/### Accommodation Details[\s\S]*?(?=###|$)/)?.[0] || processedContent.substring(processedContent.indexOf('|'), processedContent.indexOf('|') + 500);
+    console.log(processedTableSection);
+    console.log('===================');
+  }
+
+  return (
+    <div className="prose prose-sm max-w-none text-foreground">
+      <ReactMarkdown
+        components={{
+          h1: (props) => <h1 className="text-2xl font-bold mb-6 text-white" {...props} />,
+          h2: (props) => <h2 className="text-xl font-semibold mb-4 text-white" {...props} />,
+          h3: (props) => <h3 className="text-lg font-medium mb-3 text-white" {...props} />,
+          p: (props) => <p className="mb-4 text-gray-300 leading-relaxed" {...props} />,
+          ul: (props) => <ul className="list-disc list-inside mb-4 text-gray-300 space-y-2" {...props} />,
+          li: (props) => <li className="text-gray-300" {...props} />,
+          strong: (props) => <strong className="font-semibold text-white" {...props} />,
+          hr: (props) => <hr className="my-8 border-gray-600" {...props} />,
+          table: (props) => (
+            <div className="overflow-x-auto mb-6 rounded-lg border border-gray-700/30">
+              <table className="w-full border-collapse bg-gray-900/50 backdrop-blur-sm shadow-lg" {...props}>{props.children}</table>
+            </div>
+          ),
+          thead: (props) => <thead className="bg-gray-800" {...props} />,
+          th: (props) => <th className="px-6 py-4 text-white font-semibold text-left border-b border-gray-700 text-sm" {...props} />,
+          td: (props) => <td className="px-6 py-4 text-gray-300 border-b border-gray-700/50 text-sm leading-relaxed" {...props} />,
+          tbody: (props) => <tbody {...props} />,
+          tr: (props) => <tr className="hover:bg-gray-800/30 transition-colors" {...props} />,
+        }}
+      >
+        {processedContent}
+      </ReactMarkdown>
+
+      {image && image.imageUrl && (
+        <div className="mt-6 mb-8">
+          <img
+            src={image.imageUrl}
+            alt={`Featured Hotel: ${image.hotelName}`}
+            className="w-full h-96 object-cover rounded-lg shadow-lg border border-gray-700/30"
+            onError={(e) => {
+              console.error(`Failed to load image for ${image.hotelName}:`, image.imageUrl);
+              e.currentTarget.style.display = 'none';
+            }}
+          />
+          <hr className="mt-8 border-gray-600" />
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default function ItineraryPage() {
 
@@ -68,6 +145,7 @@ export default function ItineraryPage() {
   // Streaming hook
   const { 
     content, 
+    images,
     isLoading, 
     isComplete, 
     error, 
@@ -188,6 +266,65 @@ export default function ItineraryPage() {
       setIsPopulatingCanva(false);
     }
   };
+
+  // Memoize the split content to avoid re-calculating on every render
+  const itineraryOptions = useMemo(() => {
+    if (!content) return [];
+    
+    console.log("Content length:", content.length);
+    console.log("Content preview:", content.substring(0, 200));
+    
+    // Clean content before splitting - remove any standalone "Featured Hotel:" lines
+    // that appear before the actual options
+    let cleanedContent = content
+      .replace(/^[\s\S]*?(?=Option 1:)/, '') // Remove everything before "Option 1:"
+      .trim();
+    
+    // Ensure Option 1 has consistent markdown formatting with other options
+    // Check if other options have ## formatting and apply it to Option 1 if missing
+    if (cleanedContent.includes('## Option 2:') && !cleanedContent.startsWith('## Option 1:')) {
+      console.log("🔧 Fixing Option 1 formatting: adding ## header");
+      cleanedContent = cleanedContent.replace(/^Option 1:/, '## Option 1:');
+    }
+    // Or if other options have bold formatting, apply it to Option 1
+    else if (cleanedContent.includes('**Option 2:**') && !cleanedContent.startsWith('**Option 1:**')) {
+      console.log("🔧 Fixing Option 1 formatting: adding bold formatting");
+      cleanedContent = cleanedContent.replace(/^Option 1:/, '**Option 1:**');
+    }
+    
+    console.log("Option 1 starts with:", cleanedContent.substring(0, 50));
+    
+    // Try different splitting patterns based on common AI output formats
+    let options = [];
+    
+    // Pattern 1: "# Option X:" (single #)
+    if (cleanedContent.includes('# Option')) {
+      console.log("Found # Option pattern");
+      options = cleanedContent.split(/(?=# Option \d+:)/g).filter(part => part.trim().length > 0);
+    }
+    // Pattern 2: "## Option X:" (with ##)
+    else if (cleanedContent.includes('## Option')) {
+      console.log("Found ## Option pattern");
+      options = cleanedContent.split(/(?=## Option \d+:)/g).filter(part => part.trim().length > 0);
+    }
+    // Pattern 3: "Option X:" (without #)
+    else if (cleanedContent.includes('Option 2:')) {
+      console.log("Found Option X: pattern");
+      options = cleanedContent.split(/(?=Option \d+:)/g).filter(part => part.trim().startsWith('Option'));
+    }
+    // Pattern 4: Fallback - if no clear options, return the whole content as one option
+    else {
+      console.log("Using fallback - whole content");
+      options = [cleanedContent];
+    }
+    
+    console.log("Split into", options.length, "options");
+    options.forEach((option, index) => {
+      console.log(`Option ${index + 1} preview:`, option.substring(0, 100));
+    });
+    
+    return options;
+  }, [content]);
 
   if (showResults) {
   return (
@@ -361,41 +498,88 @@ export default function ItineraryPage() {
                     <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
                       <Loader2 className="h-8 w-8 animate-spin mb-4" />
                       <p className="text-center">
-                        Deep research in progress...<br/>
-                        <span className="text-sm opacity-75">This may take 30-90 seconds for comprehensive results</span>
+                        Advanced AI search in progress...<br/>
+                        <span className="text-sm opacity-75">Generating comprehensive itinerary with enhanced search results</span>
                       </p>
                     </div>
                   )}
                   
-                  {content && (
-                    <div className="prose prose-sm max-w-none text-foreground">
-                      {/* Debug: Show raw content structure */}
-                      <ReactMarkdown 
-                        components={{
-                          h1: (props) => <h1 className="text-2xl font-bold mb-6 text-white" {...props} />,
-                          h2: (props) => <h2 className="text-xl font-semibold mb-4 text-white" {...props} />,
-                          h3: (props) => <h3 className="text-lg font-medium mb-3 text-white" {...props} />,
-                          p: (props) => <p className="mb-4 text-gray-300 leading-relaxed" {...props} />,
-                          ul: (props) => <ul className="list-disc list-inside mb-4 text-gray-300 space-y-2" {...props} />,
-                          li: (props) => <li className="text-gray-300" {...props} />,
-                          strong: (props) => <strong className="font-semibold text-white" {...props} />,
-                          hr: (props) => <hr className="my-8 border-gray-600" {...props} />,
-                          table: (props) => (
-                            <div className="overflow-x-auto mb-6">
-                              <table className="w-full border-collapse bg-gray-900/50 backdrop-blur-sm rounded-lg overflow-hidden shadow-lg" {...props}>{props.children}</table>
-                            </div>
-                          ),
-                          thead: (props) => <thead className="bg-gray-800" {...props} />,
-                          th: (props) => <th className="px-4 py-3 text-white font-semibold text-left border-b border-gray-700" {...props} />,
-                          td: (props) => <td className="px-4 py-3 text-gray-300 border-b border-gray-700/50" {...props} />,
-                          tbody: (props) => <tbody {...props} />,
-                          tr: (props) => <tr className="hover:bg-gray-800/30 transition-colors" {...props} />,
-                        }}
-                      >
-                        {content}
-                      </ReactMarkdown>
-                    </div>
-                  )}
+                  {itineraryOptions.map((option, index) => {
+                    console.log(`Processing option ${index + 1}:`, option.substring(0, 200));
+                    
+                    // FIRST: Extract hotel names from ORIGINAL content before any preprocessing
+                    let hotelName = null;
+                    
+                    // Pattern 1: **Featured Hotel**: [Name]
+                    let hotelNameMatch = option.match(/\*\*Featured Hotel\*\*:\s*([^\n]+)/);
+                    if (hotelNameMatch) {
+                      hotelName = hotelNameMatch[1].trim();
+                      console.log(`Found hotel via Featured Hotel pattern: ${hotelName}`);
+                    }
+                    
+                    // Pattern 2: **Hotel/Resort**: [Name] – [description]
+                    if (!hotelName) {
+                      hotelNameMatch = option.match(/\*\*Hotel\/Resort\*\*:\s*([^–\n]+)/);
+                      if (hotelNameMatch) {
+                        hotelName = hotelNameMatch[1].trim();
+                        console.log(`Found hotel via Hotel/Resort pattern: ${hotelName}`);
+                      }
+                    }
+                    
+                    // Pattern 3: Extract from "Hotel:" line in accommodation details
+                    if (!hotelName) {
+                      hotelNameMatch = option.match(/\*\*Hotel\*\*:\s*([^\n]+)/);
+                      if (hotelNameMatch) {
+                        hotelName = hotelNameMatch[1].trim();
+                        console.log(`Found hotel via Hotel pattern: ${hotelName}`);
+                      }
+                    }
+                    
+                    // Pattern 4: Look for hotel names from backend images
+                    if (!hotelName && images && images[index]) {
+                      hotelName = images[index].hotelName;
+                      console.log(`Using hotel name from backend: ${hotelName}`);
+                    }
+                    
+                    // Clean up the hotel name for better matching
+                    if (hotelName) {
+                      hotelName = hotelName.replace(/^["']|["']$/g, ''); // Remove quotes
+                      hotelName = hotelName.replace(/\s*—.*$/, ''); // Remove everything after em dash
+                      hotelName = hotelName.trim();
+                      console.log(`Cleaned hotel name: ${hotelName}`);
+                    }
+                    
+                    // Find the corresponding image with fuzzy matching
+                    let image = null;
+                    if (images && images.length > 0) {
+                      console.log(`Available images:`, images.map(img => img.hotelName));
+                      
+                      if (hotelName) {
+                        // Try exact match first
+                        image = images.find(img => img.hotelName === hotelName);
+                        console.log(`Exact match result:`, image ? 'found' : 'not found');
+                        
+                        // If no exact match, try partial matching
+                        if (!image) {
+                          image = images.find(img => 
+                            img.hotelName.toLowerCase().includes(hotelName.toLowerCase()) || 
+                            hotelName.toLowerCase().includes(img.hotelName.toLowerCase())
+                          );
+                          console.log(`Partial match result:`, image ? 'found' : 'not found');
+                        }
+                      }
+                      
+                      // If still no match, use the image at the same index
+                      if (!image && images[index]) {
+                        image = images[index];
+                        console.log(`Using image at index ${index}:`, image.hotelName);
+                      }
+                    }
+                    
+                    console.log(`Final image for option ${index + 1}:`, image ? image.hotelName : 'none');
+                    
+                    return <ItineraryOption key={index} optionContent={option} image={image || null} />;
+                  })}
                   
                   {currentStep === 'ready' && content && (
                     <div className="mt-6 pt-6 border-t border-border/30 space-y-3">

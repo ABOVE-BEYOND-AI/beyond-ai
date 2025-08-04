@@ -18,6 +18,11 @@ interface StreamState {
   isComplete: boolean;
   error: string | null;
   thinkingContent: string; // For debugging the <think> section
+  images: Array<{
+    hotelName: string;
+    imageUrl: string | null;
+    contextLink?: string | null;
+  }>;
 }
 
 export function useItineraryStream() {
@@ -27,6 +32,7 @@ export function useItineraryStream() {
     isComplete: false,
     error: null,
     thinkingContent: "",
+    images: [],
   });
 
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -38,6 +44,7 @@ export function useItineraryStream() {
       isComplete: false,
       error: null,
       thinkingContent: "",
+      images: [],
     });
 
     if (abortControllerRef.current) {
@@ -46,7 +53,7 @@ export function useItineraryStream() {
     abortControllerRef.current = new AbortController();
 
     try {
-      // Set a 2-minute timeout for sonar-deep-research
+      // Set a 2-minute timeout for sonar-pro to ensure quality output
       const timeoutId = setTimeout(() => {
         abortControllerRef.current?.abort();
       }, 120000); // 2 minutes
@@ -62,33 +69,47 @@ export function useItineraryStream() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+        throw new Error(
+          errorData.error || `HTTP ${response.status}: ${response.statusText}`,
+        );
       }
 
+      // Handle standard JSON response from Perplexity Sonar Pro
       const responseData = await response.json();
       const content = responseData.content || '';
       
-      // For sonar-deep-research, content comes complete - no streaming needed
+      if (!content) {
+        throw new Error("No content received from API");
+      }
+      
+      console.log("Received content length:", content.length);
+      console.log("Search results:", responseData.searchResults?.length || 0);
+      console.log("Images found:", responseData.images?.length || 0);
+      console.log("Usage:", responseData.usage);
+      
+      // Set the complete content and images immediately
       setState(prev => ({ 
         ...prev, 
         content: content,
+        images: responseData.images || [],
         isLoading: false, 
         isComplete: true 
       }));
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
-        setState(prev => ({ 
-          ...prev, 
-          isLoading: false, 
-          error: "Request timed out after 2 minutes. Please try again with a simpler request or check your connection."
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          error:
+            "Request timed out after 2 minutes. Please try again with a simpler request or check your connection.",
         }));
         return;
       }
       console.error("Request error:", error);
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
         isLoading: false,
-        error: error instanceof Error ? error.message : "An unknown error occurred",
+        error: "An unexpected error occurred. Please try again.",
       }));
     }
   }, []);
@@ -96,7 +117,7 @@ export function useItineraryStream() {
   const stopStream = useCallback(() => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
-      setState(prev => ({ ...prev, isLoading: false }));
+      abortControllerRef.current = null;
     }
   }, []);
 
@@ -107,8 +128,10 @@ export function useItineraryStream() {
       isComplete: false,
       error: null,
       thinkingContent: "",
+      images: [],
     });
-  }, []);
+    stopStream();
+  }, [stopStream]);
 
   return { ...state, streamItinerary, stopStream, resetStream };
 }

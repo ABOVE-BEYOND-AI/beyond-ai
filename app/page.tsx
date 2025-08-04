@@ -10,7 +10,7 @@ import { motion } from "framer-motion";
 const features = [
   {
     title: "AI-Powered Research",
-    description: "Deep research on destinations, accommodations, and activities",
+            description: "Advanced AI search with enhanced results on destinations, accommodations, and activities",
     icon: Sparkles,
     gradient: "from-yellow-400 to-orange-500",
   },

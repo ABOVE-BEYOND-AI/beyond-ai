@@ -33,7 +33,7 @@ Lead Brief Form:
 Fields: Client name, travel interests, dates (or range), party composition (adults/kids), budget tier, preferred destinations or constraints, special requirements (e.g., ski, family-friendly, luxury), departure location (e.g., UK), number of options (3–5).
 
 Prompt Composition:
-Construct and send to Perplexity Labs Deep Research API using the exact structured prompt template (below). Insert dynamic placeholders from the form.
+Construct and send to Perplexity Sonar Pro API using the exact structured prompt template (below). Insert dynamic placeholders from the form.
 
 4.2. Research Prompt Template (to Perplexity)
 Use this exact structure:
@@ -169,7 +169,7 @@ Hosting: Vercel
 
 APIs:
 
-Perplexity Labs Deep Research API (structured prompt & JSON response)
+Perplexity Sonar Pro API (structured prompt & JSON response)
 
 Canva Connect API (OAuth, Brand Template autofill, export)
 
