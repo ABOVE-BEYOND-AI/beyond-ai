@@ -294,8 +294,9 @@ function ItineraryPageContent() {
         localStorage.setItem('persistedItinerary', JSON.stringify(dataToSave));
         setPersistedItinerary(dataToSave);
         
-        // Save to database (NEW!)
-        console.log('🗄️ Saving itinerary to database...');
+        // Save to database ONLY if not already saved (prevent duplicates!)
+        if (!savedItineraryId) {
+          console.log('🗄️ Saving NEW itinerary to database...');
         const itineraryData = {
           title: `${formData.destination} Trip`, // Generate title from destination
           destination: formData.destination,
@@ -338,6 +339,9 @@ function ItineraryPageContent() {
         .catch((error) => {
           console.error('❌ Error saving itinerary to database:', error);
         });
+        } else {
+          console.log('⚠️ Itinerary already saved, skipping database save (ID:', savedItineraryId, ')');
+        }
           
       } catch (error) {
         console.error('Error saving itinerary:', error);

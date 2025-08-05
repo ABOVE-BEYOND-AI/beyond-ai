@@ -7,7 +7,6 @@ import { useParams, useRouter } from 'next/navigation'
 import { DashboardLayout } from '@/components/dashboard-layout'
 import { ProtectedRoute } from '@/components/protected-route'
 import { useGoogleAuth } from '@/components/google-auth-provider-clean'
-import { getItinerary } from '@/lib/redis-database'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -90,12 +89,20 @@ function ItineraryViewPageContent() {
       if (!user || !itineraryId) return
 
       try {
-        const data = await getItinerary(itineraryId)
-        if (!data) {
-          setError('Itinerary not found')
-          return
+        console.log('🗄️ Client: Fetching itinerary:', itineraryId);
+        
+        const response = await fetch(`/api/itinerary/${encodeURIComponent(itineraryId)}`);
+        const result = await response.json();
+        
+        if (response.ok) {
+          console.log('✅ Client: Found itinerary:', result.itinerary.id);
+          setItinerary(result.itinerary);
+        } else if (response.status === 404) {
+          console.log('❌ Client: Itinerary not found:', itineraryId);
+          setError('Itinerary not found');
+        } else {
+          throw new Error(result.error || 'Failed to fetch itinerary');
         }
-        setItinerary(data)
       } catch (err) {
         console.error('Error fetching itinerary:', err)
         setError('Failed to load itinerary')
