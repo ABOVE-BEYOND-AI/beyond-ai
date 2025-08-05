@@ -468,6 +468,13 @@ function ItineraryPageContent() {
 
     setShowResults(true);
     setCurrentStep('research');
+    
+    // Clear any previous slides state when starting new itinerary generation
+    setSlidesEmbedUrl(null);
+    setSlidesEditUrl(null);
+    setSlidesPresentationId(null);
+    setSlidesReady(false);
+    setPdfReady(false);
 
     // Prepare data for API
     const apiData = {
