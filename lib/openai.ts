@@ -48,6 +48,7 @@ CONTENT REQUIREMENTS:
 - Make the content compelling and sales-focused
 - Use bullet points for room_details and structured formatting
 - Remove "TOTAL:" prefix from total_cost - just show the price range
+- Format dates elegantly: use "7th - 21st November 2025" instead of "2025-11-07 – 2025-11-21"
 
 CHARACTER LIMITS & FORMATTING:
 - title_main: ≤ 60 chars
@@ -61,6 +62,11 @@ CHARACTER LIMITS & FORMATTING:
 - cost_list: ≤ 300 chars (bullet points, each ≤ 60 chars)
 - total_cost: ≤ 30 chars (just the price range, no "TOTAL:" prefix)
 
+DATE FORMATTING:
+- Convert date ranges to elegant format: "7th - 21st November 2025" 
+- Use ordinal numbers (1st, 2nd, 3rd, 4th, etc.) and full month names
+- Apply this format to both trip_dates and facts sections
+
 DESTINATION: ${destination}
 DATES: ${dates}
 
@@ -70,10 +76,10 @@ ${rawItinerary}
 Return JSON in this exact format:
 {
   "trip_destination": "${destination}",
-  "trip_dates": "${dates}",
+  "trip_dates": "7th - 21st November 2025",
   "option1": {
     "title_main": "Hotel/Resort Name (≤60 chars)",
-    "facts": "Location: Place\\nDates: ${dates}\\nHotel: Name\\nRoom: Type\\nFlights: Airline Route\\nGround: Transport type",
+    "facts": "Location: Place\\nDates: 7th - 21st November 2025\\nHotel: Name\\nRoom: Type\\nFlights: Airline Route\\nGround: Transport type",
     "overview": "Compelling first paragraph about the destination and experience.\\n\\nSecond paragraph highlighting luxury amenities and unique features that make this special.",
     "why_trip": "First paragraph explaining the destination's appeal and unique qualities.\\n\\nSecond paragraph detailing the specific luxury experience, service quality, and value proposition.",
     "room_details": "• Private infinity pool and direct beach access\\n• Garden courtyard bathroom with outdoor rain shower\\n• Spacious living area with ocean views\\n• Premium amenities and luxury furnishings\\n• Size: XXX m² with specific room features",
