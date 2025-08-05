@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { Loader2, ExternalLink, AlertCircle, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { useGoogleAuth } from '@/components/google-auth-provider-clean';
 
 interface EmbeddedSlideViewerProps {
   embedUrl: string;
@@ -29,6 +30,9 @@ export function EmbeddedSlideViewer({
   // Phase 6.2: PDF download state
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
+
+  // Get Google access token for OAuth API calls
+  const { accessToken } = useGoogleAuth();
 
   // Google Slides aspect ratio: 960x600 = 16:10 ≈ 0.625
   const EMBED_ASPECT_RATIO = 600 / 960;
@@ -68,6 +72,11 @@ export function EmbeddedSlideViewer({
       return;
     }
 
+    if (!accessToken) {
+      setPdfError('Google access token not available for download');
+      return;
+    }
+
     setIsDownloadingPdf(true);
     setPdfError(null);
 
@@ -78,6 +87,7 @@ export function EmbeddedSlideViewer({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ presentationId }),
       });

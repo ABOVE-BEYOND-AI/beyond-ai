@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDriveClient } from "@/lib/googleSlides";
+import { getDriveClientOAuth } from "@/lib/googleOAuth";
+import { validateAccessToken } from "@/lib/google-auth";
 
 interface PDFRequestBody {
   presentationId: string;
@@ -16,10 +17,32 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       );
     }
 
+    // Get authorization header
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
+      return NextResponse.json(
+        { error: "No authorization header" },
+        { status: 401 }
+      );
+    }
+
+    // Extract Google access token
+    const googleAccessToken = authHeader.replace('Bearer ', '');
+    
+    // Validate the Google access token
+    const isTokenValid = await validateAccessToken(googleAccessToken);
+    if (!isTokenValid) {
+      console.log("❌ Invalid Google access token for PDF export");
+      return NextResponse.json(
+        { error: "Invalid or expired Google access token" },
+        { status: 401 }
+      );
+    }
+
     console.log("📥 Starting PDF export for presentation:", body.presentationId);
 
-    // Initialize Google Drive client
-    const drive = await getDriveClient();
+    // Initialize Google Drive client with OAuth
+    const drive = await getDriveClientOAuth(googleAccessToken);
 
     // Export the presentation as PDF using Google Drive API
     const response = await drive.files.export({
