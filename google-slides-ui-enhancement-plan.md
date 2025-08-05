@@ -32,17 +32,21 @@
   **✅ COMPLETED**: Status stepper now shows "Design → Using template" instead of "Populating → Canva template". Changes deployed successfully. Ready for Phase 2.
 
 ### **Phase 2: Slides API Enhancement**
-- [ ] **2.1** Modify slides API response to include embed URL
-  - [ ] Research Google Slides embed URL format
-  - [ ] Add "publish to web" functionality to slides creation
-  - [ ] Return both edit URL and embed URL from API
-  - [ ] Test embed URL generation
+- [x] **2.1** Modify slides API response to include embed URL ✅
+  - [x] Research Google Slides embed URL format ✅ (Format: `/d/[ID]/embed?start=false&loop=false&delayms=3000`)
+  - [x] Add "publish to web" functionality to slides creation ✅ (Added `publishToWebAndGetEmbedUrl` function)
+  - [x] Return both edit URL and embed URL from API ✅ (API now returns `presentationUrl` and `embedUrl`)
+  - [x] Test embed URL generation ✅ (Function creates public permissions and generates embed URL)
+  
+  **✅ COMPLETED**: Slides API now automatically publishes presentations to web and returns embed URLs ready for iframe integration. Ready for Phase 2.2.
 
-- [ ] **2.2** Add PDF export functionality
-  - [ ] Create `/api/slides/download-pdf` route
-  - [ ] Implement Google Drive API files.export
-  - [ ] Handle PDF streaming to frontend
-  - [ ] Add error handling for PDF generation
+- [x] **2.2** Add PDF export functionality ✅
+  - [x] Create `/api/slides/download-pdf` route ✅ (Created POST endpoint accepting presentationId)
+  - [x] Implement Google Drive API files.export ✅ (Uses Drive API to export presentation as PDF)
+  - [x] Handle PDF streaming to frontend ✅ (Streams PDF buffer directly to response)
+  - [x] Add error handling for PDF generation ✅ (Handles 404, 403, and API errors with proper status codes)
+  
+  **✅ COMPLETED**: PDF export API route ready. Accepts presentationId and returns downloadable PDF file with proper headers and caching. Ready for Phase 3.
 
 ### **Phase 3: Database Persistence (Critical Fix)**
 - [ ] **3.1** Fix itinerary saving to database
