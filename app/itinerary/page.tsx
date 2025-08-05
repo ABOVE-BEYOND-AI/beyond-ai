@@ -252,13 +252,21 @@ function ItineraryPageContent() {
         // Save to database (NEW!)
         console.log('🗄️ Saving itinerary to database...');
         const itineraryData = {
+          title: `${formData.destination} Trip`, // Generate title from destination
           destination: formData.destination,
-          dates: dateRange ? `${dateRange.start} - ${dateRange.end}` : 'Not specified',
-          guests: formData.guests,
-          budget_from: formData.budgetFrom,
-          budget_to: formData.budgetTo,
+          departure_city: formData.departureCity,
+          guests: parseInt(formData.guests) || 2, // Convert to number
+          start_date: dateRange?.start?.toString() || '',
+          end_date: dateRange?.end?.toString() || '',
+          budget_from: parseFloat(formData.budgetFrom) || undefined, // Convert to number
+          budget_to: parseFloat(formData.budgetTo) || undefined, // Convert to number
+          number_of_options: numberOfOptions,
+          additional_options: additionalOptions.map(opt => opt.value),
           raw_content: content,
-          images: images || [],
+          images: images?.map(img => ({
+            imageUrl: img.imageUrl || '',
+            hotelName: img.hotelName
+          })) || [],
           status: 'generated' as const,
         };
         
