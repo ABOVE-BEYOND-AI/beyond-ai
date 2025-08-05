@@ -690,7 +690,7 @@ function ItineraryPageContent() {
                 localStorage.removeItem('persistedItinerary');
                 setPersistedItinerary(null);
               }}>
-                ← Back to Form
+                ← Back
               </Button>
               {isLoading && (
                 <Button variant="outline" onClick={stopStream}>
@@ -834,12 +834,24 @@ function ItineraryPageContent() {
                       <div className="flex items-center gap-3">
                         <Button 
                           onClick={handleCreateSlides}
-                          disabled={isCreatingSlides}
+                          disabled={isCreatingSlides || slidesReady}
                           variant="outline"
-                          className="bg-white text-gray-900 hover:bg-gray-200 hover:text-gray-900 border-gray-300"
+                          className={`border-gray-300 ${
+                            slidesReady 
+                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                              : 'bg-white text-gray-900 hover:bg-gray-200 hover:text-gray-900'
+                          }`}
                         >
                           {isCreatingSlides ? (
                             <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : slidesReady ? (
+                            <Image
+                              src="/Google_Slides_logo_(2014-2020).svg.webp"
+                              alt="Google Slides"
+                              width={18}
+                              height={18}
+                              className="mr-2 opacity-50"
+                            />
                           ) : (
                             <Image
                               src="/Google_Slides_logo_(2014-2020).svg.webp"
@@ -849,7 +861,7 @@ function ItineraryPageContent() {
                               className="mr-2"
                             />
                           )}
-                          {isCreatingSlides ? 'Creating...' : 'Connect to Slides'}
+                          {isCreatingSlides ? 'Creating...' : slidesReady ? 'Slides Created' : 'Connect to Slides'}
                         </Button>
                       <Button 
                         onClick={handleCreateCanvaTemplate}

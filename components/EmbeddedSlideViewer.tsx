@@ -135,11 +135,8 @@ export function EmbeddedSlideViewer({
   return (
     <Card className={`border-border/30 bg-card/30 backdrop-blur-2xl overflow-hidden ${className}`}>
       <CardContent className="p-6">
-        {/* Header with title and action buttons */}
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-foreground">
-            {title}
-          </h3>
+        {/* Centered action buttons */}
+        <div className="flex items-center justify-center mb-4">
           <div className="flex items-center gap-2">
             {/* PDF Download Button */}
             {presentationId && (
