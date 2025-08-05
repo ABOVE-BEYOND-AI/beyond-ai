@@ -159,6 +159,11 @@ function ItineraryPageContent() {
   // Slides state
   const [isCreatingSlides, setIsCreatingSlides] = useState(false);
   
+  // Phase 4.1: Enhanced slides creation state
+  const [slidesEmbedUrl, setSlidesEmbedUrl] = useState<string | null>(null);
+  const [pdfReady, setPdfReady] = useState(false);
+  const [slidesReady, setSlidesReady] = useState(false);
+  
   // Database state - track itinerary ID for slides updates
   const [savedItineraryId, setSavedItineraryId] = useState<string | null>(null);
 
@@ -170,6 +175,11 @@ function ItineraryPageContent() {
     dateRange: Record<string, unknown>;
     numberOfOptions: number;
     additionalOptions: Option[];
+    // Phase 4.2: Slides state for navigation persistence
+    slidesEmbedUrl?: string | null;
+    slidesReady?: boolean;
+    pdfReady?: boolean;
+    savedItineraryId?: string | null;
   } | null>(null);
 
   // Streaming hook - MUST BE BEFORE CONDITIONAL RETURNS
@@ -218,6 +228,20 @@ function ItineraryPageContent() {
         if (parsed.content) {
           setShowResults(true);
         }
+        
+        // Phase 4.2: Restore slides state for navigation persistence
+        if (parsed.slidesEmbedUrl) {
+          setSlidesEmbedUrl(parsed.slidesEmbedUrl);
+        }
+        if (parsed.slidesReady) {
+          setSlidesReady(parsed.slidesReady);
+        }
+        if (parsed.pdfReady) {
+          setPdfReady(parsed.pdfReady);
+        }
+        if (parsed.savedItineraryId) {
+          setSavedItineraryId(parsed.savedItineraryId);
+        }
       }
     } catch (error) {
       console.error('Error loading persisted itinerary:', error);
@@ -244,6 +268,11 @@ function ItineraryPageContent() {
         dateRange: dateRange || {},
         numberOfOptions,
         additionalOptions,
+        // Phase 4.2: Include slides state for navigation persistence
+        slidesEmbedUrl,
+        slidesReady,
+        pdfReady,
+        savedItineraryId,
         timestamp: Date.now()
       };
       
@@ -302,6 +331,30 @@ function ItineraryPageContent() {
       }
     }
   }, [content, images, isComplete, formData, dateRange, numberOfOptions, additionalOptions, user?.email]);
+
+  // Phase 4.2: Save slides state changes to localStorage for navigation persistence
+  useEffect(() => {
+    if (content && isComplete) {
+      const existingData = localStorage.getItem('persistedItinerary');
+      if (existingData) {
+        try {
+          const parsed = JSON.parse(existingData);
+          const updatedData = {
+            ...parsed,
+            slidesEmbedUrl,
+            slidesReady,
+            pdfReady,
+            savedItineraryId,
+            timestamp: Date.now()
+          };
+          localStorage.setItem('persistedItinerary', JSON.stringify(updatedData));
+          setPersistedItinerary(updatedData);
+        } catch (error) {
+          console.error('Error updating persisted slides state:', error);
+        }
+      }
+    }
+  }, [slidesEmbedUrl, slidesReady, pdfReady, savedItineraryId, content, isComplete]);
 
   // Update step when research is complete
   useEffect(() => {
@@ -516,7 +569,12 @@ function ItineraryPageContent() {
       const result = await response.json();
 
       if (result.success) {
-        // Open the slides in a new tab
+        // Phase 4.1: Update slides state management
+        setSlidesEmbedUrl(result.embedUrl);
+        setSlidesReady(true);
+        setPdfReady(false); // PDF will be ready after download functionality is implemented
+        
+        // Open the slides in a new tab (temporary - will be replaced with embedded viewer)
         window.open(result.presentationUrl, '_blank');
         console.log('✅ Slides created successfully:', result.presentationUrl);
         console.log('🎯 Embed URL:', result.embedUrl);
@@ -549,10 +607,16 @@ function ItineraryPageContent() {
               console.log('✅ Itinerary updated with slides data');
             } else {
               console.error('❌ Failed to update itinerary with slides data:', updateResult.error);
+              // Reset state on database update failure
+              setSlidesReady(false);
+              setSlidesEmbedUrl(null);
             }
           })
           .catch((error) => {
             console.error('❌ Error updating itinerary with slides data:', error);
+            // Reset state on database update failure
+            setSlidesReady(false);
+            setSlidesEmbedUrl(null);
           });
         } else {
           console.warn('⚠️ Cannot update itinerary - missing savedItineraryId or slides data');
@@ -633,13 +697,17 @@ function ItineraryPageContent() {
                       }
                       
                       if (step.id === 'populate') {
-                        if (currentStep === 'populate' && isPopulatingCanva) return { ...step, status: "active" as const };
-                        if (currentStep === 'ready') return { ...step, status: "completed" as const };
+                        // Phase 4.3: Enhanced Design phase logic with slides state
+                        if (isCreatingSlides) return { ...step, status: "active" as const };
+                        if (slidesReady) return { ...step, status: "completed" as const };
+                        if (isComplete) return { ...step, status: "pending" as const }; // Ready for user to click
                         return { ...step, status: "pending" as const };
                       }
                       
                       if (step.id === 'ready') {
-                        if (currentStep === 'ready') return { ...step, status: "completed" as const };
+                        // Phase 4.3: Enhanced Ready phase logic with PDF state
+                        if (pdfReady) return { ...step, status: "completed" as const };
+                        if (slidesReady) return { ...step, status: "active" as const }; // PDF preparation in progress
                         return { ...step, status: "pending" as const };
                       }
                       
