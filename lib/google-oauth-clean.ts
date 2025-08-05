@@ -113,8 +113,10 @@ export function encodeSession(session: UserSession): string {
 // Decode session (browser-safe - uses atob)
 export function decodeSession(sessionToken: string): UserSession | null {
   try {
-    // Use standard web API - works everywhere
-    const sessionData = atob(sessionToken)
+    // First URL-decode the session token (browsers URL-encode cookies automatically)
+    const urlDecodedToken = decodeURIComponent(sessionToken)
+    // Then base64 decode using standard web API - works everywhere
+    const sessionData = atob(urlDecodedToken)
     return JSON.parse(sessionData) as UserSession
   } catch (error) {
     console.error('Failed to decode session:', error)
