@@ -5,7 +5,7 @@ interface PDFRequestBody {
   presentationId: string;
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     const body: PDFRequestBody = await req.json();
     
@@ -38,8 +38,8 @@ export async function POST(req: NextRequest) {
     // Convert the stream to buffer
     const chunks: Uint8Array[] = [];
     
-    // Handle the stream data
-    return new Promise((resolve, reject) => {
+    // Handle the stream data and return Promise<NextResponse>
+    return new Promise<NextResponse>((resolve, reject) => {
       response.data.on('data', (chunk: Uint8Array) => {
         chunks.push(chunk);
       });

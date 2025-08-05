@@ -86,16 +86,8 @@ export async function publishToWebAndGetEmbedUrl(presentationId: string): Promis
     
     console.log("✅ Made presentation publicly viewable");
     
-    // Step 2: Get the file metadata to construct embed URL
-    const fileMetadata = await drive.files.get({
-      fileId: presentationId,
-      fields: 'webViewLink',
-    });
-    
-    // Step 3: Convert the webViewLink to embed URL format
-    // Google Slides webViewLink format: https://docs.google.com/presentation/d/[ID]/edit
-    // Embed URL format: https://docs.google.com/presentation/d/[ID]/embed?start=false&loop=false&delayms=3000
-    
+    // Step 2: Generate embed URL directly using presentation ID
+    // Google Slides embed URL format: https://docs.google.com/presentation/d/[ID]/embed?start=false&loop=false&delayms=3000
     const embedUrl = `https://docs.google.com/presentation/d/${presentationId}/embed?start=false&loop=false&delayms=3000`;
     
     console.log("🎯 Generated embed URL:", embedUrl);
