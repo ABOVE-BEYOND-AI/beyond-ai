@@ -65,3 +65,45 @@ export interface ItineraryData {
   };
   // TODO: Add option2, option3, etc. when we scale
 }
+
+/**
+ * Publishes a Google Slides presentation to the web and returns the embed URL
+ */
+export async function publishToWebAndGetEmbedUrl(presentationId: string): Promise<string> {
+  try {
+    console.log("🌐 Publishing presentation to web:", presentationId);
+    
+    const drive = await getDriveClient();
+    
+    // Step 1: Make the file publicly viewable
+    await drive.permissions.create({
+      fileId: presentationId,
+      requestBody: {
+        role: 'reader',
+        type: 'anyone',
+      },
+    });
+    
+    console.log("✅ Made presentation publicly viewable");
+    
+    // Step 2: Get the file metadata to construct embed URL
+    const fileMetadata = await drive.files.get({
+      fileId: presentationId,
+      fields: 'webViewLink',
+    });
+    
+    // Step 3: Convert the webViewLink to embed URL format
+    // Google Slides webViewLink format: https://docs.google.com/presentation/d/[ID]/edit
+    // Embed URL format: https://docs.google.com/presentation/d/[ID]/embed?start=false&loop=false&delayms=3000
+    
+    const embedUrl = `https://docs.google.com/presentation/d/${presentationId}/embed?start=false&loop=false&delayms=3000`;
+    
+    console.log("🎯 Generated embed URL:", embedUrl);
+    
+    return embedUrl;
+    
+  } catch (error) {
+    console.error("❌ Error publishing presentation to web:", error);
+    throw new Error(`Failed to publish presentation: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
