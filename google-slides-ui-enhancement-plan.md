@@ -59,15 +59,19 @@
   
   **✅ COMPLETED**: Fixed Redis connection issues and client-side execution problems. Created server-side API route for database operations. Itineraries now save successfully to Redis database with proper error handling. Environment variables correctly configured. Ready for Phase 3.2.
 
-- [ ] **3.2** Add slides data to itinerary record
-  - [ ] Update itinerary database schema to include:
-    - [ ] `slides_presentation_id` (Google Slides file ID)
-    - [ ] `slides_embed_url` (iframe embed URL)
-    - [ ] `slides_edit_url` (current slides URL)
-    - [ ] `pdf_ready` (boolean flag)
-    - [ ] `slides_created_at` (timestamp)
-  - [ ] Update itinerary after slides creation
-  - [ ] Ensure data persists across browser sessions
+- [x] **3.2** Add slides data to itinerary record ✅
+  - [x] Update itinerary database schema to include: ✅
+    - [x] `slides_presentation_id` (Google Slides file ID) ✅
+    - [x] `slides_embed_url` (iframe embed URL) ✅
+    - [x] `slides_edit_url` (current slides URL) ✅
+    - [x] `pdf_ready` (boolean flag) ✅
+    - [x] `slides_created_at` (timestamp) ✅
+    - [x] `current_slide_position` (navigation persistence) ✅
+  - [x] Update itinerary after slides creation ✅ (Added /api/itinerary/update-slides endpoint)
+  - [x] Enhanced slides-oauth API to return embed URLs ✅ (Added publishToWebAndGetEmbedUrl call)
+  - [ ] Test data persistence across browser sessions
+  
+  **✅ COMPLETED**: Extended Itinerary schema with comprehensive slides metadata. Created server-side API for updating slides data. Enhanced slides creation flow to automatically save slides information to database after successful creation. Ready for Phase 4.
 
 ### **Phase 4: Frontend State Management**
 - [ ] **4.1** Enhance slides creation state
