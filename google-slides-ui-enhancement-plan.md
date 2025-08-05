@@ -53,9 +53,11 @@
   - [x] Investigate why itineraries aren't being saved ✅ (Found localStorage-only persistence)
   - [x] Ensure itinerary saves immediately after generation ✅ (Added database save to completion useEffect)
   - [x] Update Redis database calls for proper persistence ✅ (Fixed env var fallbacks, added saveItinerary call)
+  - [x] Fixed client-side vs server-side execution issue ✅ (Created /api/itinerary/save route)
+  - [x] Test itinerary saving to database ✅ (User confirmed working)
   - [ ] Test itinerary retrieval in `/itineraries` page
   
-  **✅ COMPLETED**: Fixed Redis connection issues by supporting multiple environment variable patterns (UPSTASH_REDIS_REST_URL, KV_REST_API_URL, KV_URL). Added database persistence call when itinerary generation completes, alongside existing localStorage functionality. Ready for testing and Phase 3.2.
+  **✅ COMPLETED**: Fixed Redis connection issues and client-side execution problems. Created server-side API route for database operations. Itineraries now save successfully to Redis database with proper error handling. Environment variables correctly configured. Ready for Phase 3.2.
 
 - [ ] **3.2** Add slides data to itinerary record
   - [ ] Update itinerary database schema to include:

@@ -158,6 +158,9 @@ function ItineraryPageContent() {
 
   // Slides state
   const [isCreatingSlides, setIsCreatingSlides] = useState(false);
+  
+  // Database state - track itinerary ID for slides updates
+  const [savedItineraryId, setSavedItineraryId] = useState<string | null>(null);
 
   // Persistent itinerary state
   const [persistedItinerary, setPersistedItinerary] = useState<{
@@ -285,6 +288,7 @@ function ItineraryPageContent() {
           const result = await response.json();
           if (response.ok) {
             console.log('✅ Itinerary saved to database with ID:', result.itineraryId);
+            setSavedItineraryId(result.itineraryId); // Store itinerary ID for slides updates
           } else {
             console.error('❌ Failed to save itinerary:', result.error);
           }
@@ -515,6 +519,44 @@ function ItineraryPageContent() {
         // Open the slides in a new tab
         window.open(result.presentationUrl, '_blank');
         console.log('✅ Slides created successfully:', result.presentationUrl);
+        console.log('🎯 Embed URL:', result.embedUrl);
+        
+        // Update itinerary in database with slides data
+        if (savedItineraryId && result.presentationId && result.embedUrl) {
+          console.log('🔄 Updating itinerary with slides data...');
+          
+          const slidesData = {
+            slides_presentation_id: result.presentationId,
+            slides_embed_url: result.embedUrl,
+            slides_edit_url: result.presentationUrl,
+            slides_created_at: new Date().toISOString(),
+            pdf_ready: false // PDF will be available after we implement download functionality
+          };
+          
+          fetch('/api/itinerary/update-slides', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              itineraryId: savedItineraryId,
+              slidesData
+            })
+          })
+          .then(async (response) => {
+            const updateResult = await response.json();
+            if (response.ok) {
+              console.log('✅ Itinerary updated with slides data');
+            } else {
+              console.error('❌ Failed to update itinerary with slides data:', updateResult.error);
+            }
+          })
+          .catch((error) => {
+            console.error('❌ Error updating itinerary with slides data:', error);
+          });
+        } else {
+          console.warn('⚠️ Cannot update itinerary - missing savedItineraryId or slides data');
+        }
       } else {
         console.error('Failed to create slides:', result.error);
         // Handle error - could show toast notification

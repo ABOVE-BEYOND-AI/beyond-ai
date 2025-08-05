@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSlidesClientOAuth, getDriveClientOAuth, PERSONAL_DRIVE_FOLDERS, OAUTH_TEMPLATE_IDS } from "@/lib/googleOAuth";
 import { refineItineraryWithGPT } from "@/lib/openai";
 import { validateAccessToken, getUserInfo } from "@/lib/google-auth";
+import { publishToWebAndGetEmbedUrl } from "@/lib/googleSlides";
 
 interface SlidesRequestBody {
   rawItinerary: string;
@@ -160,15 +161,21 @@ export async function POST(req: NextRequest) {
       console.log(`✅ Applied ${requests.length} updates to presentation`);
     }
 
-    // Step 7: Generate shareable URL
+    // Step 7: Generate shareable URL and embed URL
     const presentationUrl = `https://docs.google.com/presentation/d/${presentationId}/edit`;
     
+    // Step 8: Publish to web and get embed URL for iframe integration
+    console.log("🌐 Publishing presentation to web for embedding...");
+    const embedUrl = await publishToWebAndGetEmbedUrl(presentationId);
+    
     console.log("🎉 Slides creation complete:", presentationUrl);
+    console.log("🎯 Embed URL generated:", embedUrl);
 
     return NextResponse.json({
       success: true,
       presentationId,
       presentationUrl,
+      embedUrl,
       message: "Slides created successfully!",
       userEmail: googleUser.email,
     });

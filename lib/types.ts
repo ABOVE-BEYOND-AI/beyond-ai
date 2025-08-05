@@ -38,7 +38,18 @@ export interface Itinerary {
   }>
   status: 'generating' | 'generated' | 'error'
   canva_design_url?: string
+  
+  // Legacy slides field (keep for backwards compatibility)
   slides_presentation_url?: string
+  
+  // NEW: Enhanced slides data for Phase 3.2+
+  slides_presentation_id?: string    // Google Slides file ID
+  slides_embed_url?: string          // iframe embed URL  
+  slides_edit_url?: string           // Google Slides edit URL
+  slides_created_at?: string         // timestamp when slides were created
+  pdf_ready?: boolean                // PDF export availability
+  current_slide_position?: number    // for navigation persistence
+  
   created_at: string
   updated_at: string
 }
