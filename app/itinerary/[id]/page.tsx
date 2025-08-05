@@ -1,11 +1,13 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
+
 import React, { useEffect, useState, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { DashboardLayout } from '@/components/dashboard-layout'
 import { ProtectedRoute } from '@/components/protected-route'
-import { useGoogleAuth } from '@/components/google-auth-provider'
-import { getItineraryById } from '@/lib/database'
+import { useGoogleAuth } from '@/components/google-auth-provider-clean'
+import { getItinerary } from '@/lib/redis-database'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -25,8 +27,8 @@ type Itinerary = {
   budget_from?: number
   budget_to?: number
   raw_content?: string
-  processed_content?: any
-  images?: any[]
+  processed_content?: unknown
+  images?: unknown[]
   status: 'generating' | 'generated' | 'error'
   canva_design_url?: string
   slides_presentation_url?: string
@@ -49,9 +51,11 @@ const ItineraryOption: React.FC<ItineraryOptionProps> = ({ optionContent, image 
 
   return (
     <div className="space-y-6 border-b border-border/30 pb-8 last:border-b-0">
-      <ReactMarkdown className="prose prose-slate dark:prose-invert max-w-none">
-        {cleanedContent}
-      </ReactMarkdown>
+      <div className="prose prose-slate dark:prose-invert max-w-none">
+        <ReactMarkdown>
+          {cleanedContent}
+        </ReactMarkdown>
+      </div>
       
       {image && image.imageUrl && (
         <div className="space-y-2">
@@ -86,7 +90,7 @@ function ItineraryViewPageContent() {
       if (!user || !itineraryId) return
 
       try {
-        const data = await getItineraryById(itineraryId)
+        const data = await getItinerary(itineraryId)
         if (!data) {
           setError('Itinerary not found')
           return
@@ -298,7 +302,15 @@ function ItineraryViewPageContent() {
               <CardContent className="prose prose-slate dark:prose-invert max-w-none">
                 {itineraryOptions.map((option, index) => {
                   // Try to find matching image for this option
-                  const image = itinerary.images && itinerary.images[index] ? itinerary.images[index] : null
+                  const imageData = itinerary.images && itinerary.images[index] ? itinerary.images[index] : null
+                  
+                  // Type guard to ensure image has the correct structure
+                  const image = imageData && 
+                    typeof imageData === 'object' && 
+                    'hotelName' in imageData && 
+                    'imageUrl' in imageData 
+                      ? imageData as { hotelName: string; imageUrl: string | null; contextLink?: string | null }
+                      : null
                   
                   return (
                     <ItineraryOption

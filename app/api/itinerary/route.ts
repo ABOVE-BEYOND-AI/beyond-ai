@@ -15,7 +15,7 @@ interface ItineraryRequest {
   numberOfOptions?: number;
 }
 
-async function extractHotelNames(content: string, body: ItineraryRequest): Promise<string[]> {
+async function extractHotelNames(content: string): Promise<string[]> {
   try {
     console.log("Content preview for hotel extraction:", content.substring(0, 500) + "...");
     
@@ -286,7 +286,7 @@ export async function POST(req: NextRequest) {
     console.log(`Found ${images.length} images from Perplexity`);
     
     // Extract hotel names from content and fetch images
-    const hotelNames = await extractHotelNames(content, body);
+    const hotelNames = await extractHotelNames(content);
     console.log(`Extracted ${hotelNames.length} hotel names for image search`);
     
     // Fetch images for each hotel directly from Google API

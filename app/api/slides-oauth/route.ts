@@ -93,7 +93,16 @@ export async function POST(req: NextRequest) {
     console.log("🔄 Replacing text tokens...");
 
     // Step 4: Prepare batch update requests
-    const requests: any[] = [];
+    const requests: {
+      replaceAllText?: {
+        containsText: { text: string };
+        replaceText: string;
+      };
+      replaceImage?: {
+        imageObjectId: string;
+        url: string;
+      };
+    }[] = [];
 
     // Add all text replacements
     textReplacements.forEach(replacement => {

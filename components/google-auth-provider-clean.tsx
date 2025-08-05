@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useEffect, useState } from 'react'
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { GoogleUser } from '@/lib/types'
 import { getGoogleAuthUrl, decodeSession } from '@/lib/google-oauth-clean'
 
@@ -20,7 +20,12 @@ export function GoogleAuthProvider({ children }: { children: React.ReactNode }) 
   const [loading, setLoading] = useState(true)
   const [accessToken, setAccessToken] = useState<string | null>(null)
 
-  const loadSessionFromCookie = () => {
+  const clearSession = useCallback(() => {
+    // Clear session cookie using standard web API
+    document.cookie = 'beyond_ai_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
+  }, [])
+
+  const loadSessionFromCookie = useCallback(() => {
     try {
       console.log('🔍 Auth: Loading session from cookie...')
       
@@ -59,11 +64,11 @@ export function GoogleAuthProvider({ children }: { children: React.ReactNode }) 
     } finally {
       setLoading(false)
     }
-  }
+  }, [clearSession])
 
   useEffect(() => {
     loadSessionFromCookie()
-  }, [])
+  }, [loadSessionFromCookie])
 
   const signIn = () => {
     console.log('🚀 Auth: Starting Google sign-in...')
@@ -78,10 +83,7 @@ export function GoogleAuthProvider({ children }: { children: React.ReactNode }) 
     setAccessToken(null)
   }
 
-  const clearSession = () => {
-    // Clear session cookie using standard web API
-    document.cookie = 'beyond_ai_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
-  }
+
 
   const value: GoogleAuthContextType = {
     user,
@@ -102,7 +104,15 @@ export function GoogleAuthProvider({ children }: { children: React.ReactNode }) 
 export function useGoogleAuth() {
   const context = useContext(GoogleAuthContext)
   if (context === undefined) {
-    throw new Error('useGoogleAuth must be used within a GoogleAuthProvider')
+    // Return safe defaults when context is undefined (SSR, build time, or missing provider)
+    return {
+      user: null,
+      loading: true,
+      signIn: () => {},
+      signOut: () => {},
+      accessToken: null,
+      isAuthenticated: false,
+    }
   }
   return context
 }

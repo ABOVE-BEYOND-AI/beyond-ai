@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { Redis } from '@upstash/redis'
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_ANON_KEY!
-)
+const redis = Redis.fromEnv()
 
 export const runtime = 'edge'
 
@@ -16,14 +13,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required data' }, { status: 400 })
     }
 
-    // Get user's Canva token
-    const { data: tokenData, error: tokenError } = await supabase
-      .from('canva_tokens')
-      .select('access_token, expires_at')
-      .eq('user_id', userId)
-      .single()
+    // Get user's Canva token from Redis
+    const tokenKey = `canva_token:${userId}`
+    const tokenData = await redis.get(tokenKey) as { 
+      access_token: string; 
+      expires_at: string; 
+      refresh_token: string; 
+      scope: string; 
+      user_id: string 
+    } | null
 
-    if (tokenError || !tokenData) {
+    if (!tokenData) {
       return NextResponse.json({ 
         error: 'Canva not connected', 
         needsAuth: true 

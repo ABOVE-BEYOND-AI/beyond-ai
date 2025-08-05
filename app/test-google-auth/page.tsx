@@ -1,6 +1,8 @@
 'use client'
 
-import { GoogleAuthProvider, useGoogleAuth } from '@/components/google-auth-provider'
+export const dynamic = 'force-dynamic'
+
+import { useGoogleAuth } from '@/components/google-auth-provider-clean'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import Image from 'next/image'
@@ -190,9 +192,5 @@ function TestContent() {
 }
 
 export default function TestGoogleAuthPage() {
-  return (
-    <GoogleAuthProvider>
-      <TestContent />
-    </GoogleAuthProvider>
-  )
+  return <TestContent />
 }

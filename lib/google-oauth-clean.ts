@@ -95,7 +95,6 @@ export async function getUserInfo(accessToken: string): Promise<GoogleUser> {
     email: userInfo.email,
     name: userInfo.name,
     picture: userInfo.picture,
-    verified_email: userInfo.email_verified,
   }
 }
 

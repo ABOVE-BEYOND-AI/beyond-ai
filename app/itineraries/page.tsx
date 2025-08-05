@@ -3,12 +3,12 @@
 import React, { useEffect, useState } from 'react'
 import { DashboardLayout } from '@/components/dashboard-layout'
 import { ProtectedRoute } from '@/components/protected-route'
-import { useGoogleAuth } from '@/components/google-auth-provider'
-import { getItinerariesByUser } from '@/lib/database'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { useGoogleAuth } from '@/components/google-auth-provider-clean'
+import { getItineraries } from '@/lib/redis-database'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Calendar, MapPin, Users, Plane, Eye, Trash2, Plus } from 'lucide-react'
+import { Calendar, MapPin, Users, Plane, Eye, Plus } from 'lucide-react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { formatDistanceToNow } from 'date-fns'
@@ -38,7 +38,7 @@ function ItinerariesPageContent() {
       if (!user) return
 
       try {
-        const userItineraries = await getItinerariesByUser(user.id)
+        const userItineraries = await getItineraries(user.email)
         setItineraries(userItineraries)
       } catch (err) {
         console.error('Error fetching itineraries:', err)

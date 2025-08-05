@@ -1,7 +1,7 @@
 // Authentication utilities and session management
 import { GoogleUser, GoogleTokens, AuthSession } from './types'
 import { validateAccessToken, refreshAccessToken } from './google-auth'
-import { saveUserSession, getUserSession, clearUserSession } from './redis-database'
+import { saveUserSession, clearUserSession } from './redis-database'
 
 // JWT-like session token utilities (using simple encoding for now)
 export function encodeSessionToken(session: AuthSession): string {
@@ -30,7 +30,7 @@ export async function createSession(user: GoogleUser, tokens: GoogleTokens): Pro
   }
 
   // Save session in Redis
-  await saveUserSession(user.email, session)
+  await saveUserSession(user.email, session as unknown as Record<string, unknown>)
 
   // Return encoded session token
   return encodeSessionToken(session)
@@ -76,7 +76,7 @@ export async function getValidSession(sessionToken: string): Promise<AuthSession
           expires_at: newTokens.expires_at || (Date.now() + (3600 * 1000)),
         }
 
-        await saveUserSession(session.user.email, updatedSession)
+        await saveUserSession(session.user.email, updatedSession as unknown as Record<string, unknown>)
         return updatedSession
       } catch (error) {
         console.error('Failed to refresh token:', error)

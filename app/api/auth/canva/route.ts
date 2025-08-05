@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { Redis } from '@upstash/redis'
 import crypto from 'crypto'
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_ANON_KEY!
-)
+const redis = Redis.fromEnv()
 
 export async function GET(request: NextRequest) {
   try {
@@ -26,30 +23,19 @@ export async function GET(request: NextRequest) {
     // Generate state parameter for CSRF protection
     const state = crypto.randomBytes(96).toString('base64url')
     
-    // Store code_verifier and state in database temporarily
-    // We'll retrieve these in the callback
-    await supabase
-      .from('users')
-      .upsert({
-        id: userId,
-        email: null,
-      })
+    // Store the PKCE data temporarily in Redis (expires in 10 minutes)
+    const pkceKey = `canva_pkce:${userId}`
+    const pkceData = {
+      codeVerifier,
+      state,
+      userId,
+      expires_at: Date.now() + 10 * 60 * 1000 // 10 minutes
+    }
 
-    // Store the PKCE data temporarily (expires in 10 minutes)
-    const { error: storeError } = await supabase
-      .from('canva_tokens')
-      .upsert({
-        user_id: userId,
-        access_token: `temp_verifier:${codeVerifier}`, // Temporary storage
-        refresh_token: `temp_state:${state}`,
-        expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // 10 minutes
-        scope: 'pending',
-      }, {
-        onConflict: 'user_id'
-      })
-
-    if (storeError) {
-      console.error('Error storing PKCE data:', storeError)
+    try {
+      await redis.set(pkceKey, pkceData, { ex: 600 }) // 10 minutes expiry
+    } catch (error) {
+      console.error('Error storing PKCE data:', error)
       return NextResponse.json({ error: 'Failed to store session data' }, { status: 500 })
     }
     

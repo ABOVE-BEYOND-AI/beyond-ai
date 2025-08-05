@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = 'force-dynamic'
+
 import React, { useState, useMemo } from "react";
 import Image from "next/image";
 import { DashboardLayout } from "@/components/dashboard-layout";
@@ -108,9 +110,11 @@ const ItineraryOption: React.FC<ItineraryOptionProps> = ({ optionContent, image 
 
       {image && image.imageUrl && (
         <div className="mt-6 mb-8">
-          <img
+          <Image
             src={image.imageUrl}
             alt={`Featured Hotel: ${image.hotelName}`}
+            width={800}
+            height={384}
             className="w-full h-96 object-cover rounded-lg shadow-lg border border-gray-700/30"
             onError={(e) => {
               console.error(`Failed to load image for ${image.hotelName}:`, image.imageUrl);
@@ -157,7 +161,7 @@ function ItineraryPageContent() {
   // Persistent itinerary state
   const [persistedItinerary, setPersistedItinerary] = useState<{
     content: string | null;
-    images: Array<{imageUrl: string; hotelName: string}> | null;
+    images: Array<{hotelName: string; imageUrl: string | null; contextLink?: string | null}> | null;
     formData: Record<string, string>;
     dateRange: Record<string, unknown>;
     numberOfOptions: number;
@@ -233,8 +237,7 @@ function ItineraryPageContent() {
         content,
         images,
         formData,
-        // Skip dateRange to avoid serialization issues with CalendarDate objects
-        // dateRange,
+        dateRange: dateRange || {},
         numberOfOptions,
         additionalOptions,
         timestamp: Date.now()
@@ -462,7 +465,6 @@ function ItineraryPageContent() {
       const result = await response.json();
 
       if (result.success) {
-        setSlidesUrl(result.presentationUrl);
         // Open the slides in a new tab
         window.open(result.presentationUrl, '_blank');
         console.log('✅ Slides created successfully:', result.presentationUrl);

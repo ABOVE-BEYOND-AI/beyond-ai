@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { Redis } from '@upstash/redis'
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_ANON_KEY!
-)
+const redis = Redis.fromEnv()
 
 export async function GET(request: NextRequest) {
   try {
@@ -32,22 +29,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL('/itinerary?error=invalid_state', request.url))
     }
 
-    // Retrieve the stored PKCE data
-    const { data: storedData, error: retrieveError } = await supabase
-      .from('canva_tokens')
-      .select('access_token, refresh_token')
-      .eq('user_id', userId)
-      .eq('scope', 'pending')
-      .single()
+    // Retrieve the stored PKCE data from Redis
+    const pkceKey = `canva_pkce:${userId}`
+    const storedData = await redis.get(pkceKey) as { codeVerifier: string; state: string; userId: string; expires_at: number } | null
 
-    if (retrieveError || !storedData) {
-      console.error('Failed to retrieve PKCE data:', retrieveError)
+    if (!storedData) {
+      console.error('Failed to retrieve PKCE data - session expired')
       return NextResponse.redirect(new URL('/itinerary?error=session_expired', request.url))
     }
 
-    // Extract code_verifier and state from temporary storage
-    const codeVerifier = storedData.access_token.replace('temp_verifier:', '')
-    const storedState = storedData.refresh_token.replace('temp_state:', '')
+    // Extract code_verifier and state from storage
+    const codeVerifier = storedData.codeVerifier
+    const storedState = storedData.state
 
     // Verify state parameter
     if (stateToken !== storedState) {
@@ -78,28 +71,29 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL('/itinerary?error=token_exchange_failed', request.url))
     }
 
-    const tokenData = await tokenResponse.json()
-    const { access_token, refresh_token, expires_in, scope } = tokenData
+    const tokenResponse_data = await tokenResponse.json()
+    const { access_token, refresh_token, expires_in, scope } = tokenResponse_data
 
     // Calculate expiration time
     const expiresAt = new Date(Date.now() + expires_in * 1000)
 
-    // Store real tokens in database (replacing temporary PKCE data)
-    const { error: dbError } = await supabase
-      .from('canva_tokens')
-      .upsert({
-        user_id: userId,
-        access_token,
-        refresh_token,
-        expires_at: expiresAt.toISOString(),
-        scope,
-      }, {
-        onConflict: 'user_id'
-      })
+    // Store real tokens in Redis (replacing temporary PKCE data)
+    const tokenKey = `canva_token:${userId}`
+    const tokenData = {
+      user_id: userId,
+      access_token,
+      refresh_token,
+      expires_at: expiresAt.toISOString(),
+      scope,
+    }
 
-    if (dbError) {
-      console.error('Database error:', dbError)
-      return NextResponse.redirect(new URL('/itinerary?error=db_error', request.url))
+    try {
+      await redis.set(tokenKey, tokenData)
+      // Clear the temporary PKCE data
+      await redis.del(pkceKey)
+    } catch (error) {
+      console.error('Redis error:', error)
+      return NextResponse.redirect(new URL('/itinerary?error=storage_error', request.url))
     }
 
     // Redirect back to itinerary page with success

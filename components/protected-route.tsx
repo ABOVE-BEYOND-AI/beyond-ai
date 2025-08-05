@@ -1,6 +1,6 @@
 'use client'
 
-import { useGoogleAuth } from './google-auth-provider'
+import { useGoogleAuth } from './google-auth-provider-clean'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 

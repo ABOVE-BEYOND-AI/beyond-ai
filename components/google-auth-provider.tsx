@@ -1,7 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useEffect, useState } from 'react'
-import { GoogleUser, AuthSession } from '@/lib/types'
+import { GoogleUser } from '@/lib/types'
 import { getGoogleAuthUrl } from '@/lib/google-auth'
 import { getValidSession, clearSession, COOKIE_NAME } from '@/lib/auth-utils'
 
