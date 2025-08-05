@@ -49,11 +49,13 @@
   **✅ COMPLETED**: PDF export API route ready. Accepts presentationId and returns downloadable PDF file with proper headers and caching. Ready for Phase 3.
 
 ### **Phase 3: Database Persistence (Critical Fix)**
-- [ ] **3.1** Fix itinerary saving to database
-  - [ ] Investigate why itineraries aren't being saved
-  - [ ] Ensure itinerary saves immediately after generation
-  - [ ] Update Redis database calls for proper persistence
+- [x] **3.1** Fix itinerary saving to database ✅
+  - [x] Investigate why itineraries aren't being saved ✅ (Found localStorage-only persistence)
+  - [x] Ensure itinerary saves immediately after generation ✅ (Added database save to completion useEffect)
+  - [x] Update Redis database calls for proper persistence ✅ (Fixed env var fallbacks, added saveItinerary call)
   - [ ] Test itinerary retrieval in `/itineraries` page
+  
+  **✅ COMPLETED**: Fixed Redis connection issues by supporting multiple environment variable patterns (UPSTASH_REDIS_REST_URL, KV_REST_API_URL, KV_URL). Added database persistence call when itinerary generation completes, alongside existing localStorage functionality. Ready for testing and Phase 3.2.
 
 - [ ] **3.2** Add slides data to itinerary record
   - [ ] Update itinerary database schema to include:
