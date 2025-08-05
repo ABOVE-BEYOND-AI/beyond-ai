@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
+import { GoogleAuthProvider } from "@/components/google-auth-provider-clean";
 
 const jakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -34,7 +35,9 @@ export default function RootLayout({
           "font-sans antialiased bg-background text-foreground transition-colors duration-300"
         )}
       >
-        {children}
+        <GoogleAuthProvider>
+          {children}
+        </GoogleAuthProvider>
       </body>
     </html>
   );

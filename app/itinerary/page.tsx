@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import Image from "next/image";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,11 @@ import { CalendarDate } from "@internationalized/date";
 import { useItineraryStream } from "@/hooks/useItineraryStream";
 import ReactMarkdown from "react-markdown";
 
+import { useGoogleAuth } from "@/components/google-auth-provider-clean";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+
 const processSteps: Step[] = [
   { id: "research", label: "Researching", description: "AI analysis", status: "pending" },
   { id: "populate", label: "Populating", description: "Canva template", status: "pending" },
@@ -22,21 +28,21 @@ const processSteps: Step[] = [
 ];
 
 const additionalOptionsData: Option[] = [
-    { value: "kids-club", label: "Kids Club" },
-    { value: "business-class", label: "Business Class" },
-    { value: "transfers-included", label: "Transfers Included" },
-    { value: "private-chef", label: "Private Chef" },
-    { value: "spa-treatments", label: "Spa Treatments" },
-    { value: "private-yacht", label: "Private Yacht" },
-    { value: "helicopter-tours", label: "Helicopter Tours" },
-    { value: "wine-tasting", label: "Wine Tasting" },
-    { value: "golf-access", label: "Golf Access" },
-    { value: "ski-equipment", label: "Ski Equipment" },
-    { value: "butler-service", label: "Butler Service" },
-    { value: "airport-lounge", label: "Airport Lounge" },
-    { value: "cultural-guide", label: "Cultural Guide" },
-    { value: "photography", label: "Photography Service" },
-    { value: "fitness-trainer", label: "Personal Fitness Trainer" },
+  { value: "kids-club", label: "Kids Club" },
+  { value: "business-class", label: "Business Class" },
+  { value: "transfers-included", label: "Transfers Included" },
+  { value: "private-chef", label: "Private Chef" },
+  { value: "spa-treatments", label: "Spa Treatments" },
+  { value: "private-yacht", label: "Private Yacht" },
+  { value: "helicopter-tours", label: "Helicopter Tours" },
+  { value: "wine-tasting", label: "Wine Tasting" },
+  { value: "golf-access", label: "Golf Access" },
+  { value: "ski-equipment", label: "Ski Equipment" },
+  { value: "butler-service", label: "Butler Service" },
+  { value: "airport-lounge", label: "Airport Lounge" },
+  { value: "cultural-guide", label: "Cultural Guide" },
+  { value: "photography", label: "Photography Service" },
+  { value: "fitness-trainer", label: "Personal Fitness Trainer" },
 ];
 
 // New component to render each itinerary option with its image
@@ -118,10 +124,13 @@ const ItineraryOption: React.FC<ItineraryOptionProps> = ({ optionContent, image 
   );
 };
 
-export default function ItineraryPage() {
+function ItineraryPageContent() {
+  // Auth session
+  const { user, accessToken, loading } = useGoogleAuth();
+  const router = useRouter();
 
+  // ALL STATE HOOKS MUST BE AT THE TOP - BEFORE ANY CONDITIONAL RETURNS
   const [showResults, setShowResults] = useState(false);
-
   const [dateRange, setDateRange] = useState<{start: CalendarDate, end: CalendarDate} | null>(null);
   const [formData, setFormData] = useState({
     destination: "",
@@ -141,8 +150,22 @@ export default function ItineraryPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [canvaConnected, setCanvaConnected] = useState(false);
   const [canvaDesignUrl, setCanvaDesignUrl] = useState<string | null>(null);
+  
+  // Slides state
+  const [isCreatingSlides, setIsCreatingSlides] = useState(false);
+  const [slidesUrl, setSlidesUrl] = useState<string | null>(null);
 
-  // Streaming hook
+  // Persistent itinerary state
+  const [persistedItinerary, setPersistedItinerary] = useState<{
+    content: string | null;
+    images: any[] | null;
+    formData: any;
+    dateRange: any;
+    numberOfOptions: number;
+    additionalOptions: Option[];
+  } | null>(null);
+
+  // Streaming hook - MUST BE BEFORE CONDITIONAL RETURNS
   const { 
     content, 
     images,
@@ -153,6 +176,164 @@ export default function ItineraryPage() {
     stopStream, 
     resetStream 
   } = useItineraryStream();
+
+  // All useEffect hooks
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/auth/signin');
+    }
+  }, [user, loading, router]);
+
+  // Initialize user on component mount and restore persisted data
+  useEffect(() => {
+    // Generate a simple user ID for this session (in production, use proper auth)
+    const sessionUserId = sessionStorage.getItem('userId') || crypto.randomUUID();
+    sessionStorage.setItem('userId', sessionUserId);
+    setUserId(sessionUserId);
+
+    // Restore persisted itinerary data from localStorage
+    try {
+      const savedItinerary = localStorage.getItem('persistedItinerary');
+      if (savedItinerary) {
+        const parsed = JSON.parse(savedItinerary);
+        setPersistedItinerary(parsed);
+        
+        // Restore form state if we have persisted data
+        if (parsed.formData) {
+          setFormData(parsed.formData);
+        }
+        if (parsed.numberOfOptions) {
+          setNumberOfOptions(parsed.numberOfOptions);
+        }
+        if (parsed.additionalOptions) {
+          setAdditionalOptions(parsed.additionalOptions);
+        }
+        if (parsed.content) {
+          setShowResults(true);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading persisted itinerary:', error);
+    }
+
+    // Check for auth callback state
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('code')) {
+      // Handle OAuth callback here if needed
+    }
+    if (urlParams.get('error')) {
+      console.error('OAuth error:', urlParams.get('error'));
+      // Handle error states here
+    }
+  }, []);
+
+  // Save itinerary data to localStorage when content changes
+  useEffect(() => {
+    if (content && isComplete) {
+      const dataToSave = {
+        content,
+        images,
+        formData,
+        // Skip dateRange to avoid serialization issues with CalendarDate objects
+        // dateRange,
+        numberOfOptions,
+        additionalOptions,
+        timestamp: Date.now()
+      };
+      
+      try {
+        localStorage.setItem('persistedItinerary', JSON.stringify(dataToSave));
+        setPersistedItinerary(dataToSave);
+      } catch (error) {
+        console.error('Error saving itinerary to localStorage:', error);
+      }
+    }
+  }, [content, images, isComplete, formData, dateRange, numberOfOptions, additionalOptions]);
+
+  // Update step when research is complete
+  useEffect(() => {
+    if (isComplete && currentStep === 'research') {
+      setCurrentStep('idle'); // Research complete, waiting for user to click Canva
+    }
+  }, [isComplete, currentStep]);
+
+  // Memoize the split content to avoid re-calculating on every render
+  const itineraryOptions = useMemo(() => {
+    // Use current content or persisted content
+    const currentContent = content || (persistedItinerary?.content);
+    if (!currentContent) return [];
+    
+    console.log("Content length:", currentContent.length);
+    console.log("Content preview:", currentContent.substring(0, 200));
+    
+    // Clean content before splitting - remove any standalone "Featured Hotel:" lines
+    // that appear before the actual options
+    let cleanedContent = currentContent
+      .replace(/^[\s\S]*?(?=Option 1:)/, '') // Remove everything before "Option 1:"
+      .trim();
+    
+    // Ensure Option 1 has consistent markdown formatting with other options
+    // Check if other options have ## formatting and apply it to Option 1 if missing
+    if (cleanedContent.includes('## Option 2:') && !cleanedContent.startsWith('## Option 1:')) {
+      console.log("🔧 Fixing Option 1 formatting: adding ## header");
+      cleanedContent = cleanedContent.replace(/^Option 1:/, '## Option 1:');
+    }
+    // Or if other options have bold formatting, apply it to Option 1
+    else if (cleanedContent.includes('**Option 2:**') && !cleanedContent.startsWith('**Option 1:**')) {
+      console.log("🔧 Fixing Option 1 formatting: adding bold formatting");
+      cleanedContent = cleanedContent.replace(/^Option 1:/, '**Option 1:**');
+    }
+    
+    console.log("Option 1 starts with:", cleanedContent.substring(0, 50));
+    
+    // Try different splitting patterns based on common AI output formats
+    let options = [];
+    
+    // Pattern 1: "# Option X:" (single #)
+    if (cleanedContent.includes('# Option')) {
+      console.log("Found # Option pattern");
+      options = cleanedContent.split(/(?=# Option \d+:)/g).filter(part => part.trim().length > 0);
+    }
+    // Pattern 2: "## Option X:" (with ##)
+    else if (cleanedContent.includes('## Option')) {
+      console.log("Found ## Option pattern");
+      options = cleanedContent.split(/(?=## Option \d+:)/g).filter(part => part.trim().length > 0);
+    }
+    // Pattern 3: "Option X:" (without #)
+    else if (cleanedContent.includes('Option 2:')) {
+      console.log("Found Option X: pattern");
+      options = cleanedContent.split(/(?=Option \d+:)/g).filter(part => part.trim().startsWith('Option'));
+    }
+    // Pattern 4: Fallback - if no clear options, return the whole content as one option
+    else {
+      console.log("Using fallback - whole content");
+      options = [cleanedContent];
+    }
+    
+    console.log("Split into", options.length, "options");
+    options.forEach((option, index) => {
+      console.log(`Option ${index + 1} preview:`, option.substring(0, 100));
+    });
+    
+    return options;
+  }, [content, persistedItinerary]);
+
+  // CONDITIONAL RETURNS AFTER ALL HOOKS
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render if not authenticated (will redirect)
+  if (!user) {
+    return null;
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -184,32 +365,7 @@ export default function ItineraryPage() {
     streamItinerary(apiData);
   };
 
-  // Initialize user on component mount
-  React.useEffect(() => {
-    // Generate a simple user ID for this session (in production, use proper auth)
-    const sessionUserId = sessionStorage.getItem('userId') || crypto.randomUUID();
-    sessionStorage.setItem('userId', sessionUserId);
-    setUserId(sessionUserId);
 
-    // Check URL parameters for OAuth success/error
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('canva_connected') === 'true') {
-      setCanvaConnected(true);
-      // Clear the URL parameter
-      window.history.replaceState({}, '', window.location.pathname);
-    }
-    if (urlParams.get('error')) {
-      console.error('OAuth error:', urlParams.get('error'));
-      // Handle error states here
-    }
-  }, []);
-
-  // Update step when research is complete
-  React.useEffect(() => {
-    if (isComplete && currentStep === 'research') {
-      setCurrentStep('idle'); // Research complete, waiting for user to click Canva
-    }
-  }, [isComplete, currentStep]);
 
   const handleCreateCanvaTemplate = async () => {
     if (!userId) {
@@ -267,64 +423,62 @@ export default function ItineraryPage() {
     }
   };
 
-  // Memoize the split content to avoid re-calculating on every render
-  const itineraryOptions = useMemo(() => {
-    if (!content) return [];
-    
-    console.log("Content length:", content.length);
-    console.log("Content preview:", content.substring(0, 200));
-    
-    // Clean content before splitting - remove any standalone "Featured Hotel:" lines
-    // that appear before the actual options
-    let cleanedContent = content
-      .replace(/^[\s\S]*?(?=Option 1:)/, '') // Remove everything before "Option 1:"
-      .trim();
-    
-    // Ensure Option 1 has consistent markdown formatting with other options
-    // Check if other options have ## formatting and apply it to Option 1 if missing
-    if (cleanedContent.includes('## Option 2:') && !cleanedContent.startsWith('## Option 1:')) {
-      console.log("🔧 Fixing Option 1 formatting: adding ## header");
-      cleanedContent = cleanedContent.replace(/^Option 1:/, '## Option 1:');
+  const handleCreateSlides = async () => {
+    if (!user) {
+      console.error('User not authenticated');
+      return;
     }
-    // Or if other options have bold formatting, apply it to Option 1
-    else if (cleanedContent.includes('**Option 2:**') && !cleanedContent.startsWith('**Option 1:**')) {
-      console.log("🔧 Fixing Option 1 formatting: adding bold formatting");
-      cleanedContent = cleanedContent.replace(/^Option 1:/, '**Option 1:**');
-    }
+
+    const currentContent = content || (persistedItinerary?.content);
+    const currentImages = images || (persistedItinerary?.images);
     
-    console.log("Option 1 starts with:", cleanedContent.substring(0, 50));
-    
-    // Try different splitting patterns based on common AI output formats
-    let options = [];
-    
-    // Pattern 1: "# Option X:" (single #)
-    if (cleanedContent.includes('# Option')) {
-      console.log("Found # Option pattern");
-      options = cleanedContent.split(/(?=# Option \d+:)/g).filter(part => part.trim().length > 0);
+    if (!currentContent || !formData.destination) {
+      console.error('No content or destination available for slides creation');
+      return;
     }
-    // Pattern 2: "## Option X:" (with ##)
-    else if (cleanedContent.includes('## Option')) {
-      console.log("Found ## Option pattern");
-      options = cleanedContent.split(/(?=## Option \d+:)/g).filter(part => part.trim().length > 0);
+
+    setIsCreatingSlides(true);
+
+    try {
+      // Use Google access token directly
+      if (!accessToken) {
+        console.error('No Google access token available');
+        return;
+      }
+
+      const response = await fetch('/api/slides-oauth', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          rawItinerary: currentContent,
+          destination: formData.destination,
+          dates: dateRange ? `${dateRange.start.toString()} – ${dateRange.end.toString()}` : '',
+          imageUrl: currentImages && currentImages.length > 0 ? currentImages[0].imageUrl : null,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setSlidesUrl(result.presentationUrl);
+        // Open the slides in a new tab
+        window.open(result.presentationUrl, '_blank');
+        console.log('✅ Slides created successfully:', result.presentationUrl);
+      } else {
+        console.error('Failed to create slides:', result.error);
+        // Handle error - could show toast notification
+      }
+    } catch (error) {
+      console.error('Error creating slides:', error);
+    } finally {
+      setIsCreatingSlides(false);
     }
-    // Pattern 3: "Option X:" (without #)
-    else if (cleanedContent.includes('Option 2:')) {
-      console.log("Found Option X: pattern");
-      options = cleanedContent.split(/(?=Option \d+:)/g).filter(part => part.trim().startsWith('Option'));
-    }
-    // Pattern 4: Fallback - if no clear options, return the whole content as one option
-    else {
-      console.log("Using fallback - whole content");
-      options = [cleanedContent];
-    }
-    
-    console.log("Split into", options.length, "options");
-    options.forEach((option, index) => {
-      console.log(`Option ${index + 1} preview:`, option.substring(0, 100));
-    });
-    
-    return options;
-  }, [content]);
+  };
+
+  // USEMEMO HOOK MOVED TO TOP OF COMPONENT - DO NOT ADD HOOKS HERE
 
   if (showResults) {
   return (
@@ -351,6 +505,9 @@ export default function ItineraryPage() {
               <Button variant="outline" onClick={() => {
                 setShowResults(false);
                 resetStream();
+                // Clear persisted data when going back to form
+                localStorage.removeItem('persistedItinerary');
+                setPersistedItinerary(null);
               }}>
                 ← Back to Form
               </Button>
@@ -476,14 +633,42 @@ export default function ItineraryPage() {
                     {isLoading && (
                       <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                     )}
-                    {isComplete && currentStep === 'idle' && (
+                    {(isComplete || (content || persistedItinerary?.content)) && (
+                      <div className="flex items-center gap-3">
+                        <Button 
+                          onClick={handleCreateSlides}
+                          disabled={isCreatingSlides}
+                          variant="outline"
+                          className="bg-white text-gray-900 hover:bg-gray-200 hover:text-gray-900 border-gray-300"
+                        >
+                          {isCreatingSlides ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : (
+                            <Image
+                              src="/Google_Slides_logo_(2014-2020).svg.webp"
+                              alt="Google Slides"
+                              width={18}
+                              height={18}
+                              className="mr-2"
+                            />
+                          )}
+                          {isCreatingSlides ? 'Creating...' : 'Connect to Slides'}
+                        </Button>
                       <Button 
                         onClick={handleCreateCanvaTemplate}
                         variant="outline"
-                        className="bg-white text-gray-900 hover:bg-gray-100"
-                      >
+                          className="bg-white text-gray-900 hover:bg-gray-200 hover:text-gray-900 border-gray-300"
+                        >
+                          <Image
+                            src="/canva-logo_compressed.webp"
+                            alt="Canva"
+                            width={24}
+                            height={24}
+                            className="mr-2"
+                          />
                         {canvaConnected ? 'Create Canva Template' : 'Connect to Canva'}
                       </Button>
+                      </div>
                     )}
                     {currentStep === 'populate' && isPopulatingCanva && (
                       <div className="flex items-center gap-2 text-muted-foreground">
@@ -536,8 +721,9 @@ export default function ItineraryPage() {
                     }
                     
                     // Pattern 4: Look for hotel names from backend images
-                    if (!hotelName && images && images[index]) {
-                      hotelName = images[index].hotelName;
+                    const currentImages = images || (persistedItinerary?.images);
+                    if (!hotelName && currentImages && currentImages[index]) {
+                      hotelName = currentImages[index].hotelName;
                       console.log(`Using hotel name from backend: ${hotelName}`);
                     }
                     
@@ -551,17 +737,17 @@ export default function ItineraryPage() {
                     
                     // Find the corresponding image with fuzzy matching
                     let image = null;
-                    if (images && images.length > 0) {
-                      console.log(`Available images:`, images.map(img => img.hotelName));
+                    if (currentImages && currentImages.length > 0) {
+                      console.log(`Available images:`, currentImages.map(img => img.hotelName));
                       
                       if (hotelName) {
                         // Try exact match first
-                        image = images.find(img => img.hotelName === hotelName);
+                        image = currentImages.find(img => img.hotelName === hotelName);
                         console.log(`Exact match result:`, image ? 'found' : 'not found');
                         
                         // If no exact match, try partial matching
                         if (!image) {
-                          image = images.find(img => 
+                          image = currentImages.find(img => 
                             img.hotelName.toLowerCase().includes(hotelName.toLowerCase()) || 
                             hotelName.toLowerCase().includes(img.hotelName.toLowerCase())
                           );
@@ -570,8 +756,8 @@ export default function ItineraryPage() {
                       }
                       
                       // If still no match, use the image at the same index
-                      if (!image && images[index]) {
-                        image = images[index];
+                      if (!image && currentImages[index]) {
+                        image = currentImages[index];
                         console.log(`Using image at index ${index}:`, image.hotelName);
                       }
                     }
@@ -581,7 +767,7 @@ export default function ItineraryPage() {
                     return <ItineraryOption key={index} optionContent={option} image={image || null} />;
                   })}
                   
-                  {currentStep === 'ready' && content && (
+                  {currentStep === 'ready' && (content || persistedItinerary?.content) && (
                     <div className="mt-6 pt-6 border-t border-border/30 space-y-3">
                       {canvaDesignUrl && (
                         <Button 
@@ -639,6 +825,7 @@ export default function ItineraryPage() {
                 <div className="w-24 h-1 bg-white/60 mt-3 rounded-full"></div>
                 
                 {/* Past Itineraries Button - Below title */}
+                <Link href="/itineraries">
                 <motion.button
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -647,6 +834,7 @@ export default function ItineraryPage() {
                 >
                   Past Itineraries
                 </motion.button>
+                </Link>
               </div>
             </motion.div>
           </div>
@@ -830,4 +1018,8 @@ export default function ItineraryPage() {
       </div>
     </DashboardLayout>
   );
+}
+
+export default function ItineraryPage() {
+  return <ItineraryPageContent />;
 }

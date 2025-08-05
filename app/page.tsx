@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, Globe, Sparkles, Zap, Shield } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { useGoogleAuth } from "@/components/google-auth-provider-clean";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 const features = [
   {
@@ -50,6 +53,32 @@ const item = {
 };
 
 export default function DashboardPage() {
+  const { user, loading } = useGoogleAuth();
+  const router = useRouter();
+
+  // Redirect to sign-in if not authenticated
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/auth/signin');
+    }
+  }, [user, loading, router]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render if not authenticated (will redirect)
+  if (!user) {
+    return null;
+  }
+
   return (
     <DashboardLayout>
       <div className="p-6 lg:p-12 pl-32">
