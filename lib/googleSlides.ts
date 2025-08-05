@@ -68,6 +68,7 @@ export interface ItineraryData {
 
 /**
  * Publishes a Google Slides presentation to the web and returns the embed URL
+ * Uses service account credentials (for server-side use)
  */
 export async function publishToWebAndGetEmbedUrl(presentationId: string): Promise<string> {
   try {
@@ -96,6 +97,43 @@ export async function publishToWebAndGetEmbedUrl(presentationId: string): Promis
     
   } catch (error) {
     console.error("❌ Error publishing presentation to web:", error);
+    throw new Error(`Failed to publish presentation: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Publishes a Google Slides presentation to the web and returns the embed URL
+ * Uses OAuth access token (for user-authenticated requests)
+ */
+export async function publishToWebAndGetEmbedUrlOAuth(presentationId: string, accessToken: string): Promise<string> {
+  try {
+    console.log("🌐 Publishing presentation to web (OAuth):", presentationId);
+    
+    // Import here to avoid circular dependencies
+    const { getDriveClientOAuth } = await import('./googleOAuth');
+    const drive = await getDriveClientOAuth(accessToken);
+    
+    // Step 1: Make the file publicly viewable
+    await drive.permissions.create({
+      fileId: presentationId,
+      requestBody: {
+        role: 'reader',
+        type: 'anyone',
+      },
+    });
+    
+    console.log("✅ Made presentation publicly viewable (OAuth)");
+    
+    // Step 2: Generate embed URL directly using presentation ID
+    // Google Slides embed URL format: https://docs.google.com/presentation/d/[ID]/embed?start=false&loop=false&delayms=3000
+    const embedUrl = `https://docs.google.com/presentation/d/${presentationId}/embed?start=false&loop=false&delayms=3000`;
+    
+    console.log("🎯 Generated embed URL (OAuth):", embedUrl);
+    
+    return embedUrl;
+    
+  } catch (error) {
+    console.error("❌ Error publishing presentation to web (OAuth):", error);
     throw new Error(`Failed to publish presentation: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }

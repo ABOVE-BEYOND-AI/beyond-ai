@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSlidesClientOAuth, getDriveClientOAuth, PERSONAL_DRIVE_FOLDERS, OAUTH_TEMPLATE_IDS } from "@/lib/googleOAuth";
 import { refineItineraryWithGPT } from "@/lib/openai";
 import { validateAccessToken, getUserInfo } from "@/lib/google-auth";
-import { publishToWebAndGetEmbedUrl } from "@/lib/googleSlides";
+import { publishToWebAndGetEmbedUrlOAuth } from "@/lib/googleSlides";
 
 interface SlidesRequestBody {
   rawItinerary: string;
@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
     
     // Step 8: Publish to web and get embed URL for iframe integration
     console.log("🌐 Publishing presentation to web for embedding...");
-    const embedUrl = await publishToWebAndGetEmbedUrl(presentationId);
+    const embedUrl = await publishToWebAndGetEmbedUrlOAuth(presentationId, googleAccessToken);
     
     console.log("🎉 Slides creation complete:", presentationUrl);
     console.log("🎯 Embed URL generated:", embedUrl);
