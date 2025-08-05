@@ -114,7 +114,7 @@ function ItineraryViewPageContent() {
     const content = itinerary.raw_content
     
     // Clean content before splitting
-    let cleanedContent = content
+    const cleanedContent = content
       .replace(/^[\s\S]*?(?=Option 1:)/, '') // Remove everything before "Option 1:"
       .trim()
     
