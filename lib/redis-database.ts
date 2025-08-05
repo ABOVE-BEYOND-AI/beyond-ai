@@ -4,9 +4,33 @@ import { User, Itinerary, GoogleUser } from './types'
 
 // Initialize Redis client from environment variables
 // Support both Vercel KV and direct Upstash environment variable patterns
+const redisUrl = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL || process.env.KV_URL;
+const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
+
+// Debug logging for server-side execution
+if (typeof window === 'undefined') { // Only log server-side
+  console.log('🔧 Redis Debug: URL exists:', !!redisUrl);
+  console.log('🔧 Redis Debug: Token exists:', !!redisToken);
+  console.log('🔧 Redis Debug: Available env vars:', {
+    UPSTASH_REDIS_REST_URL: !!process.env.UPSTASH_REDIS_REST_URL,
+    KV_REST_API_URL: !!process.env.KV_REST_API_URL,
+    KV_URL: !!process.env.KV_URL,
+    UPSTASH_REDIS_REST_TOKEN: !!process.env.UPSTASH_REDIS_REST_TOKEN,
+    KV_REST_API_TOKEN: !!process.env.KV_REST_API_TOKEN,
+  });
+}
+
+if (!redisUrl || !redisToken) {
+  console.error('❌ Redis configuration missing:', {
+    url: !!redisUrl,
+    token: !!redisToken
+  });
+  throw new Error('Redis configuration is incomplete. Check environment variables.');
+}
+
 const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL || process.env.KV_URL || '',
-  token: process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN || '',
+  url: redisUrl,
+  token: redisToken,
 })
 
 // Redis key patterns

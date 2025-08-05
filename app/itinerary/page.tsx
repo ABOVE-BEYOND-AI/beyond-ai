@@ -22,7 +22,7 @@ import { useGoogleAuth } from "@/components/google-auth-provider-clean";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { saveItinerary } from "@/lib/redis-database";
+// Removed direct import - now using API route for server-side database operations
 
 const processSteps: Step[] = [
   { id: "research", label: "Researching", description: "AI analysis", status: "pending" },
@@ -270,13 +270,28 @@ function ItineraryPageContent() {
           status: 'generated' as const,
         };
         
-        saveItinerary(user.email, itineraryData)
-          .then((itineraryId) => {
-            console.log('✅ Itinerary saved to database with ID:', itineraryId);
+        // Call server-side API to save itinerary
+        fetch('/api/itinerary/save', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userEmail: user.email,
+            itineraryData
           })
-          .catch((error) => {
-            console.error('❌ Error saving itinerary to database:', error);
-          });
+        })
+        .then(async (response) => {
+          const result = await response.json();
+          if (response.ok) {
+            console.log('✅ Itinerary saved to database with ID:', result.itineraryId);
+          } else {
+            console.error('❌ Failed to save itinerary:', result.error);
+          }
+        })
+        .catch((error) => {
+          console.error('❌ Error saving itinerary to database:', error);
+        });
           
       } catch (error) {
         console.error('Error saving itinerary:', error);
