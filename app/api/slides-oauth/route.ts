@@ -116,9 +116,17 @@ export async function POST(req: NextRequest) {
     });
 
     // Step 5: Add image replacement if we have an image URL
+    // NOTE: Temporarily skip image replacement due to external URL access restrictions
     if (body.imageUrl) {
-      console.log("🖼️ Adding image replacement for:", body.imageUrl);
+      console.log("🖼️ Image URL provided but skipping replacement due to access restrictions:", body.imageUrl);
+      console.log("📝 Slides will be created with text content only");
       
+      // TODO: Implement proper image handling by:
+      // 1. Download image server-side
+      // 2. Upload to Google Drive  
+      // 3. Use Google Drive URL for replacement
+      
+      /* Commented out until proper image handling is implemented
       // First, find the image with alt-text "Option1_Image"
       const presentation = await slides.presentations.get({ presentationId });
       
@@ -150,6 +158,7 @@ export async function POST(req: NextRequest) {
       } else {
         console.log("⚠️ No image placeholder found with alt-text 'Option1_Image'");
       }
+      */
     }
 
     // Step 6: Execute all updates in a single batch
