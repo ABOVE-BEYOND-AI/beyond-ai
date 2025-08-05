@@ -131,12 +131,12 @@ export async function getUserItineraryCount(userEmail: string): Promise<number> 
 }
 
 // Session management
-export async function saveUserSession(email: string, sessionData: any): Promise<void> {
+export async function saveUserSession(email: string, sessionData: Record<string, unknown>): Promise<void> {
   // Sessions expire in 1 hour
   await redis.set(KEYS.userSession(email), sessionData, { ex: 3600 })
 }
 
-export async function getUserSession(email: string): Promise<any> {
+export async function getUserSession(email: string): Promise<Record<string, unknown> | null> {
   return await redis.get(KEYS.userSession(email))
 }
 

@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { GoogleUser } from '@/lib/types'
-import { getGoogleAuthUrl, decodeSession, UserSession } from '@/lib/google-oauth-clean'
+import { getGoogleAuthUrl, decodeSession } from '@/lib/google-oauth-clean'
 
 interface GoogleAuthContextType {
   user: GoogleUser | null
@@ -19,10 +19,6 @@ export function GoogleAuthProvider({ children }: { children: React.ReactNode }) 
   const [user, setUser] = useState<GoogleUser | null>(null)
   const [loading, setLoading] = useState(true)
   const [accessToken, setAccessToken] = useState<string | null>(null)
-
-  useEffect(() => {
-    loadSessionFromCookie()
-  }, [])
 
   const loadSessionFromCookie = () => {
     try {
@@ -64,6 +60,10 @@ export function GoogleAuthProvider({ children }: { children: React.ReactNode }) 
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    loadSessionFromCookie()
+  }, [])
 
   const signIn = () => {
     console.log('🚀 Auth: Starting Google sign-in...')

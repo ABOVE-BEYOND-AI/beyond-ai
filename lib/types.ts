@@ -31,7 +31,7 @@ export interface Itinerary {
   number_of_options: number
   additional_options: string[]
   raw_content?: string
-  processed_content?: any
+  processed_content?: string | object
   images?: Array<{
     imageUrl: string
     hotelName: string

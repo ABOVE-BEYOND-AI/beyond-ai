@@ -160,7 +160,7 @@ function TestContent() {
           <Card>
             <CardHeader>
               <CardTitle>Test Results</CardTitle>
-              <CardDescription>What we're verifying with this test</CardDescription>
+              <CardDescription>What we&apos;re verifying with this test</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">

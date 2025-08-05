@@ -9,10 +9,6 @@ export default function GoogleCallbackPage() {
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing')
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    handleGoogleCallback()
-  }, [])
-
   const handleGoogleCallback = async () => {
     try {
       console.log('🔄 Google Callback: Processing OAuth response...')
@@ -70,6 +66,11 @@ export default function GoogleCallbackPage() {
       setStatus('error')
     }
   }
+
+  useEffect(() => {
+    handleGoogleCallback()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   if (status === 'processing') {
     return (

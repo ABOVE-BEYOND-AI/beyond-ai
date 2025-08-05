@@ -150,17 +150,16 @@ function ItineraryPageContent() {
   const [userId, setUserId] = useState<string | null>(null);
   const [canvaConnected, setCanvaConnected] = useState(false);
   const [canvaDesignUrl, setCanvaDesignUrl] = useState<string | null>(null);
-  
+
   // Slides state
   const [isCreatingSlides, setIsCreatingSlides] = useState(false);
-  const [slidesUrl, setSlidesUrl] = useState<string | null>(null);
 
   // Persistent itinerary state
   const [persistedItinerary, setPersistedItinerary] = useState<{
     content: string | null;
-    images: any[] | null;
-    formData: any;
-    dateRange: any;
+    images: Array<{imageUrl: string; hotelName: string}> | null;
+    formData: Record<string, string>;
+    dateRange: Record<string, unknown>;
     numberOfOptions: number;
     additionalOptions: Option[];
   } | null>(null);

@@ -6,14 +6,14 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import Image from 'next/image'
-import Script from 'next/script'
+
 
 // TypeScript declaration for UnicornStudio global
 declare global {
   interface Window {
     UnicornStudio: {
-      addScene: (config: any) => Promise<any>
-      init: () => Promise<any>
+      addScene: (config: Record<string, unknown>) => Promise<unknown>
+      init: () => Promise<unknown>
       destroy: () => void
     }
   }
