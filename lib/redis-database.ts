@@ -107,10 +107,17 @@ export async function saveItinerary(userEmail: string, itineraryData: Omit<Itine
   // Save the itinerary
   await redis.set(KEYS.itinerary(id), itinerary)
 
-  // Add to user's itinerary list
+  // Add to user's itinerary list (prevent duplicates)
   const userItineraryIds = await getUserItineraryIds(userEmail)
-  userItineraryIds.unshift(id) // Add to beginning (most recent first)
-  await redis.set(KEYS.userItineraries(userEmail), userItineraryIds)
+  
+  // Check if ID already exists to prevent duplicates
+  if (!userItineraryIds.includes(id)) {
+    userItineraryIds.unshift(id) // Add to beginning (most recent first)
+    await redis.set(KEYS.userItineraries(userEmail), userItineraryIds)
+    console.log(`✅ Added itinerary ${id} to user ${userEmail}'s list (total: ${userItineraryIds.length})`);
+  } else {
+    console.log(`⚠️ Itinerary ${id} already exists in user ${userEmail}'s list - skipping duplicate`);
+  }
 
   return id
 }
@@ -121,16 +128,22 @@ export async function getItinerary(id: string): Promise<Itinerary | null> {
   return itinerary as Itinerary | null
 }
 
-export async function getItineraries(userEmail: string): Promise<Itinerary[]> {
+export async function getItineraries(userEmail: string, limit: number = 50, offset: number = 0): Promise<Itinerary[]> {
   const itineraryIds = await getUserItineraryIds(userEmail)
+  
+  console.log(`🔍 getItineraries: User ${userEmail} has ${itineraryIds.length} total itinerary IDs`);
   
   if (itineraryIds.length === 0) {
     return []
   }
 
-  // Get all itineraries in parallel
+  // Apply pagination to avoid loading thousands of entries
+  const paginatedIds = itineraryIds.slice(offset, offset + limit);
+  console.log(`📄 getItineraries: Loading ${paginatedIds.length} itineraries (offset: ${offset}, limit: ${limit})`);
+
+  // Get paginated itineraries in parallel
   const itineraries = await Promise.all(
-    itineraryIds.map(id => getItinerary(id))
+    paginatedIds.map(id => getItinerary(id))
   )
 
   // Filter out any null results and return
