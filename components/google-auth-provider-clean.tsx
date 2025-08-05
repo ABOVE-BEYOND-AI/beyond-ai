@@ -28,6 +28,7 @@ export function GoogleAuthProvider({ children }: { children: React.ReactNode }) 
   const loadSessionFromCookie = useCallback(() => {
     try {
       console.log('🔍 Auth: Loading session from cookie...')
+      console.log('🔍 Auth: All cookies:', document.cookie)
       
       // Get session cookie using standard web API
       const cookies = document.cookie.split('; ')
@@ -35,6 +36,7 @@ export function GoogleAuthProvider({ children }: { children: React.ReactNode }) 
       
       if (!sessionCookie) {
         console.log('🔍 Auth: No session cookie found')
+        console.log('🔍 Auth: Available cookies:', cookies)
         setLoading(false)
         return
       }
