@@ -61,7 +61,7 @@ const ItineraryOption: React.FC<ItineraryOptionProps> = ({ optionContent, image 
         <div className="space-y-2">
           <div className="relative w-full h-96 rounded-lg overflow-hidden">
             <Image
-              src={image.imageUrl}
+              src={`/api/image-proxy?url=${encodeURIComponent(image.imageUrl)}`}
               alt={image.hotelName}
               fill
               className="object-cover"

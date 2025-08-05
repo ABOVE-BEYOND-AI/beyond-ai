@@ -111,7 +111,7 @@ const ItineraryOption: React.FC<ItineraryOptionProps> = ({ optionContent, image 
       {image && image.imageUrl && (
         <div className="mt-6 mb-8">
           <Image
-            src={image.imageUrl}
+            src={`/api/image-proxy?url=${encodeURIComponent(image.imageUrl)}`}
             alt={`Featured Hotel: ${image.hotelName}`}
             width={800}
             height={384}
