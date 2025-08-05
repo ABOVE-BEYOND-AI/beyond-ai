@@ -25,7 +25,7 @@ import { useEffect } from "react";
 
 const processSteps: Step[] = [
   { id: "research", label: "Researching", description: "AI analysis", status: "pending" },
-  { id: "populate", label: "Populating", description: "Canva template", status: "pending" },
+  { id: "populate", label: "Design", description: "Using template", status: "pending" },
   { id: "ready", label: "Ready", description: "Download available", status: "pending" },
 ];
 
