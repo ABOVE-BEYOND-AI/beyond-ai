@@ -270,7 +270,7 @@ function ItineraryPageContent() {
     
     // Clean content before splitting - remove any standalone "Featured Hotel:" lines
     // that appear before the actual options
-    const cleanedContent = currentContent
+    let cleanedContent = currentContent
       .replace(/^[\s\S]*?(?=Option 1:)/, '') // Remove everything before "Option 1:"
       .trim();
     
