@@ -120,14 +120,16 @@
 - [x] **6.1** Integrate embedded viewer into itinerary page ✅ (Completed in Phase 5)
   - [x] Replace "open new tab" with embedded viewer ✅
   - [x] Position viewer appropriately in layout ✅ (between status stepper and request summary)
-  - [ ] Add smooth animations (fade-in, scale-up)
-  - [ ] Load slides data from database on page load
+  - [x] Add smooth animations (fade-in, scale-up) ✅ (animate-in slide-in-from-top-5 duration-500)
+  - [x] Load slides data from database on page load ✅ (localStorage + database persistence implemented)
 
-- [ ] **6.2** Implement PDF download flow
-  - [ ] Call `/api/slides/download-pdf` endpoint
-  - [ ] Handle file download in browser
-  - [ ] Show download progress/spinner
-  - [ ] Handle download errors gracefully
+- [x] **6.2** Implement PDF download flow ✅
+  - [x] Call `/api/slides/download-pdf` endpoint ✅ (using presentationId from slides creation)
+  - [x] Handle file download in browser ✅ (createObjectURL + download link with timestamp filename)
+  - [x] Show download progress/spinner ✅ (Download PDF button shows loading state)
+  - [x] Handle download errors gracefully ✅ (error state with dismiss functionality)
+  
+  **✅ COMPLETED**: Added comprehensive PDF download functionality to EmbeddedSlideViewer component. Users can now download their slides as PDF with proper loading states, error handling, and automatic filename generation. PDF download triggers the onPdfReady callback to update status stepper Ready phase completion. Full state persistence implemented for slidesPresentationId across navigation and browser refresh.
 
 - [ ] **6.3** Add itinerary persistence navigation
   - [ ] Save current state when navigating away

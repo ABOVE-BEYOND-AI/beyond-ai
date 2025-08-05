@@ -163,6 +163,7 @@ function ItineraryPageContent() {
   // Phase 4.1: Enhanced slides creation state
   const [slidesEmbedUrl, setSlidesEmbedUrl] = useState<string | null>(null);
   const [slidesEditUrl, setSlidesEditUrl] = useState<string | null>(null);
+  const [slidesPresentationId, setSlidesPresentationId] = useState<string | null>(null);
   const [pdfReady, setPdfReady] = useState(false);
   const [slidesReady, setSlidesReady] = useState(false);
   
@@ -180,6 +181,7 @@ function ItineraryPageContent() {
     // Phase 4.2: Slides state for navigation persistence
     slidesEmbedUrl?: string | null;
     slidesEditUrl?: string | null;
+    slidesPresentationId?: string | null;
     slidesReady?: boolean;
     pdfReady?: boolean;
     savedItineraryId?: string | null;
@@ -239,6 +241,9 @@ function ItineraryPageContent() {
         if (parsed.slidesEditUrl) {
           setSlidesEditUrl(parsed.slidesEditUrl);
         }
+        if (parsed.slidesPresentationId) {
+          setSlidesPresentationId(parsed.slidesPresentationId);
+        }
         if (parsed.slidesReady) {
           setSlidesReady(parsed.slidesReady);
         }
@@ -277,6 +282,7 @@ function ItineraryPageContent() {
         // Phase 4.2: Include slides state for navigation persistence
         slidesEmbedUrl,
         slidesEditUrl,
+        slidesPresentationId,
         slidesReady,
         pdfReady,
         savedItineraryId,
@@ -337,7 +343,7 @@ function ItineraryPageContent() {
         console.error('Error saving itinerary:', error);
       }
     }
-  }, [content, images, isComplete, formData, dateRange, numberOfOptions, additionalOptions, slidesEmbedUrl, slidesEditUrl, slidesReady, pdfReady, savedItineraryId, user?.email]);
+  }, [content, images, isComplete, formData, dateRange, numberOfOptions, additionalOptions, slidesEmbedUrl, slidesEditUrl, slidesPresentationId, slidesReady, pdfReady, savedItineraryId, user?.email]);
 
   // Phase 4.2: Save slides state changes to localStorage for navigation persistence
   useEffect(() => {
@@ -350,6 +356,7 @@ function ItineraryPageContent() {
             ...parsed,
             slidesEmbedUrl,
             slidesEditUrl,
+            slidesPresentationId,
             slidesReady,
             pdfReady,
             savedItineraryId,
@@ -362,7 +369,7 @@ function ItineraryPageContent() {
         }
       }
     }
-  }, [slidesEmbedUrl, slidesEditUrl, slidesReady, pdfReady, savedItineraryId, content, isComplete]);
+  }, [slidesEmbedUrl, slidesEditUrl, slidesPresentationId, slidesReady, pdfReady, savedItineraryId, content, isComplete]);
 
   // Update step when research is complete
   useEffect(() => {
@@ -577,9 +584,10 @@ function ItineraryPageContent() {
       const result = await response.json();
 
       if (result.success) {
-        // Phase 5.2: Update slides state management for embedded viewer
+        // Phase 6.2: Update slides state management for embedded viewer + PDF download
         setSlidesEmbedUrl(result.embedUrl);
         setSlidesEditUrl(result.presentationUrl);
+        setSlidesPresentationId(result.presentationId);
         setSlidesReady(true);
         setPdfReady(false); // PDF will be ready after download functionality is implemented
         
@@ -619,6 +627,7 @@ function ItineraryPageContent() {
               setSlidesReady(false);
               setSlidesEmbedUrl(null);
               setSlidesEditUrl(null);
+              setSlidesPresentationId(null);
             }
           })
           .catch((error) => {
@@ -627,6 +636,7 @@ function ItineraryPageContent() {
             setSlidesReady(false);
             setSlidesEmbedUrl(null);
             setSlidesEditUrl(null);
+            setSlidesPresentationId(null);
           });
         } else {
           console.warn('⚠️ Cannot update itinerary - missing savedItineraryId or slides data');
@@ -755,13 +765,15 @@ function ItineraryPageContent() {
                 </CardContent>
               </Card>
               
-              {/* Phase 5.2: Embedded Slide Viewer */}
+              {/* Phase 6.2: Embedded Slide Viewer with PDF Download */}
               {slidesReady && slidesEmbedUrl && (
                 <EmbeddedSlideViewer
                   embedUrl={slidesEmbedUrl!}
                   editUrl={slidesEditUrl || undefined}
+                  presentationId={slidesPresentationId || undefined}
                   title="Your Travel Presentation"
                   className="animate-in slide-in-from-top-5 duration-500"
+                  onPdfReady={() => setPdfReady(true)}
                 />
               )}
               
