@@ -97,27 +97,29 @@
   **✅ COMPLETED**: Enhanced frontend state management with comprehensive slides state tracking. Added slidesEmbedUrl, pdfReady, and slidesReady states. Implemented navigation persistence through localStorage with automatic state restoration. Updated status stepper to reflect slides creation progress with proper loading states and completion indicators. All slides state now persists across browser refreshes and page navigation. Ready for Phase 5: Embedded Slide Viewer Component.
 
 ### **Phase 5: Embedded Slide Viewer Component**
-- [ ] **5.1** Create `EmbeddedSlideViewer` component
-  - [ ] iframe implementation with loading state
-  - [ ] Responsive design (960x600 base, scalable)
-  - [ ] Loading spinner overlay
-  - [ ] Error handling for failed embeds
+- [x] **5.1** Create `EmbeddedSlideViewer` component ✅
+  - [x] iframe implementation with loading state ✅ (responsive iframe with overlay)
+  - [x] Responsive design (960x600 base, scalable) ✅ (16:10 aspect ratio preservation)
+  - [x] Loading spinner overlay ✅ (with motion animations)
+  - [x] Error handling for failed embeds ✅ (10-second timeout + retry functionality)
 
-- [ ] **5.2** Add slide navigation controls
-  - [ ] Research iframe slide navigation options
-  - [ ] Implement arrow controls (if possible)
-  - [ ] Alternative: Use Google's built-in controls
+- [x] **5.2** Add slide navigation controls ✅ (Research-informed decision)
+  - [x] Research iframe slide navigation options ✅ (comprehensive research completed)
+  - [x] ~~Implement arrow controls~~ ❌ Not possible due to iframe security restrictions
+  - [x] Alternative: Use Google's built-in controls ✅ (industry standard approach)
 
-- [ ] **5.3** Add action buttons
-  - [ ] "View in Slides" button (opens new tab)
-  - [ ] "Download as PDF" button
-  - [ ] Loading states for buttons
-  - [ ] Success/error feedback
+- [x] **5.3** Add action buttons ✅
+  - [x] "View in Slides" button (opens new tab) ✅ (with external link icon)
+  - [ ] "Download as PDF" button (pending Phase 6)
+  - [x] Loading states for buttons ✅ (integrated with overall loading state)
+  - [x] Success/error feedback ✅ (error state with retry functionality)
+  
+  **✅ COMPLETED**: Built industry-standard embedded slide viewer based on comprehensive research from Perplexity. Component includes responsive iframe with aspect ratio preservation (16:10), loading states with motion animations, comprehensive error handling with 10-second timeout, and full accessibility features. Research confirmed iframe navigation limitations - using Google's built-in controls per industry best practices (Notion, Loom, etc.). Fully integrated into itinerary page with proper state management. Users now see slides embedded in-page instead of new tab redirect. Ready for Phase 6.
 
 ### **Phase 6: Integration & Flow**
-- [ ] **6.1** Integrate embedded viewer into itinerary page
-  - [ ] Replace "open new tab" with embedded viewer
-  - [ ] Position viewer appropriately in layout
+- [x] **6.1** Integrate embedded viewer into itinerary page ✅ (Completed in Phase 5)
+  - [x] Replace "open new tab" with embedded viewer ✅
+  - [x] Position viewer appropriately in layout ✅ (between status stepper and request summary)
   - [ ] Add smooth animations (fade-in, scale-up)
   - [ ] Load slides data from database on page load
 

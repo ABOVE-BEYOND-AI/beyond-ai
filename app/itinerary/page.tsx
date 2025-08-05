@@ -22,6 +22,7 @@ import { useGoogleAuth } from "@/components/google-auth-provider-clean";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { EmbeddedSlideViewer } from "@/components/EmbeddedSlideViewer";
 // Removed direct import - now using API route for server-side database operations
 
 const processSteps: Step[] = [
@@ -161,6 +162,7 @@ function ItineraryPageContent() {
   
   // Phase 4.1: Enhanced slides creation state
   const [slidesEmbedUrl, setSlidesEmbedUrl] = useState<string | null>(null);
+  const [slidesEditUrl, setSlidesEditUrl] = useState<string | null>(null);
   const [pdfReady, setPdfReady] = useState(false);
   const [slidesReady, setSlidesReady] = useState(false);
   
@@ -177,6 +179,7 @@ function ItineraryPageContent() {
     additionalOptions: Option[];
     // Phase 4.2: Slides state for navigation persistence
     slidesEmbedUrl?: string | null;
+    slidesEditUrl?: string | null;
     slidesReady?: boolean;
     pdfReady?: boolean;
     savedItineraryId?: string | null;
@@ -233,6 +236,9 @@ function ItineraryPageContent() {
         if (parsed.slidesEmbedUrl) {
           setSlidesEmbedUrl(parsed.slidesEmbedUrl);
         }
+        if (parsed.slidesEditUrl) {
+          setSlidesEditUrl(parsed.slidesEditUrl);
+        }
         if (parsed.slidesReady) {
           setSlidesReady(parsed.slidesReady);
         }
@@ -270,6 +276,7 @@ function ItineraryPageContent() {
         additionalOptions,
         // Phase 4.2: Include slides state for navigation persistence
         slidesEmbedUrl,
+        slidesEditUrl,
         slidesReady,
         pdfReady,
         savedItineraryId,
@@ -342,6 +349,7 @@ function ItineraryPageContent() {
           const updatedData = {
             ...parsed,
             slidesEmbedUrl,
+            slidesEditUrl,
             slidesReady,
             pdfReady,
             savedItineraryId,
@@ -354,7 +362,7 @@ function ItineraryPageContent() {
         }
       }
     }
-  }, [slidesEmbedUrl, slidesReady, pdfReady, savedItineraryId, content, isComplete]);
+  }, [slidesEmbedUrl, slidesEditUrl, slidesReady, pdfReady, savedItineraryId, content, isComplete]);
 
   // Update step when research is complete
   useEffect(() => {
@@ -569,15 +577,15 @@ function ItineraryPageContent() {
       const result = await response.json();
 
       if (result.success) {
-        // Phase 4.1: Update slides state management
+        // Phase 5.2: Update slides state management for embedded viewer
         setSlidesEmbedUrl(result.embedUrl);
+        setSlidesEditUrl(result.presentationUrl);
         setSlidesReady(true);
         setPdfReady(false); // PDF will be ready after download functionality is implemented
         
-        // Open the slides in a new tab (temporary - will be replaced with embedded viewer)
-        window.open(result.presentationUrl, '_blank');
         console.log('✅ Slides created successfully:', result.presentationUrl);
         console.log('🎯 Embed URL:', result.embedUrl);
+        console.log('🖼️ Embedded viewer will now display the slides in-page');
         
         // Update itinerary in database with slides data
         if (savedItineraryId && result.presentationId && result.embedUrl) {
@@ -610,6 +618,7 @@ function ItineraryPageContent() {
               // Reset state on database update failure
               setSlidesReady(false);
               setSlidesEmbedUrl(null);
+              setSlidesEditUrl(null);
             }
           })
           .catch((error) => {
@@ -617,6 +626,7 @@ function ItineraryPageContent() {
             // Reset state on database update failure
             setSlidesReady(false);
             setSlidesEmbedUrl(null);
+            setSlidesEditUrl(null);
           });
         } else {
           console.warn('⚠️ Cannot update itinerary - missing savedItineraryId or slides data');
@@ -744,6 +754,16 @@ function ItineraryPageContent() {
                   )}
                 </CardContent>
               </Card>
+              
+              {/* Phase 5.2: Embedded Slide Viewer */}
+              {slidesReady && slidesEmbedUrl && (
+                <EmbeddedSlideViewer
+                  embedUrl={slidesEmbedUrl}
+                  editUrl={slidesEditUrl}
+                  title="Your Travel Presentation"
+                  className="animate-in slide-in-from-top-5 duration-500"
+                />
+              )}
               
               {/* Request Summary */}
               <Card className="border-border/30 bg-card/30 backdrop-blur-2xl">
