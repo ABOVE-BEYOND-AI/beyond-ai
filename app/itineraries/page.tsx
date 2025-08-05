@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react'
 import { DashboardLayout } from '@/components/dashboard-layout'
 import { ProtectedRoute } from '@/components/protected-route'
 import { useGoogleAuth } from '@/components/google-auth-provider-clean'
-import { getItineraries } from '@/lib/redis-database'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -38,8 +37,17 @@ function ItinerariesPageContent() {
       if (!user) return
 
       try {
-        const userItineraries = await getItineraries(user.email)
-        setItineraries(userItineraries)
+        console.log('🗄️ Client: Fetching itineraries for user:', user.email);
+        
+        const response = await fetch(`/api/itineraries?userEmail=${encodeURIComponent(user.email)}`);
+        const result = await response.json();
+        
+        if (response.ok) {
+          console.log('✅ Client: Fetched', result.itineraries.length, 'itineraries');
+          setItineraries(result.itineraries);
+        } else {
+          throw new Error(result.error || 'Failed to fetch itineraries');
+        }
       } catch (err) {
         console.error('Error fetching itineraries:', err)
         setError('Failed to load itineraries')
