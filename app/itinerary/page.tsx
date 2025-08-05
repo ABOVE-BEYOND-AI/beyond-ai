@@ -22,6 +22,7 @@ import { useGoogleAuth } from "@/components/google-auth-provider-clean";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { saveItinerary } from "@/lib/redis-database";
 
 const processSteps: Step[] = [
   { id: "research", label: "Researching", description: "AI analysis", status: "pending" },
@@ -230,9 +231,9 @@ function ItineraryPageContent() {
     }
   }, []);
 
-  // Save itinerary data to localStorage when content changes
+  // Save itinerary data to localStorage and database when content changes
   useEffect(() => {
-    if (content && isComplete) {
+    if (content && isComplete && user?.email) {
       const dataToSave = {
         content,
         images,
@@ -244,13 +245,36 @@ function ItineraryPageContent() {
       };
       
       try {
+        // Save to localStorage (existing functionality)
         localStorage.setItem('persistedItinerary', JSON.stringify(dataToSave));
         setPersistedItinerary(dataToSave);
+        
+        // Save to database (NEW!)
+        console.log('🗄️ Saving itinerary to database...');
+        const itineraryData = {
+          destination: formData.destination,
+          dates: dateRange ? `${dateRange.start} - ${dateRange.end}` : 'Not specified',
+          guests: formData.guests,
+          budget_from: formData.budgetFrom,
+          budget_to: formData.budgetTo,
+          raw_content: content,
+          images: images || [],
+          status: 'generated' as const,
+        };
+        
+        saveItinerary(user.email, itineraryData)
+          .then((itineraryId) => {
+            console.log('✅ Itinerary saved to database with ID:', itineraryId);
+          })
+          .catch((error) => {
+            console.error('❌ Error saving itinerary to database:', error);
+          });
+          
       } catch (error) {
-        console.error('Error saving itinerary to localStorage:', error);
+        console.error('Error saving itinerary:', error);
       }
     }
-  }, [content, images, isComplete, formData, dateRange, numberOfOptions, additionalOptions]);
+  }, [content, images, isComplete, formData, dateRange, numberOfOptions, additionalOptions, user?.email]);
 
   // Update step when research is complete
   useEffect(() => {

@@ -3,7 +3,11 @@ import { Redis } from '@upstash/redis'
 import { User, Itinerary, GoogleUser } from './types'
 
 // Initialize Redis client from environment variables
-const redis = Redis.fromEnv()
+// Support both Vercel KV and direct Upstash environment variable patterns
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL || process.env.KV_URL || '',
+  token: process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN || '',
+})
 
 // Redis key patterns
 const KEYS = {
