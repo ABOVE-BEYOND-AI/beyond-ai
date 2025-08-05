@@ -758,8 +758,8 @@ function ItineraryPageContent() {
               {/* Phase 5.2: Embedded Slide Viewer */}
               {slidesReady && slidesEmbedUrl && (
                 <EmbeddedSlideViewer
-                  embedUrl={slidesEmbedUrl}
-                  editUrl={slidesEditUrl}
+                  embedUrl={slidesEmbedUrl!}
+                  editUrl={slidesEditUrl || undefined}
                   title="Your Travel Presentation"
                   className="animate-in slide-in-from-top-5 duration-500"
                 />
