@@ -8,7 +8,7 @@
 
 ### **Current Flow:**
 1. ✅ Researching → AI analysis (with spinner)
-2. ❌ Populating → Canva template (unclear status)
+2. ❌ Populating → Canva template (LEAVE THIS FOR NOW)
 3. ❌ Ready → Download available (opens new tab)
 
 ### **Target Flow:**
@@ -23,11 +23,13 @@
 ## 📋 Implementation Checklist
 
 ### **Phase 1: Status Text Updates**
-- [ ] **1.1** Update status stepper component text
-  - [ ] Change "Populating" to "Design"
-  - [ ] Change "Canva template" to "Using template"
-  - [ ] Locate status stepper component file
-  - [ ] Update text constants/props
+- [x] **1.1** Update status stepper component text ✅
+  - [x] Change "Populating" to "Design" ✅
+  - [x] Change "Canva template" to "Using template" ✅
+  - [x] Locate status stepper component file ✅ (Found in `app/itinerary/page.tsx` lines 26-30)
+  - [x] Update text constants/props ✅ (Updated `processSteps` array)
+  
+  **✅ COMPLETED**: Status stepper now shows "Design → Using template" instead of "Populating → Canva template". Changes deployed successfully. Ready for Phase 2.
 
 ### **Phase 2: Slides API Enhancement**
 - [ ] **2.1** Modify slides API response to include embed URL
