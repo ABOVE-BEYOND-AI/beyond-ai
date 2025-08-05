@@ -109,7 +109,7 @@ export function EmbeddedSlideViewer({
                 Unable to Load Presentation
               </h4>
               <p className="text-sm text-muted-foreground text-center mb-4 max-w-sm">
-                The presentation failed to load. This might be due to a network issue or the slides aren't published to web yet.
+                The presentation failed to load. This might be due to a network issue or the slides aren&apos;t published to web yet.
               </p>
               <div className="flex gap-2">
                 <Button

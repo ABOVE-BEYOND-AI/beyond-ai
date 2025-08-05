@@ -337,7 +337,7 @@ function ItineraryPageContent() {
         console.error('Error saving itinerary:', error);
       }
     }
-  }, [content, images, isComplete, formData, dateRange, numberOfOptions, additionalOptions, user?.email]);
+  }, [content, images, isComplete, formData, dateRange, numberOfOptions, additionalOptions, slidesEmbedUrl, slidesEditUrl, slidesReady, pdfReady, savedItineraryId, user?.email]);
 
   // Phase 4.2: Save slides state changes to localStorage for navigation persistence
   useEffect(() => {
