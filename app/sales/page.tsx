@@ -134,8 +134,15 @@ export default function SalesPage() {
 
   // Calculate filtered stats
   const filteredDeals = dashboardData ? filterDealsByPeriod(dashboardData.recent_deals, selectedPeriod) : [];
-  const filteredAmount = filteredDeals.reduce((sum, deal) => sum + deal.amount, 0);
-  const filteredCount = filteredDeals.length;
+  
+  // For "This Month", use pre-calculated totals; for Today/Week, use filtered deals
+  const displayAmount = selectedPeriod === 'month' 
+    ? (dashboardData?.total_amount || 0)
+    : filteredDeals.reduce((sum, deal) => sum + deal.amount, 0);
+  
+  const displayCount = selectedPeriod === 'month'
+    ? (dashboardData?.total_deals || 0)
+    : filteredDeals.length;
 
   if (loading) {
     return (
@@ -243,7 +250,7 @@ export default function SalesPage() {
                           animate={{ opacity: 1, scale: 1 }}
                           transition={{ duration: 0.3 }}
                         >
-                          {formatCurrency(filteredAmount)}
+                          {formatCurrency(displayAmount)}
                         </motion.span>
                       )}
                     </div>
@@ -274,7 +281,7 @@ export default function SalesPage() {
                           animate={{ opacity: 1, scale: 1 }}
                           transition={{ duration: 0.3 }}
                         >
-                          {filteredCount}
+                          {displayCount}
                         </motion.span>
                       )}
                     </div>
