@@ -96,7 +96,7 @@ export async function saveDeal(dealData: Omit<Deal, 'id' | 'created_at' | 'updat
       );
     }
 
-    console.log(`✅ Saved deal ${id} for rep ${dealData.rep_email} - £${dealData.amount/100}`);
+    console.log(`✅ Saved deal ${id} for rep ${dealData.rep_email} - £${dealData.amount}`);
     return id;
   } catch (error) {
     console.error('❌ Error saving deal:', error);
@@ -271,17 +271,15 @@ export function getPreviousMonth(): string {
   return `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`;
 }
 
-// Parse currency amounts (£1,234.56 → 123456 pence)
+// Parse currency amounts (£1,234.56 → 1234.56 pounds)
 export function parseCurrencyAmount(amountStr: string): number {
-  // Remove currency symbols and commas, convert to pence
+  // Remove currency symbols and commas, return pounds
   const cleanAmount = amountStr.replace(/[£$,\s]/g, '');
-  const pounds = parseFloat(cleanAmount);
-  return Math.round(pounds * 100); // Convert to pence for precision
+  return parseFloat(cleanAmount);
 }
 
-// Format pence to currency string (123456 → "£1,234.56")
-export function formatCurrency(pence: number, currency: string = 'GBP'): string {
-  const pounds = pence / 100;
+// Format pounds to currency string (1234.56 → "£1,234.56")
+export function formatCurrency(pounds: number, currency: string = 'GBP'): string {
   const symbol = currency === 'GBP' ? '£' : '$';
   return `${symbol}${pounds.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }

@@ -75,7 +75,7 @@ export interface Deal {
   rep_name: string
   rep_email: string
   deal_name: string
-  amount: number  // Amount in GBP (pence for precision)
+  amount: number  // Amount in GBP (pounds)
   currency: string  // e.g., 'GBP', 'USD'
   created_at: string
   updated_at: string
@@ -88,7 +88,7 @@ export interface SalesRep {
   email: string
   name: string
   total_deals: number
-  total_amount: number  // Total sales in pence
+  total_amount: number  // Total sales in pounds
   monthly_deals: number
   monthly_amount: number
   rank?: number  // Position in leaderboard
@@ -98,8 +98,8 @@ export interface SalesRep {
 export interface MonthlySalesStats {
   month: string  // Format: 'YYYY-MM'
   total_deals: number
-  total_amount: number  // Total sales in pence
-  target_amount: number  // Monthly target in pence
+  total_amount: number  // Total sales in pounds
+  target_amount: number  // Monthly target in pounds
   completion_percentage: number
   top_reps: SalesRep[]
   created_at: string

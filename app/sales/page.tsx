@@ -53,8 +53,7 @@ const item = {
 };
 
 // Format currency
-const formatCurrency = (pence: number): string => {
-  const pounds = pence / 100;
+const formatCurrency = (pounds: number): string => {
   return `£${pounds.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
