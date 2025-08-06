@@ -169,7 +169,7 @@ export default function SalesPage() {
             <span className="text-gradient">Dashboard</span>
           </h1>
           <p className="text-lg text-muted-foreground max-w-3xl">
-            Track your team's performance with real-time sales data from Slack notifications.
+            Track your team&apos;s performance with real-time sales data from Slack notifications.
           </p>
         </motion.div>
 
