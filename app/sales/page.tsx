@@ -162,7 +162,7 @@ export default function SalesPage() {
 
   return (
     <DashboardLayout>
-      <div className="p-6 lg:p-12 pl-32">
+      <div className="p-6 lg:p-12 pl-20 lg:pl-72">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}

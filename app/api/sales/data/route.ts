@@ -92,8 +92,6 @@ export async function POST(request: NextRequest) {
     
     const body = await request.json()
     const { rep_name, rep_email, deal_name, amount, currency = 'GBP', created_at } = body
-    
-    console.log('📅 DEBUG: Received created_at:', created_at)
 
     if (!rep_name || !rep_email || !deal_name || !amount) {
       return NextResponse.json(
