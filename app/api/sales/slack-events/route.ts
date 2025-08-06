@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { WebClient } from '@slack/web-api'
+import crypto from 'crypto'
 import { 
   saveDeal, 
   isSlackMessageProcessed, 
@@ -17,7 +18,6 @@ function verifySlackSignature(
   signature: string,
   signingSecret: string
 ): boolean {
-  const crypto = require('crypto')
   const time = Math.floor(new Date().getTime() / 1000)
   
   // Request must be within 5 minutes
@@ -36,7 +36,12 @@ function verifySlackSignature(
 }
 
 // Parse deal information from Slack message
-function parseDealFromMessage(text: string, user: any): {
+function parseDealFromMessage(text: string, user: { 
+  real_name?: string; 
+  name?: string; 
+  display_name?: string; 
+  profile?: { email?: string }; 
+}): {
   rep_name: string
   rep_email: string
   deal_name: string

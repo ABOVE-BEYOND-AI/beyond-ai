@@ -9,14 +9,15 @@ import {
   formatCurrency,
   saveDeal
 } from '@/lib/sales-database'
-import { SalesDashboardData, SalesRep } from '@/lib/types'
+import { SalesDashboardData } from '@/lib/types'
 
 export async function GET(request: NextRequest) {
   try {
     console.log('🔄 Sales Data API: Fetching dashboard data...')
     
     const { searchParams } = new URL(request.url)
-    const month = searchParams.get('month') || getCurrentMonth()
+    // Month parameter for future use (currently using current/previous month)
+    searchParams.get('month') || getCurrentMonth()
     
     // Get current and previous month data
     const currentMonth = getCurrentMonth()

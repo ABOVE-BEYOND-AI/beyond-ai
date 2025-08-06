@@ -7,7 +7,6 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   Calendar,
-  FileText,
   Menu,
   Shield,
   Sparkles,

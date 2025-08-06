@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import crypto from 'crypto'
 import { 
   getMonthlySalesStats, 
   getMonthlyLeaderboard,
@@ -15,7 +16,6 @@ function verifySlackSignature(
   signature: string,
   signingSecret: string
 ): boolean {
-  const crypto = require('crypto')
   const time = Math.floor(new Date().getTime() / 1000)
   
   // Request must be within 5 minutes
@@ -57,8 +57,15 @@ function parseMonthParameter(param: string): string {
 
 // Format sales report for Slack
 function formatSalesReport(
-  monthStats: any,
-  leaderboard: any[],
+  monthStats: { 
+    total_amount: number; 
+    total_deals: number; 
+  } | null,
+  leaderboard: Array<{ 
+    name: string; 
+    monthly_amount: number; 
+    monthly_deals: number; 
+  }>,
   monthlyTarget: number,
   month: string
 ): string {
@@ -129,7 +136,8 @@ export async function POST(request: NextRequest) {
     const text = formData.get('text') || ''
     const userId = formData.get('user_id')
     const userName = formData.get('user_name')
-    const channelId = formData.get('channel_id')
+    // Channel ID for future use
+    formData.get('channel_id')
 
     console.log('📝 Command details:', { command, text, userId, userName })
 

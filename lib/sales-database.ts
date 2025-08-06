@@ -1,6 +1,6 @@
 // Redis/Upstash database operations for sales data
 import { Redis } from '@upstash/redis'
-import { Deal, SalesRep, MonthlySalesStats, SalesDashboardData } from './types'
+import { Deal, SalesRep, MonthlySalesStats } from './types'
 
 // Lazy Redis client initialization to prevent client-side execution
 let redis: Redis | null = null;
