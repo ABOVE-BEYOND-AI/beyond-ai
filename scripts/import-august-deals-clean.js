@@ -54,7 +54,7 @@ async function importCleanDeals() {
       amount: deal.amount, // Stored in POUNDS, no conversion
       currency: 'GBP',
       source: 'manual',
-      created_at: `2025-08-${String(Math.floor(Math.random() * 28) + 1).padStart(2, '0')}T${String(Math.floor(Math.random() * 12) + 9).padStart(2, '0')}:${String(Math.floor(Math.random() * 60)).padStart(2, '0')}:00.000Z`
+      created_at: `2025-08-${String(Math.floor(Math.random() * 5) + 1).padStart(2, '0')}T${String(Math.floor(Math.random() * 12) + 9).padStart(2, '0')}:${String(Math.floor(Math.random() * 60)).padStart(2, '0')}:00.000Z`
     };
   });
   

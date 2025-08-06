@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
     console.log('🔄 Sales Data API: Manual deal submission (fixed)...')
     
     const body = await request.json()
-    const { rep_name, rep_email, deal_name, amount, currency = 'GBP' } = body
+    const { rep_name, rep_email, deal_name, amount, currency = 'GBP', created_at } = body
 
     if (!rep_name || !rep_email || !deal_name || !amount) {
       return NextResponse.json(
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
       slack_message_url: undefined
     }
 
-    const dealId = await saveDeal(dealData)
+    const dealId = await saveDeal(dealData, created_at)
 
     console.log(`✅ Manual deal created: ${dealId} for ${rep_name} - ${formatCurrency(dealData.amount)}`)
 

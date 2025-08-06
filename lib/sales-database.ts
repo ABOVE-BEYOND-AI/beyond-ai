@@ -65,7 +65,10 @@ const SALES_KEYS = {
 }
 
 // Deal operations
-export async function saveDeal(dealData: Omit<Deal, 'id' | 'created_at' | 'updated_at'>): Promise<string> {
+export async function saveDeal(
+  dealData: Omit<Deal, 'id' | 'created_at' | 'updated_at'>, 
+  customCreatedAt?: string
+): Promise<string> {
   const redis = getRedisClient();
   const id = `deal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   const now = new Date().toISOString();
@@ -73,7 +76,7 @@ export async function saveDeal(dealData: Omit<Deal, 'id' | 'created_at' | 'updat
   const deal: Deal = {
     id,
     ...dealData,
-    created_at: now,
+    created_at: customCreatedAt || now,
     updated_at: now,
   };
 
