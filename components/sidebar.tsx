@@ -17,6 +17,7 @@ import {
   Home,
   LogOut,
   Settings,
+  DollarSign,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGoogleAuth } from "@/components/google-auth-provider-clean";
@@ -35,15 +36,15 @@ const navigation = [
     active: true,
   },
   {
+    name: "Sales",
+    href: "/sales",
+    icon: DollarSign,
+    active: true,
+  },
+  {
     name: "Upcoming Events",
     href: "#",
     icon: Calendar,
-    active: false,
-  },
-  {
-    name: "Cases",
-    href: "#",
-    icon: FileText,
     active: false,
   },
   {

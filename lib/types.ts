@@ -67,3 +67,50 @@ export interface AuthSession {
   tokens: GoogleTokens
   expires_at: number
 }
+
+// Sales Dashboard Types
+export interface Deal {
+  id: string
+  slack_ts: string  // Slack message timestamp for duplicate detection
+  rep_name: string
+  rep_email: string
+  deal_name: string
+  amount: number  // Amount in GBP (pence for precision)
+  currency: string  // e.g., 'GBP', 'USD'
+  created_at: string
+  updated_at: string
+  slack_channel_id?: string
+  slack_message_url?: string
+  source: 'slack' | 'manual' | 'api'  // Track data source
+}
+
+export interface SalesRep {
+  email: string
+  name: string
+  total_deals: number
+  total_amount: number  // Total sales in pence
+  monthly_deals: number
+  monthly_amount: number
+  rank?: number  // Position in leaderboard
+  last_deal_at?: string
+}
+
+export interface MonthlySalesStats {
+  month: string  // Format: 'YYYY-MM'
+  total_deals: number
+  total_amount: number  // Total sales in pence
+  target_amount: number  // Monthly target in pence
+  completion_percentage: number
+  top_reps: SalesRep[]
+  created_at: string
+  updated_at: string
+}
+
+export interface SalesDashboardData {
+  current_month: MonthlySalesStats
+  previous_month?: MonthlySalesStats
+  recent_deals: Deal[]
+  leaderboard: SalesRep[]
+  monthly_target: number
+  progress_percentage: number
+}
