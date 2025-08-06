@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
 // POST endpoint to manually add deals (for testing)
 export async function POST(request: NextRequest) {
   try {
-    console.log('🔄 Sales Data API: Manual deal submission...')
+    console.log('🔄 Sales Data API: Manual deal submission (fixed)...')
     
     const body = await request.json()
     const { rep_name, rep_email, deal_name, amount, currency = 'GBP' } = body
