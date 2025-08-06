@@ -164,7 +164,7 @@ export async function POST(request: NextRequest) {
         const userInfo = await slack.users.info({ user: event.user })
         
         // Parse deal information from message
-        const dealData = parseDealFromMessage(event.text, userInfo.user)
+        const dealData = parseDealFromMessage(event.text, userInfo.user || {})
         
         if (!dealData) {
           console.log('⏭️ Message does not contain deal information')

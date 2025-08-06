@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     
     const { searchParams } = new URL(request.url)
     // Month parameter for future use (currently using current/previous month)
-    searchParams.get('month') || getCurrentMonth()
+    const _monthParam = searchParams.get('month') || getCurrentMonth()
     
     // Get current and previous month data
     const currentMonth = getCurrentMonth()
