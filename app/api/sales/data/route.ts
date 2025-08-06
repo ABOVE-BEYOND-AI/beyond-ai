@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
       rep_name,
       rep_email,
       deal_name,
-      amount: typeof amount === 'string' ? parseFloat(amount) * 100 : amount * 100, // Convert to pence
+      amount: typeof amount === 'string' ? parseFloat(amount) : amount, // Amount should already be in pence
       currency,
       source: 'manual' as const,
       slack_channel_id: undefined,
