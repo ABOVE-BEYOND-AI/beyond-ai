@@ -365,3 +365,30 @@
     filter: none;
   }
 }
+
+/* NumberFlow styling for gradient text effect */
+.number-flow-container number-flow::part(value) {
+  background: linear-gradient(to bottom, 
+    hsl(var(--foreground)), 
+    hsl(var(--foreground)), 
+    hsl(var(--foreground) / 0.6)
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-variant-numeric: tabular-nums;
+  font-family: inherit;
+  font-weight: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+}
+
+/* Ensure NumberFlow inherits container styles */
+.number-flow-container number-flow {
+  font-family: inherit;
+  font-weight: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+}
