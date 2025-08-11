@@ -102,23 +102,23 @@ Performance:
 
 ## 9) Implementation Steps
 Phase 1 – Backend
-1. Add `EventItem` to `lib/types.ts`.
-2. Create `lib/events-database.ts`: `saveEvent`, `getEvent`, `listEvents`, `deleteEvent`, list by month/category; build indexes.
-3. Implement API routes in `app/api/events/` per Section 5.
-4. Implement `POST /api/events/import` (multipart + JSON); admin-only.
-5. Create `scripts/import-events-2025.js` to parse `data/events-2025.csv` and POST events.
+1. Add `EventItem` to `lib/types.ts`. ✅
+2. Create `lib/events-database.ts`: `saveEvent`, `getEvent`, `listEvents`, `deleteEvent`, `updateEvent`, list by month/category; build indexes. ✅
+3. Implement API routes in `app/api/events/` per Section 5. ✅
+   - `GET /api/events` ✅
+   - `POST /api/events` (admin) ✅
+   - `GET /api/events/[id]` ✅
+   - `PUT /api/events/[id]` (admin) ✅
+   - `DELETE /api/events/[id]` (admin) ✅
+4. Implement `POST /api/events/import` (JSON for now; CSV multipart later); admin-only. ✅
+5. Create `scripts/import-events-2025.js` to parse `data/events-2025.csv` and POST events. (pending)
 
 Phase 2 – UI
-6. Build `/events` page (grid + list + filters + search).
-7. Category legend and color mapping.
-8. Hover/expand cards with CTAs.
-9. Responsive layouts.
-10. Wire sidebar entry to `/events`.
-
-Phase 3 – Enhancements
-11. ICS feed endpoint.
-12. Revalidation hooks after admin writes.
-13. SEO metadata + JSON-LD; optional `/events/[slug]` detail pages.
+6. Build `/events` page (grid + list + filters + search). – Basic list scaffold added ✅
+7. Category legend and color mapping. (pending)
+8. Hover/expand cards with CTAs. (pending)
+9. Responsive layouts. (pending)
+10. Wire sidebar entry to `/events`. ✅
 
 ## 10) CSV Notes from Provided File
 - Mixed date formats present; must parse both.

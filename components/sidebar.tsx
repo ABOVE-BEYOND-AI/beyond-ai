@@ -42,9 +42,9 @@ const navigation = [
   },
   {
     name: "Upcoming Events",
-    href: "#",
+    href: "/events",
     icon: Calendar,
-    active: false,
+    active: true,
   },
   {
     name: "Upgrades",

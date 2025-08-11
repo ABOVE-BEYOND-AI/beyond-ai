@@ -114,3 +114,16 @@ export interface SalesDashboardData {
   monthly_target: number
   progress_percentage: number
 }
+
+// Events Calendar Types
+export interface EventItem {
+  id: string
+  name: string
+  startDate: string // ISO date string (UTC) at 00:00:00
+  endDate: string // ISO date string (UTC) at 23:59:59 for inclusive ranges
+  location: string
+  description: string
+  category: string // normalized slug e.g., formula-1
+  created_at: string
+  updated_at: string
+}
