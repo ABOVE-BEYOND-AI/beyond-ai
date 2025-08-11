@@ -25,40 +25,67 @@ export async function GET(request: NextRequest) {
     
     console.log('📊 Fetching data for months:', { currentMonth, previousMonth })
     
-    // Fetch all required data in parallel
+    // Fetch base data in parallel
     const [
       currentMonthStats,
       previousMonthStats,
       recentDeals,
-      leaderboard,
+      savedLeaderboard,
       monthlyTarget
     ] = await Promise.all([
       getMonthlySalesStats(currentMonth),
       getMonthlySalesStats(previousMonth),
-      getDeals(10, 0), // Get 10 most recent deals
+      getDeals(50, 0), // Fetch more and slice below to 10
       getMonthlyLeaderboard(currentMonth),
       getMonthlyTarget(currentMonth)
     ])
 
+    // If monthly stats are missing, compute on the fly from recent deals
+    let computedCurrentMonthStats = currentMonthStats
+    if (!computedCurrentMonthStats) {
+      const monthDeals = recentDeals.filter(d => d.created_at.startsWith(currentMonth))
+      const total_amount = monthDeals.reduce((sum, d) => sum + d.amount, 0)
+      const total_deals = monthDeals.length
+      computedCurrentMonthStats = {
+        month: currentMonth,
+        total_deals,
+        total_amount,
+        target_amount: monthlyTarget,
+        completion_percentage: monthlyTarget > 0 ? Math.round((total_amount / monthlyTarget) * 100) : 0,
+        top_reps: [],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+    }
+
+    // If leaderboard is missing, compute from month deals
+    let leaderboard = savedLeaderboard
+    if (!leaderboard || leaderboard.length === 0) {
+      const monthDeals = recentDeals.filter(d => d.created_at.startsWith(currentMonth))
+      const repMap: Record<string, { name: string; email: string; monthly_deals: number; monthly_amount: number }> = {}
+      for (const d of monthDeals) {
+        const key = d.rep_name + '|' + (d.id || '')
+        if (!repMap[d.rep_name]) {
+          repMap[d.rep_name] = { name: d.rep_name, email: '', monthly_deals: 0, monthly_amount: 0 }
+        }
+        repMap[d.rep_name].monthly_deals += 1
+        repMap[d.rep_name].monthly_amount += d.amount
+      }
+      leaderboard = Object.values(repMap)
+        .sort((a, b) => b.monthly_amount - a.monthly_amount)
+        .map((r, idx) => ({ ...r, total_amount: 0, total_deals: 0, rank: idx + 1 })) as any
+    }
+
     // Calculate progress percentage
-    const progressPercentage = monthlyTarget > 0 && currentMonthStats 
-      ? Math.round((currentMonthStats.total_amount / monthlyTarget) * 100)
+    const progressPercentage = monthlyTarget > 0 && computedCurrentMonthStats 
+      ? Math.round((computedCurrentMonthStats.total_amount / monthlyTarget) * 100)
       : 0
 
     // Prepare dashboard data
     const dashboardData: SalesDashboardData = {
-      current_month: currentMonthStats || {
-        month: currentMonth,
-        total_deals: 0,
-        total_amount: 0,
-        target_amount: monthlyTarget,
-        completion_percentage: 0,
-        top_reps: [],
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      },
+      current_month: computedCurrentMonthStats!,
       previous_month: previousMonthStats || undefined,
-      recent_deals: recentDeals,
+      recent_deals: recentDeals.slice(0, 10),
       leaderboard: leaderboard,
       monthly_target: monthlyTarget,
       progress_percentage: progressPercentage

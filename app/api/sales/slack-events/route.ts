@@ -86,9 +86,18 @@ function parseDealFromMessage(text: string, user: {
       }
     }
 
-    // Use Slack user info for rep details
-    const repName = user?.real_name || user?.name || user?.display_name || 'Unknown Rep'
-    const repEmail = user?.profile?.email || `${user?.name || 'unknown'}@company.com`
+    // Extract rep from message (Sold By: ...), fallback to Slack user info
+    let repName = 'Unknown Rep'
+    let repEmail = ''
+    const soldByMatch = text.match(/Sold By:\s*([^\n]+)/i)
+    if (soldByMatch) {
+      repName = soldByMatch[1].trim()
+      const derived = repName.toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.|\.$/g, '')
+      repEmail = `${derived}@unknown`
+    } else {
+      repName = user?.real_name || user?.name || user?.display_name || 'Unknown Rep'
+      repEmail = user?.profile?.email || `${(user?.name || 'unknown').toLowerCase()}@unknown`
+    }
 
     console.log('✅ Parsed deal:', { repName, repEmail, dealName, amount, currency })
 
@@ -137,9 +146,20 @@ export async function POST(request: NextRequest) {
     if (payload.type === 'event_callback' && payload.event?.type === 'message') {
       const event = payload.event
       
-      // Ignore bot messages and messages without text
-      if (event.bot_id || !event.text || event.subtype) {
-        console.log('⏭️ Ignoring bot message or message without text')
+      // Ignore messages without text and destructive subtype events
+      if (!event.text) {
+        console.log('⏭️ Ignoring message without text')
+        return NextResponse.json({ ok: true })
+      }
+
+      const ignoredSubtypes = new Set([
+        'message_changed',
+        'message_deleted',
+        'message_replied',
+        'thread_broadcast'
+      ])
+      if (event.subtype && ignoredSubtypes.has(event.subtype)) {
+        console.log(`⏭️ Ignoring message with subtype: ${event.subtype}`)
         return NextResponse.json({ ok: true })
       }
 
@@ -160,8 +180,15 @@ export async function POST(request: NextRequest) {
       console.log('📝 Processing message:', event.text.substring(0, 100) + '...')
 
       try {
-        // Get user information from Slack
-        const userInfo = await slack.users.info({ user: event.user })
+        // Get user information from Slack when present (human poster)
+        let userInfo: any = { user: {} }
+        if (event.user) {
+          try {
+            userInfo = await slack.users.info({ user: event.user })
+          } catch (e) {
+            console.log('⚠️ Could not fetch Slack user info, proceeding without it')
+          }
+        }
         
         // Parse deal information from message
         const dealData = parseDealFromMessage(event.text, userInfo.user || {})

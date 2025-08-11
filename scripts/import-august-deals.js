@@ -241,7 +241,242 @@ Gross: £138,847.94
 Special Requirements:
 Payment Terms: 100% before booking
 Sold By: Sam Harrop
-Link to Record: https://aboveandbeyondgroup.lightning.force.com/lightning/r/Opportunity/006WS00000Cg6y9YAB/view`;
+Link to Record: https://aboveandbeyondgroup.lightning.force.com/lightning/r/Opportunity/006WS00000Cg6y9YAB/view
+
+Salesforce for Slack
+APP  4:52 PM
+Deal Signed! :champagne:
+Stephen Mccann
+Hungarian Grand Prix 2026
+Gross: £10,015.01
+Special Requirements:
+Payment Terms: 10% deposit - 40% in 7 days - 50% 16 weeks before the event date
+Sold By: James Walters
+Link to Record: https://aboveandbeyondgroup.lightning.force.com/lightning/r/Opportunity/006WS00000CsKHNYA3/view
+:+1::skin-tone-4:
+1
+
+
+Salesforce for Slack
+APP  5:17 PM
+Deal Signed! :champagne:
+Ajit Deshpande
+Sao Paulo Grand Prix 2025
+Gross: £66,934.18
+Special Requirements:
+Payment Terms: 10% deposit - 90% on signing of the agreement
+Sold By: Daniel Parker
+Link to Record: https://aboveandbeyondgroup.lightning.force.com/lightning/r/Opportunity/006WS00000CqMbsYAF/view
+:+1::skin-tone-4:
+1
+
+
+Salesforce for Slack
+APP  12:03 PM
+Deal Signed! :champagne:
+Richard Gallon
+British GP 2026
+Gross: £4,273.96
+Special Requirements:
+Payment Terms: 25% deposit - 75% in 7 days time
+Sold By: Ashley Hayes
+Link to Record: https://aboveandbeyondgroup.lightning.force.com/lightning/r/Opportunity/006WS00000CuBGQYA3/view
+:+1::skin-tone-4:
+1
+
+
+Salesforce for Slack
+APP  2:53 PM
+Deal Signed! :champagne:
+Sean Le Tissier
+Baftas 2026
+Gross: £42,846.8
+Special Requirements:
+Payment Terms: 10% deposit - 90% on signing of the agreement
+Sold By: Conner Millar
+Link to Record: https://aboveandbeyondgroup.lightning.force.com/lightning/r/Opportunity/006WS00000Cu9OJYAZ/view
+:+1::skin-tone-4:
+1
+
+
+Salesforce for Slack
+APP  3:44 PM
+Deal Signed! :champagne:
+Scott Fletcher
+Baftas 2026
+Gross: £42,213.6
+Special Requirements:
+Payment Terms: 100% before booking
+Sold By: Toby Davies
+Link to Record: https://aboveandbeyondgroup.lightning.force.com/lightning/r/Opportunity/006WS00000Cuo9iYAB/view
+:+1:
+1
+
+
+Salesforce for Slack
+APP  4:20 PM
+Deal Signed! :champagne:
+Stephen Taylor
+Hungarian Grand Prix 2026
+Gross: £8,909.67
+Special Requirements:
+Payment Terms: 10% deposit - 30% in 14 days - 30% 3 months - 30% 6 months
+Sold By: Max Heighton
+Link to Record: https://aboveandbeyondgroup.lightning.force.com/lightning/r/Opportunity/006WS00000CuqgHYAR/view
+
+Salesforce for Slack
+APP  4:31 PM
+Deal Signed! :champagne:
+Sean Le Tissier
+Baftas 2026
+Gross: £6,685.6
+Special Requirements:
+Payment Terms: 100% before booking
+Sold By: Conner Millar
+Link to Record: https://aboveandbeyondgroup.lightning.force.com/lightning/r/Opportunity/006WS00000CuzjRYAR/view
+:+1:
+1
+
+
+Salesforce for Slack
+APP  5:42 PM
+Deal Signed! :champagne:
+Tim Queenan
+Monaco GP 2026
+Gross: £87,844.44
+Special Requirements:
+Payment Terms: 10% deposit - 40% in 7 days - 50% 16 weeks before the event date
+Sold By: Daniel Parker
+Link to Record: https://aboveandbeyondgroup.lightning.force.com/lightning/r/Opportunity/006WS00000CnMuwYAF/view
+:+1:
+1
+
+
+Salesforce for Slack
+APP  6:09 PM
+Deal Signed! :champagne:
+Mark Stock
+Hungarian Grand Prix 2026
+Gross: £4,454.84
+Special Requirements:
+Payment Terms: 10% deposit - 40% in 7 days - 50% 16 weeks before the event date
+Sold By: Sam Harrop
+Link to Record: https://aboveandbeyondgroup.lightning.force.com/lightning/r/Opportunity/006WS00000CuiM3YAJ/view
+:+1:
+1
+
+Salesforce for Slack
+APP  12:18 PM
+Deal Signed! :champagne:
+Tommy Hutchings
+EL CLASICO 2026
+Gross: £3,338.34
+Special Requirements:
+Payment Terms: 10% deposit - 40% in 7 days - 50% 16 weeks before the event date
+Sold By: Toby Davies
+Link to Record: https://aboveandbeyondgroup.lightning.force.com/lightning/r/Opportunity/006WS00000CwQUgYAN/view
+
+Salesforce for Slack
+APP  2:17 PM
+Deal Signed! :champagne:
+Sean Race
+EL CLASICO 2026
+Gross: £10,015.01
+Special Requirements:
+Payment Terms: 10% deposit - 30% in 14 days - 30% 3 months - 30% 6 months
+Sold By: Max Heighton
+Link to Record: https://aboveandbeyondgroup.lightning.force.com/lightning/r/Opportunity/006WS00000CwdoVYAR/view
+
+Salesforce for Slack
+APP  2:29 PM
+Deal Signed! :champagne:
+Rob Evans
+MOULIN ROUGE 2026
+Gross: £2,221.84
+Special Requirements:
+Payment Terms: 10% deposit - 40% in 7 days - 50% 16 weeks before the event date
+Sold By: Alex Kirby
+Link to Record: https://aboveandbeyondgroup.lightning.force.com/lightning/r/Opportunity/006WS00000CwsadYAB/view
+
+Salesforce for Slack
+APP  5:54 PM
+Deal Signed! :champagne:
+Nathan Dunn
+EL CLASICO 2026
+Gross: £3,338.34
+Special Requirements: Stansted airport request!
+Payment Terms: 10% deposit - 40% in 7 days - 50% 16 weeks before the event date
+Sold By: Billy Prowse
+Link to Record: https://aboveandbeyondgroup.lightning.force.com/lightning/r/Opportunity/006WS00000CwIk6YAF/view
+
+Salesforce for Slack
+APP  6:10 PM
+Deal Signed! :champagne:
+Andy Bacon
+CHRIS EUBANK VS CONOR BENN 2025
+Gross: £1,524.69
+Special Requirements:
+Payment Terms: 10% deposit - 90% in 7 days time
+Sold By: Billy Prowse
+Link to Record: https://aboveandbeyondgroup.lightning.force.com/lightning/r/Opportunity/006WS00000CxFP7YAN/view
+
+Salesforce for Slack
+APP  8:02 PM
+Deal Signed! :champagne:
+Ian Bagshaw
+MADRID GRAND PRIX 2026
+Gross: £4,454.84
+Special Requirements:
+Payment Terms: 10% deposit - 30% in 14 days - 30% 3 months - 30% 6 months
+Sold By: Max Heighton
+Link to Record: https://aboveandbeyondgroup.lightning.force.com/lightning/r/Opportunity/006WS00000Cx01vYAB/view
+
+Salesforce for Slack
+APP  8:39 AM
+Deal Signed! :champagne:
+Dominic Russell
+VIP TURKEY GOLF TRIP 2026
+Gross: £11,142.67
+Special Requirements:
+Payment Terms: 10% deposit - 30% in 14 days - 30% 3 months - 30% 6 months
+Sold By: Max Heighton
+Link to Record: https://aboveandbeyondgroup.lightning.force.com/lightning/r/Opportunity/006WS00000Cx3pPYAR/view
+
+Salesforce for Slack
+APP  11:20 AM
+Deal Signed! :champagne:
+Aiden Rood
+Hungarian Grand Prix 2026
+Gross: £8,909.67
+Special Requirements:
+Payment Terms: 10% deposit - 30% in 14 days - 30% 3 months - 30% 6 months
+Sold By: Aaron Swaby
+Link to Record: https://aboveandbeyondgroup.lightning.force.com/lightning/r/Opportunity/006WS00000CpasBYAR/view
+:heart:
+1
+
+
+Salesforce for Slack
+APP  1:15 PM
+Deal Signed! :champagne:
+Aniko Smith
+Baftas 2026
+Gross: £21,423.4
+Special Requirements:
+Payment Terms: 10% deposit - 90% in 7 days time
+Sold By: Tom Culpin
+Link to Record: https://aboveandbeyondgroup.lightning.force.com/lightning/r/Opportunity/006WS00000CwBc8YAF/view
+
+Salesforce for Slack
+APP  9:33 AM
+Deal Signed! :champagne:
+Lee Puri
+EL CLASICO 2026
+Gross: £3,338.34
+Special Requirements:
+Payment Terms: 10% deposit - 90% in 7 days time
+Sold By: Sam Harrop
+Link to Record: https://aboveandbeyondgroup.lightning.force.com/lightning/r/Opportunity/006WS00000Cx7jJYAR/view`;
 
 // Sales rep email mapping (you may need to adjust these)
 const repEmailMap = {
@@ -323,16 +558,21 @@ function parseDeals(text) {
       }
     }
     
+    // Fallback: if no event name but we captured a single meaningful line, use it as the event name
+    if (!eventName && clientName) {
+      eventName = clientName;
+    }
+    
     // Only add if we have the essential data
     if (eventName && grossAmount && soldBy) {
-      const amountInPence = Math.round(parseFloat(grossAmount) * 100);
+      const amountInPounds = parseFloat(grossAmount);
       const repEmail = repEmailMap[soldBy] || `${soldBy.toLowerCase().replace(/[^a-z]/g, '')}@aboveandbeyond.co.uk`;
       
       deals.push({
         rep_name: soldBy,
         rep_email: repEmail,
         deal_name: eventName,
-        amount: amountInPence,
+        amount: amountInPounds,
         currency: 'GBP',
         source: 'manual',
         created_at: `2025-08-${String(Math.floor(Math.random() * 28) + 1).padStart(2, '0')}T${String(Math.floor(Math.random() * 12) + 9).padStart(2, '0')}:${String(Math.floor(Math.random() * 60)).padStart(2, '0')}:00.000Z`

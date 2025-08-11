@@ -125,26 +125,56 @@ export async function getDeals(limit: number = 50, offset: number = 0): Promise<
   try {
     // Get all deal IDs
     const dealIds = await redis.smembers(SALES_KEYS.allDeals()) as string[];
-    
-    // Sort by creation time (newest first) and paginate
-    const sortedIds = dealIds.slice(offset, offset + limit);
-    
-    // Get deal details
-    const deals: Deal[] = [];
-    for (const id of sortedIds) {
+
+    // Fetch all deals, sort by created_at desc, then paginate reliably
+    const allDeals: Deal[] = [];
+    for (const id of dealIds) {
       const deal = await redis.get(SALES_KEYS.deal(id)) as Deal | null;
       if (deal) {
-        deals.push(deal);
+        allDeals.push(deal);
       }
     }
-    
-    // Sort by created_at descending
-    deals.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    
-    return deals;
+
+    allDeals.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    return allDeals.slice(offset, offset + limit);
   } catch (error) {
     console.error('❌ Error getting deals:', error);
     return [];
+  }
+}
+
+// Delete a deal and remove all references
+export async function deleteDealById(id: string): Promise<boolean> {
+  const redis = getRedisClient();
+
+  try {
+    const deal = await redis.get(SALES_KEYS.deal(id)) as Deal | null;
+    if (!deal) {
+      return false;
+    }
+
+    // Delete primary record
+    await redis.del(SALES_KEYS.deal(id));
+
+    // Remove from global set
+    await redis.srem(SALES_KEYS.allDeals(), id);
+
+    // Remove from rep's set
+    if (deal.rep_email) {
+      await redis.srem(SALES_KEYS.repDeals(deal.rep_email), id);
+    }
+
+    // Remove slack duplicate key if present
+    if (deal.slack_ts && deal.slack_channel_id) {
+      await redis.del(SALES_KEYS.slackMessage(deal.slack_channel_id, deal.slack_ts));
+    }
+
+    console.log(`🗑️ Deleted deal ${id} (${deal.deal_name}) for ${deal.rep_name}`);
+    return true;
+  } catch (error) {
+    console.error('❌ Error deleting deal:', error);
+    return false;
   }
 }
 
