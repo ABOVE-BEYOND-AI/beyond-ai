@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ success: true, created })
-  } catch (e) {
+  } catch (_e) {
     return NextResponse.json({ error: 'Failed to import events' }, { status: 500 })
   }
 }

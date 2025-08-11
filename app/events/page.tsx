@@ -26,7 +26,7 @@ export default function EventsPage() {
         const res = await fetch(`/api/events?limit=200`);
         const data = await res.json();
         setItems(data.items || []);
-      } catch (e) {
+      } catch (_e) {
         setError("Failed to load events");
       } finally {
         setLoading(false);
