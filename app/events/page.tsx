@@ -361,7 +361,7 @@ export default function EventsPage() {
                 transition={{ duration: 0.15 }}
                 className="pointer-events-auto w-full max-w-xl mx-4 bg-card rounded-xl border overflow-hidden shadow-xl"
               >
-                {(() => { const d = (hoverDetails[hovered.id] as any) || hovered; return (
+                {(() => { const d: EventItem = { ...hovered, ...(hoverDetails[hovered.id] || {}) } as EventItem; return (
                 <>
                 <div className="relative w-full aspect-video bg-muted">
                   {(d.imageUrl) && (
