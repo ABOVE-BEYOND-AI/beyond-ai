@@ -64,16 +64,16 @@ export async function GET(request: NextRequest) {
       const monthDeals = recentDeals.filter(d => d.created_at.startsWith(currentMonth))
       const repMap: Record<string, { name: string; email: string; monthly_deals: number; monthly_amount: number }> = {}
       for (const d of monthDeals) {
-        const key = d.rep_name + '|' + (d.id || '')
-        if (!repMap[d.rep_name]) {
-          repMap[d.rep_name] = { name: d.rep_name, email: '', monthly_deals: 0, monthly_amount: 0 }
+        const key = d.rep_email || d.rep_name
+        if (!repMap[key]) {
+          repMap[key] = { name: d.rep_name, email: d.rep_email || '', monthly_deals: 0, monthly_amount: 0 }
         }
-        repMap[d.rep_name].monthly_deals += 1
-        repMap[d.rep_name].monthly_amount += d.amount
+        repMap[key].monthly_deals += 1
+        repMap[key].monthly_amount += d.amount
       }
       leaderboard = Object.values(repMap)
         .sort((a, b) => b.monthly_amount - a.monthly_amount)
-        .map((r, idx) => ({ ...r, total_amount: 0, total_deals: 0, rank: idx + 1 })) as any
+        .map((r, idx) => ({ ...r, total_amount: 0, total_deals: 0, rank: idx + 1 }))
     }
 
     // Calculate progress percentage

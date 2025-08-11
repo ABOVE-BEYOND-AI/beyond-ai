@@ -2,9 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import {
   getDeals,
   saveMonthlySalesStats,
-  saveMonthlyLeaderboard,
-  getMonthlySalesStats,
-  getMonthlyLeaderboard
+  saveMonthlyLeaderboard
 } from '@/lib/sales-database'
 import { SalesRep } from '@/lib/types'
 

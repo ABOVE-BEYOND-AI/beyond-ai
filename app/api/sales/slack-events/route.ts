@@ -181,11 +181,11 @@ export async function POST(request: NextRequest) {
 
       try {
         // Get user information from Slack when present (human poster)
-        let userInfo: any = { user: {} }
+        let userInfo: { user?: { real_name?: string; name?: string; display_name?: string; profile?: { email?: string } } } = { user: {} }
         if (event.user) {
           try {
             userInfo = await slack.users.info({ user: event.user })
-          } catch (e) {
+          } catch (_err) {
             console.log('⚠️ Could not fetch Slack user info, proceeding without it')
           }
         }

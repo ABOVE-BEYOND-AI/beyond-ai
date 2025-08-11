@@ -1,0 +1,172 @@
+Product Requirements Document (PRD)
+Project: Animated “Total Sales” Dashboard & Leaderboard Slack App
+Platform: Next.js on Vercel (built with Cursor) + Slack (free tier)
+
+1. Purpose & Background
+Your sales channel (#sales-updates) already receives “Deal Signed!” notifications from Salesforce. This project will capture those notifications, store deal data, compute month-to-date totals and top performers, generate an animated progress visualization, and post it back into Slack (channel and/or App Home). The goal is to give your team a real-time, visually engaging snapshot of sales performance—without touching Salesforce directly.
+
+2. Objectives & Success Metrics
+Objective	Success Metric
+Visibility: Surface MTD totals daily	≥ 80% of sales team cites Home tab or channel post as “go-to report”
+Motivation: Highlight top reps	≥ 25% lift in inter-rep engagement (emoji reactions, comments)
+Automation: Zero manual steps	100% hands-off data flow from notification → dashboard
+Reliability: On-time posting	≥ 99% of scheduled posts delivered within 5 mins of target time
+
+3. Personas
+Sales Rep
+
+Wants a quick “Did I hit my number?” view each morning.
+
+Sales Manager
+
+Needs to see leaderboards and trends to coach reps.
+
+Ops/IT
+
+Must deploy & maintain with minimal overhead.
+
+4. Key Features
+Deal Ingestion
+
+Trigger: Listen to Slack message events on #sales-updates.
+
+Parse: Extract amount, rep name, deal name, timestamp.
+
+Store: Persist in PostgreSQL (hosted via Supabase or Neon).
+
+Aggregation Job
+
+Schedule: Vercel Scheduled Function or node-cron in a serverless route.
+
+Compute:
+
+totalSales = sum(amount for current month)
+
+leaderboard = top 5 reps by monthly volume
+
+Thresholds: Support custom monthly targets via env var.
+
+Animated Progress Visualization
+
+Engine: chartjs-node-canvas + gifencoder.
+
+Frames: Animate bar/gauge from 0 → (totalSales/target) in 20 steps.
+
+Output: Upload GIF to Slack via files.upload, retrieve url.
+
+Slack Posting
+
+App Home: views.publish() with:
+
+Animated GIF
+
+“MTD Total: £X” + Δ vs. last month
+
+Leaderboard section (rep names + totals)
+
+Channel Message (optional): chat.postMessage to #sales-updates.
+
+Configuration & Controls
+
+Env Vars:
+
+SLACK_BOT_TOKEN, SLACK_SIGNING_SECRET
+
+SALES_CHANNEL_ID, MONTHLY_TARGET
+
+Slash Command (optional): /sales-report [month] to trigger on-demand.
+
+5. Functional Requirements
+ID	Requirement
+FR1	App must subscribe to Slack Events API (message.channels).
+FR2	Parser must correctly handle currency formats (£, digits, commas, decimals).
+FR3	Data retention: keep at least 12 months of deal records.
+FR4	Scheduled function runs at 09:00 on the 1st of each month (UTC).
+FR5	Generated GIF must be ≤ 2 MB (to comply with Slack limits).
+FR6	Home tab layout must refresh on each scheduled run.
+FR7	Slash command /sales-report must accept this-month, last-month, or YYYY-MM.
+
+6. Non-Functional Requirements
+Performance:
+
+Parsing latency < 100 ms per message.
+
+GIF generation < 5 s per run.
+
+Reliability:
+
+99% uptime.
+
+Scalability:
+
+Handle up to 1 000 deals/month without code changes.
+
+Security:
+
+Secrets in Vercel Encrypted Environment Variables.
+
+Verify Slack request signatures on each request.
+
+Cost:
+
+Zero Slack API fees; Vercel Hobby (free) or Pro (< $20/mo).
+
+7. Technical Architecture
+mermaid
+Copy
+Edit
+flowchart LR
+  subgraph Slack
+    A[Deal Signed! channel post] -->|message.channels| B(Bolt.js Listener)
+    F[Slash: /sales-report] -->|HTTP| B
+  end
+
+  subgraph Vercel/API
+    B --> C[(PostgreSQL DB)]
+    B --> D[ACK to user]
+    cron[(Scheduled Function)] --> E[Aggregation & GIF Generation]
+    E --> C
+    E --> G[Slack Post: chat.postMessage + files.upload]
+    E --> H[App Home: views.publish]
+  end
+8. Data Model
+sql
+Copy
+Edit
+CREATE TABLE deals (
+  id SERIAL PRIMARY KEY,
+  slack_ts VARCHAR NOT NULL UNIQUE,
+  rep_name VARCHAR NOT NULL,
+  deal_name VARCHAR NOT NULL,
+  amount NUMERIC(12,2) NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+9. Timeline & Milestones
+Week	Milestone
+1	– Set up Next.js repo & Slack App (Bolt.js)
+– Build message listener & DB write (FR1, FR3)
+2	– Aggregation API route & scheduled function (FR4)
+– Basic JSON response for totals & leaderboard
+3	– GIF generation & file upload (FR5)
+– Home tab update implementation (FR6)
+4	– Slash command support & on-demand reporting (FR7)
+– End-to-end testing, edge-case handling, docs
+5	– Internal roll-out, feedback gathering, final polish
+
+10. Risks & Mitigations
+Risk	Mitigation
+Slack rate-limits on large GIFs	Keep GIF ≤ 2 MB; fall back to a static chart image.
+Missing or malformed messages	Add robust parsing & logging; manual correction tool.
+Vercel cold starts on schedule	Use Vercel Pro or split heavy jobs into smaller tasks.
+
+Next Steps:
+
+Approve PRD & assign owners.
+
+Provision PostgreSQL instance (e.g. Neon, Supabase).
+
+Configure Slack App scopes & install to workspace.
+
+Kick off Week 1 implementation.
+
+Let me know if you’d like clarification or adjustments!
