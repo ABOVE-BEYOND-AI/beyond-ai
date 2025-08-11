@@ -114,10 +114,10 @@ Phase 1 – Backend
 5. Create `scripts/import-events-2025.js` to parse `data/events-2025.csv` and POST events. (pending)
 
 Phase 2 – UI
-6. Build `/events` page (grid + list + filters + search). – Basic list scaffold added ✅
+6. Build `/events` page (grid + list + filters + search). – Month grid + category filter + search + list toggle implemented ✅
 7. Category legend and color mapping. (pending)
 8. Hover/expand cards with CTAs. (pending)
-9. Responsive layouts. (pending)
+9. Responsive layouts: improved; further polish pending.
 10. Wire sidebar entry to `/events`. ✅
 
 ## 10) CSV Notes from Provided File

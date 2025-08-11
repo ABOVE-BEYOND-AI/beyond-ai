@@ -124,6 +124,7 @@ export interface EventItem {
   location: string
   description: string
   category: string // normalized slug e.g., formula-1
+  imageUrl?: string
   created_at: string
   updated_at: string
 }

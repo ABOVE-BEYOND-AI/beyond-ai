@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { listEvents, saveEvent } from '@/lib/events-database'
+import { listEventsOptimized, saveEvent } from '@/lib/events-database'
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
@@ -8,8 +8,14 @@ export async function GET(req: NextRequest) {
   const q = searchParams.get('q') || undefined
   const limit = Number(searchParams.get('limit') || '50')
   const offset = Number(searchParams.get('offset') || '0')
-  const items = await listEvents({ month, category, q, limit, offset })
-  return NextResponse.json({ items })
+  const view = (searchParams.get('fields') as 'grid' | 'list' | 'all') || 'all'
+  const items = await listEventsOptimized({ month, category, q, limit, offset, fields: view })
+  return new NextResponse(JSON.stringify({ items }), {
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': q ? 'public, s-maxage=30, stale-while-revalidate=86400' : 'public, s-maxage=300, stale-while-revalidate=86400'
+    }
+  })
 }
 
 export async function POST(req: NextRequest) {
