@@ -185,8 +185,8 @@ export async function POST(request: NextRequest) {
         if (event.user) {
           try {
             userInfo = await slack.users.info({ user: event.user })
-          } catch (_err) {
-            console.log('⚠️ Could not fetch Slack user info, proceeding without it')
+          } catch (err) {
+            console.log('⚠️ Could not fetch Slack user info, proceeding without it', err)
           }
         }
         

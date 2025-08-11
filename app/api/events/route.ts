@@ -31,7 +31,8 @@ export async function POST(req: NextRequest) {
     }
     const id = await saveEvent({ name, startDate, endDate, location: location || '', description: description || '', category: (category || '').toLowerCase().replace(/\s+/g, '-') })
     return NextResponse.json({ success: true, id })
-  } catch (_e) {
+  } catch (e) {
+    console.error('Failed to create event', e)
     return NextResponse.json({ error: 'Failed to create event' }, { status: 500 })
   }
 }

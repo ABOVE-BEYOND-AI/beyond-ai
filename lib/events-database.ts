@@ -166,7 +166,7 @@ export async function listEventsOptimized(params?: { month?: string; category?: 
     return events.map((e) => ({ id: e.id, name: e.name, startDate: e.startDate, endDate: e.endDate, category: e.category }))
   }
   if (f === 'list') {
-    return events.map((e) => ({ id: e.id, name: e.name, startDate: e.startDate, endDate: e.endDate, location: e.location, description: e.description, category: e.category, imageUrl: (e as any).imageUrl }))
+    return events.map((e) => ({ id: e.id, name: e.name, startDate: e.startDate, endDate: e.endDate, location: e.location, description: e.description, category: e.category, imageUrl: (e as unknown as { imageUrl?: string }).imageUrl }))
   }
   return events
 }

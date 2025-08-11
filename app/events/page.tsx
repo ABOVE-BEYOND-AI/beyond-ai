@@ -61,7 +61,8 @@ export default function EventsPage() {
         const deduped = Array.from(seen.values())
         setItems(deduped);
         if (!query && selectedCategory === 'all') cacheRef.current.set(simpleKey, deduped)
-      } catch (_e) {
+      } catch (e) {
+        console.error('Failed to load events', e)
         setError("Failed to load events");
       } finally {
         setLoading(false);
@@ -104,11 +105,7 @@ export default function EventsPage() {
     return Array.from(map.values());
   }, [items]);
 
-  const categories = useMemo(() => {
-    const set = new Set<string>();
-    for (const e of uniqueItems) set.add(e.category);
-    return ["all", ...Array.from(set).sort()];
-  }, [uniqueItems]);
+  // Removed unused categories computation
 
   // Category colors (static classes so Tailwind includes them)
   const CAT_COLORS: Record<string, { start: string; cont: string }> = {
@@ -149,7 +146,7 @@ export default function EventsPage() {
       } catch {}
     };
     fetchDetails();
-  }, [hovered]);
+  }, [hovered, hoverDetails]);
 
   // Month helpers
   function shiftMonth(delta: number) {
@@ -179,24 +176,7 @@ export default function EventsPage() {
     return weeks;
   }, [month]);
 
-  // Map events to each day (inclusive range)
-  const eventsByDay = useMemo(() => {
-    const map = new Map<string, EventItem[]>();
-    for (const e of uniqueItems) {
-      const start = new Date(e.startDate);
-      const end = new Date(e.endDate);
-      for (
-        let d = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
-        d <= end;
-        d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1))
-      ) {
-        const key = d.toISOString().slice(0, 10);
-        if (!map.has(key)) map.set(key, []);
-        map.get(key)!.push(e);
-      }
-    }
-    return map;
-  }, [uniqueItems]);
+  // Removed unused eventsByDay computation
 
   return (
     <DashboardLayout>
