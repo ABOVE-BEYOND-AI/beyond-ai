@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DashboardLayout } from "@/components/dashboard-layout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +23,7 @@ export default function EventsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const selectedCategory = "all" as const;
   const [view, setView] = useState<"grid" | "list">("grid");
   const [month, setMonth] = useState<string>(() => {
     const now = new Date();
@@ -32,7 +32,7 @@ export default function EventsPage() {
   const todayStr = new Date().toISOString().slice(0, 10);
 
   // Local month cache for instant view switching
-  const cacheRef = (global as any).__eventsMonthCache || ((global as any).__eventsMonthCache = new Map<string, EventItem[]>())
+  const cacheRef = useRef<Map<string, EventItem[]>>(new Map())
 
   useEffect(() => {
     const run = async () => {
@@ -45,10 +45,9 @@ export default function EventsPage() {
         const viewFields = view === 'grid' ? 'grid' : 'list'
         params.set('fields', viewFields)
         // If month cached and no search/category, show instantly
-        const cacheKey = `${month}|${viewFields}|${selectedCategory}|${query}`
         const simpleKey = `${month}|${viewFields}`
-        if (!query && selectedCategory === 'all' && cacheRef.has(simpleKey)) {
-          setItems(cacheRef.get(simpleKey) as EventItem[])
+        if (!query && selectedCategory === 'all' && cacheRef.current.has(simpleKey)) {
+          setItems(cacheRef.current.get(simpleKey) as EventItem[])
         }
         const res = await fetch(`/api/events?${params.toString()}`);
         const data = await res.json();
@@ -61,7 +60,7 @@ export default function EventsPage() {
         }
         const deduped = Array.from(seen.values())
         setItems(deduped);
-        if (!query && selectedCategory === 'all') cacheRef.set(simpleKey, deduped)
+        if (!query && selectedCategory === 'all') cacheRef.current.set(simpleKey, deduped)
       } catch (_e) {
         setError("Failed to load events");
       } finally {
@@ -70,26 +69,28 @@ export default function EventsPage() {
     };
     setLoading(true);
     run();
-  }, [month, selectedCategory, query, view]);
+  }, [month, query, view]);
 
   // Prefetch adjacent months on idle
   useEffect(() => {
-    const id = (window as any).requestIdleCallback?.(async () => {
+    type WindowWithRIC = Window & { requestIdleCallback?: (cb: IdleRequestCallback) => number; cancelIdleCallback?: (handle: number) => void }
+    const w = window as WindowWithRIC
+    const id = w.requestIdleCallback?.(async () => {
       const [y, m] = month.split('-').map(Number)
       const prev = new Date(Date.UTC(y, m - 2, 1))
       const next = new Date(Date.UTC(y, m, 1))
       for (const d of [prev, next]) {
         const mm = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
         const key = `${mm}|grid`
-        if (cacheRef.has(key)) continue
+        if (cacheRef.current.has(key)) continue
         try {
           const res = await fetch(`/api/events?month=${mm}&limit=500&fields=grid`)
           const data = await res.json()
-          if (Array.isArray(data.items)) cacheRef.set(key, data.items)
+          if (Array.isArray(data.items)) cacheRef.current.set(key, data.items)
         } catch {}
       }
     })
-    return () => (window as any).cancelIdleCallback?.(id)
+    return () => w.cancelIdleCallback?.(id as number)
   }, [month])
 
   // Derive category set
