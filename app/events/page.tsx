@@ -299,8 +299,8 @@ export default function EventsPage() {
                   // compute start/end columns relative to this week
                   let startCol = week.findIndex((c) => c.date && c.date >= s)
                   if (startCol === -1) startCol = week.findIndex((c) => c.date !== null)
-                  let endColRev = [...week].reverse().findIndex((c) => c.date && c.date <= en)
-                  let endCol = endColRev === -1 ? week.length - 1 : week.length - 1 - endColRev
+                  const endColRev = [...week].reverse().findIndex((c) => c.date && c.date <= en)
+                  const endCol = endColRev === -1 ? week.length - 1 : week.length - 1 - endColRev
                   const startsInWeek = s >= weekStart
                   const endsInWeek = en <= weekEnd
                   // simple stacking to avoid overlaps in same row

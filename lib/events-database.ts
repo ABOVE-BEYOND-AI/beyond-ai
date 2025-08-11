@@ -146,9 +146,9 @@ export async function listEventsOptimized(params?: { month?: string; category?: 
   // MGET all events
   const keys = ids.map((id) => KEYS.event(id))
   // Upstash Redis client doesn't expose mget in types; cast to unknown and call if available
-  const client = r as unknown as { mget?: (...k: string[]) => Promise<(EventItem | null)[]> }
-  const results = client.mget ? await client.mget(...keys) : await Promise.all(keys.map((k) => r.get(k) as Promise<EventItem | null>))
-  let events = results.filter(Boolean) as EventItem[]
+  const client = r as unknown as { mget?: (...k: string[]) => Promise<unknown[]> }
+  const results = client.mget ? (await client.mget(...keys)) as (EventItem | null)[] : await Promise.all(keys.map((k) => r.get(k) as Promise<EventItem | null>))
+  let events: EventItem[] = (results as (EventItem | null)[]).filter(Boolean) as EventItem[]
 
   // Search filter
   const q = params?.q?.toLowerCase().trim()
