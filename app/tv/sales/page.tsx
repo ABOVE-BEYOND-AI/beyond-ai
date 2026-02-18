@@ -1,7 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState, useCallback, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import NumberFlow from "@number-flow/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -105,6 +104,19 @@ function clientName(oppName: string): string {
   return parts[0] || oppName;
 }
 
+/** Read ?key= from window.location — works on any browser, no React hooks needed */
+function getKeyFromURL(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("key");
+  } catch {
+    // Fallback for very old browsers that don't support URLSearchParams
+    const match = window.location.search.match(/[?&]key=([^&]*)/);
+    return match ? decodeURIComponent(match[1]) : null;
+  }
+}
+
 // ── Leaderboard Row (same as /sales) ──
 
 function LeaderboardRow({ rep, index }: { rep: LeaderboardEntry; index: number }) {
@@ -180,41 +192,9 @@ function DealRow({ deal, index }: { deal: SalesforceOpportunity; index: number }
   );
 }
 
-// ── Auth Gate ──
+// ── Main Component ──
 
-function TVAccessDenied() {
-  return (
-    <div className="h-screen flex items-center justify-center bg-background">
-      <div className="text-center">
-        <div className="w-20 h-20 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-6">
-          <span className="text-4xl">🔒</span>
-        </div>
-        <h1 className="text-3xl font-bold mb-3">Access Denied</h1>
-        <p className="text-muted-foreground text-lg max-w-md mx-auto">
-          Invalid or missing access key. Add <code className="text-sm bg-muted/50 px-2 py-0.5 rounded">?key=YOUR_KEY</code> to the URL.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function TVLoading() {
-  return (
-    <div className="h-screen flex items-center justify-center bg-background">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-6" />
-        <p className="text-muted-foreground text-xl">Loading TV Display...</p>
-      </div>
-    </div>
-  );
-}
-
-// ── Main TV Sales Component ──
-
-function TVSalesContent() {
-  const searchParams = useSearchParams();
-  const key = searchParams.get("key");
-
+export default function TVSalesPage() {
   const [authState, setAuthState] = useState<"loading" | "denied" | "granted">("loading");
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -226,9 +206,13 @@ function TVSalesContent() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const cycleRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hasFetchedOnce = useRef(false);
+  const keyRef = useRef<string | null>(null);
 
-  // ── Verify TV access key ──
+  // ── Verify TV access key on mount ──
   useEffect(() => {
+    const key = getKeyFromURL();
+    keyRef.current = key;
+
     if (!key) {
       setAuthState("denied");
       return;
@@ -240,7 +224,7 @@ function TVSalesContent() {
         else setAuthState("denied");
       })
       .catch(() => setAuthState("denied"));
-  }, [key]);
+  }, []);
 
   // ── Fetch data ──
   const fetchData = useCallback(
@@ -295,9 +279,29 @@ function TVSalesContent() {
     return () => { if (cycleRef.current) clearInterval(cycleRef.current); };
   }, [authState]);
 
-  // ── Auth screens ──
-  if (authState === "loading") return <TVLoading />;
-  if (authState === "denied") return <TVAccessDenied />;
+  // ── Loading screen ──
+  if (authState === "loading") {
+    return (
+      <div className="h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-6" />
+          <p className="text-muted-foreground text-xl">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Access denied screen ──
+  if (authState === "denied") {
+    return (
+      <div className="h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold mb-3">Access Denied</h1>
+          <p className="text-muted-foreground text-lg">Invalid or missing access key.</p>
+        </div>
+      </div>
+    );
+  }
 
   // ── Derived values ──
   const allTotals = data?.all_totals;
@@ -540,15 +544,5 @@ function TVSalesContent() {
         )}
       </div>
     </div>
-  );
-}
-
-// ── Default export with Suspense (required for useSearchParams) ──
-
-export default function TVSalesPage() {
-  return (
-    <Suspense fallback={<TVLoading />}>
-      <TVSalesContent />
-    </Suspense>
   );
 }
