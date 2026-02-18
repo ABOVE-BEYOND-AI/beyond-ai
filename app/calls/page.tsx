@@ -887,7 +887,7 @@ export default function CallsPage() {
         )}
       </AnimatePresence>
 
-      <div className="min-h-screen bg-gradient-to-br from-background to-muted/20 p-6 lg:p-8 pl-24">
+      <div className="h-full overflow-y-auto bg-gradient-to-br from-background to-muted/20 p-6 lg:p-8 pl-24">
         <div className="max-w-7xl mx-auto">
           {/* ── Header ── */}
           <motion.div
@@ -1028,7 +1028,7 @@ export default function CallsPage() {
                   delay={0.15}
                 />
                 <StatCard
-                  label="Meaningful (2m+)"
+                  label="Analysable (3m+)"
                   value={callData?.meaningfulCallCount || 0}
                   icon={Brain}
                   color="text-purple-400"
@@ -1302,7 +1302,7 @@ export default function CallsPage() {
                   <Brain className="h-12 w-12 mx-auto mb-4 opacity-20" />
                   <p className="text-lg font-semibold mb-1">No analysable calls yet</p>
                   <p className="text-sm">
-                    Calls longer than 2 minutes will appear here for AI analysis
+                    Calls longer than 3 minutes will appear here for AI analysis
                   </p>
                 </div>
               )}

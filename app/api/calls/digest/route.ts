@@ -79,9 +79,9 @@ export async function POST(request: NextRequest) {
     // Fetch all calls for the period
     const calls = await getCallsForPeriod(period)
 
-    // Filter to meaningful calls (2+ minutes, answered)
+    // Filter to meaningful calls (3+ minutes, answered)
     const meaningfulCalls = calls.filter(
-      c => c.duration >= 120 && (c.status === 'answered' || c.answered_at)
+      c => c.duration >= 180 && (c.status === 'answered' || c.answered_at)
     )
 
     if (meaningfulCalls.length === 0) {

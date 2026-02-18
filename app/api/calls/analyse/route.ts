@@ -49,11 +49,10 @@ async function transcribeRecording(recordingUrl: string, agentName: string, cont
     file,
     language: 'en',
     response_format: 'verbose_json',
-    prompt: `Sales call between ${agentName} and ${contactName} at Above and Beyond luxury hospitality company. Events discussed may include Grand Prix, The Open, Wimbledon, Six Nations.`,
+    prompt: `This is a British sales call between ${agentName} (sales rep at Above and Beyond, a luxury hospitality company) and ${contactName} (client/prospect). They discuss premium event hospitality packages for sporting events like Formula 1 Grand Prix, The Open Championship, Wimbledon, Six Nations rugby, Cheltenham, and the Ryder Cup. British English accents.`,
   })
 
-  // Format as readable transcript
-  // whisper-1 verbose_json includes segments with timestamps
+  // Format as readable transcript with timestamps
   if ('segments' in transcription && Array.isArray(transcription.segments)) {
     return transcription.segments
       .map((seg: { start: number; text: string }) => {
@@ -61,11 +60,38 @@ async function transcribeRecording(recordingUrl: string, agentName: string, cont
         const secs = Math.floor(seg.start % 60)
         return `[${mins}:${secs.toString().padStart(2, '0')}] ${seg.text.trim()}`
       })
+      .filter(line => {
+        // Filter out empty or near-empty segments
+        const textPart = line.replace(/^\[\d+:\d+\]\s*/, '')
+        return textPart.length > 2
+      })
       .join('\n')
   }
 
-  // Fallback to plain text
   return transcription.text
+}
+
+/**
+ * Validate that a transcript has enough meaningful content for analysis.
+ * Filters out transcripts that are mostly silence markers, hold music, or noise.
+ */
+function isTranscriptMeaningful(transcript: string): { valid: boolean; reason?: string } {
+  // Count actual words (strip timestamps)
+  const textOnly = transcript.replace(/\[\d+:\d+\]/g, '').trim()
+  const words = textOnly.split(/\s+/).filter(w => w.length > 1)
+
+  if (words.length < 30) {
+    return { valid: false, reason: `Transcript only contains ${words.length} words — likely silence, hold music, or voicemail. Need at least 30 words of conversation.` }
+  }
+
+  // Check for repeated patterns (Whisper sometimes hallucinates repetitive content)
+  const uniqueWords = new Set(words.map(w => w.toLowerCase()))
+  const uniqueRatio = uniqueWords.size / words.length
+  if (uniqueRatio < 0.15 && words.length > 50) {
+    return { valid: false, reason: 'Transcript appears to be repetitive noise or hallucinated content.' }
+  }
+
+  return { valid: true }
 }
 
 export async function POST(request: NextRequest) {
@@ -100,9 +126,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (call.duration < 60) {
+    if (call.duration < 90) {
       return NextResponse.json(
-        { success: false, error: 'Call too short for meaningful analysis' },
+        { success: false, error: 'Call too short for meaningful analysis (need 90+ seconds)' },
         { status: 400 }
       )
     }
@@ -118,16 +144,19 @@ export async function POST(request: NextRequest) {
     // Step 1: Download recording and transcribe with Whisper
     const transcript = await transcribeRecording(call.recording, agentName, contactName)
 
-    if (transcript.length < 50) {
+    // Step 2: Validate transcript quality
+    const validation = isTranscriptMeaningful(transcript)
+    if (!validation.valid) {
+      console.warn(`⚠️ Call ${callId} transcript rejected: ${validation.reason}`)
       return NextResponse.json(
-        { success: false, error: 'Transcript too short for meaningful analysis' },
+        { success: false, error: validation.reason },
         { status: 400 }
       )
     }
 
     console.log(`📝 Transcript ready (${transcript.length} chars). Analysing with Claude...`)
 
-    // Step 2: Analyse with Claude
+    // Step 3: Analyse with Claude
     const analysis = await analyseCall({
       transcript,
       agentName,

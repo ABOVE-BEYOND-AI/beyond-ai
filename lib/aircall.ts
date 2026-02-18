@@ -81,18 +81,18 @@ function getAuthHeader(): string {
 const BASE_URL = 'https://api.aircall.io/v1'
 
 // ── Rate-limit–aware fetch ──
+// Aircall allows 60 requests/minute. We use response headers to throttle only when needed.
 
-let lastRequestTime = 0
-const MIN_REQUEST_INTERVAL_MS = 1050 // ~57 req/min (under the 60/min limit)
+let rateLimitRemaining = 60
+let rateLimitReset = 0
 
 async function aircallFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  // Simple rate limiting
-  const now = Date.now()
-  const elapsed = now - lastRequestTime
-  if (elapsed < MIN_REQUEST_INTERVAL_MS) {
-    await new Promise(resolve => setTimeout(resolve, MIN_REQUEST_INTERVAL_MS - elapsed))
+  // Only throttle when we're actually close to the limit
+  if (rateLimitRemaining <= 2 && Date.now() / 1000 < rateLimitReset) {
+    const waitMs = (rateLimitReset - Date.now() / 1000) * 1000 + 500
+    console.log(`⏳ Aircall rate limit: waiting ${Math.round(waitMs)}ms`)
+    await new Promise(resolve => setTimeout(resolve, waitMs))
   }
-  lastRequestTime = Date.now()
 
   const url = path.startsWith('http') ? path : `${BASE_URL}${path}`
 
@@ -104,6 +104,20 @@ async function aircallFetch<T>(path: string, options?: RequestInit): Promise<T> 
       ...options?.headers,
     },
   })
+
+  // Update rate limit tracking from response headers
+  const remaining = response.headers.get('x-aircallapi-remaining')
+  const reset = response.headers.get('x-aircallapi-reset')
+  if (remaining) rateLimitRemaining = parseInt(remaining, 10)
+  if (reset) rateLimitReset = parseInt(reset, 10)
+
+  if (response.status === 429) {
+    // Rate limited — wait and retry
+    const retryAfter = rateLimitReset > 0 ? (rateLimitReset - Date.now() / 1000) * 1000 + 1000 : 5000
+    console.warn(`⚠️ Aircall rate limited. Retrying in ${Math.round(retryAfter)}ms`)
+    await new Promise(resolve => setTimeout(resolve, retryAfter))
+    return aircallFetch(path, options)
+  }
 
   if (!response.ok) {
     const errorBody = await response.text()

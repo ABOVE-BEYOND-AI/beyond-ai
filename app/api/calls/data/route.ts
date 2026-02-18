@@ -19,9 +19,10 @@ export async function GET(request: NextRequest) {
     const stats = computeCallStats(calls)
     const repStats = computeRepStats(calls)
 
-    // Get calls worth analysing (2+ minutes, answered)
+    // Get calls worth analysing (3+ minutes, answered — shorter calls are usually
+    // voicemail, gatekeeper, or hold music and produce poor transcripts)
     const meaningfulCalls = calls.filter(
-      c => c.duration >= 120 && (c.status === 'answered' || c.answered_at)
+      c => c.duration >= 180 && (c.status === 'answered' || c.answered_at)
     )
 
     // Build hourly distribution for chart data
