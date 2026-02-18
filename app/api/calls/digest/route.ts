@@ -30,11 +30,15 @@ export async function POST(request: NextRequest) {
     const redis = getRedis()
     const today = new Date().toISOString().split('T')[0]
 
-    // Check digest cache (unless force refresh)
+    // Check digest cache (unless force refresh, gracefully skip if Redis unavailable)
     if (!forceRefresh && redis) {
-      const cachedDigest = await redis.get(DIGEST_KEY(today, period))
-      if (cachedDigest) {
-        return NextResponse.json({ success: true, data: cachedDigest, cached: true })
+      try {
+        const cachedDigest = await redis.get(DIGEST_KEY(today, period))
+        if (cachedDigest) {
+          return NextResponse.json({ success: true, data: cachedDigest, cached: true })
+        }
+      } catch (cacheErr) {
+        console.warn('Redis digest cache read failed, proceeding without cache:', cacheErr)
       }
     }
 
@@ -73,12 +77,16 @@ export async function POST(request: NextRequest) {
 
     for (const call of callsToAnalyse) {
       try {
-        // Check cache
+        // Check cache (gracefully skip if Redis unavailable)
         if (redis) {
-          const cached = await redis.get<CallAnalysis>(ANALYSIS_KEY(call.id))
-          if (cached) {
-            analyses.push(cached)
-            continue
+          try {
+            const cached = await redis.get<CallAnalysis>(ANALYSIS_KEY(call.id))
+            if (cached) {
+              analyses.push(cached)
+              continue
+            }
+          } catch (cacheErr) {
+            console.warn(`Redis cache read failed for call ${call.id}, proceeding:`, cacheErr)
           }
         }
 
@@ -108,9 +116,11 @@ export async function POST(request: NextRequest) {
 
         analyses.push(analysis)
 
-        // Cache individual analysis
+        // Cache individual analysis (non-blocking)
         if (redis) {
-          await redis.set(ANALYSIS_KEY(call.id), analysis, { ex: 60 * 60 * 24 * 7 })
+          redis.set(ANALYSIS_KEY(call.id), analysis, { ex: 60 * 60 * 24 * 7 }).catch(err =>
+            console.warn(`Redis cache write failed for call ${call.id}:`, err)
+          )
         }
       } catch (err) {
         console.error(`Failed to analyse call ${call.id}:`, err)
@@ -152,9 +162,11 @@ export async function POST(request: NextRequest) {
       period: periodLabel,
     })
 
-    // Cache the digest
+    // Cache the digest (non-blocking)
     if (redis) {
-      await redis.set(DIGEST_KEY(today, period), digest, { ex: CACHE_TTL })
+      redis.set(DIGEST_KEY(today, period), digest, { ex: CACHE_TTL }).catch(err =>
+        console.warn('Redis digest cache write failed:', err)
+      )
     }
 
     return NextResponse.json({ success: true, data: digest, cached: false })

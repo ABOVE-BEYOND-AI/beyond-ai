@@ -25,12 +25,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'call_id is required' }, { status: 400 })
     }
 
-    // Check cache first
+    // Check cache first (gracefully skip if Redis is unavailable)
     const redis = getRedis()
     if (redis) {
-      const cached = await redis.get<CallAnalysis>(CACHE_KEY(callId))
-      if (cached) {
-        return NextResponse.json({ success: true, data: cached, cached: true })
+      try {
+        const cached = await redis.get<CallAnalysis>(CACHE_KEY(callId))
+        if (cached) {
+          return NextResponse.json({ success: true, data: cached, cached: true })
+        }
+      } catch (cacheErr) {
+        console.warn('Redis cache read failed, proceeding without cache:', cacheErr)
       }
     }
 
@@ -71,9 +75,11 @@ export async function POST(request: NextRequest) {
       callId: call.id,
     })
 
-    // Cache the result
+    // Cache the result (non-blocking, skip on failure)
     if (redis) {
-      await redis.set(CACHE_KEY(callId), analysis, { ex: CACHE_TTL })
+      redis.set(CACHE_KEY(callId), analysis, { ex: CACHE_TTL }).catch(err =>
+        console.warn('Redis cache write failed:', err)
+      )
     }
 
     return NextResponse.json({ success: true, data: analysis, cached: false })
