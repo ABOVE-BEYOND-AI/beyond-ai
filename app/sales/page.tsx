@@ -109,13 +109,14 @@ export default function SalesPage() {
   const router = useRouter();
 
   const [data, setData] = useState<DashboardResponse | null>(null);
-  const [dataLoading, setDataLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true); // Only true until first successful fetch
   const [selectedPeriod, setSelectedPeriod] = useState<SalesPeriod>("month");
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hasFetchedOnce = useRef(false);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -127,8 +128,8 @@ export default function SalesPage() {
   // Fetch data from Salesforce API
   const fetchData = useCallback(
     async (silent = false) => {
-      if (!silent) setDataLoading(true);
-      else setIsRefreshing(true);
+      if (!silent && !hasFetchedOnce.current) setInitialLoading(true);
+      if (silent) setIsRefreshing(true);
       setError(null);
 
       try {
@@ -140,14 +141,15 @@ export default function SalesPage() {
         if (result.success) {
           setData(result.data);
           setLastUpdated(new Date());
+          hasFetchedOnce.current = true;
         } else {
           throw new Error(result.error || "Unknown error");
         }
       } catch (err) {
         console.error("Error fetching sales data:", err);
-        if (!silent) setError("Failed to load sales data. Check Salesforce connection.");
+        if (!hasFetchedOnce.current) setError("Failed to load sales data. Check Salesforce connection.");
       } finally {
-        setDataLoading(false);
+        setInitialLoading(false);
         setIsRefreshing(false);
       }
     },
@@ -156,7 +158,7 @@ export default function SalesPage() {
 
   // Initial fetch + re-fetch on period change
   useEffect(() => {
-    if (user) fetchData();
+    if (user) fetchData(hasFetchedOnce.current); // silent if we already have data
   }, [user, fetchData]);
 
   // Polling — refresh every 30s
@@ -173,13 +175,14 @@ export default function SalesPage() {
   }, [user, fetchData]);
 
   // ── Derived values ──
-
-  const totals: PeriodTotals = data?.totals || {
+  // Use all_totals for instant tab switching (NumberFlow animates the number)
+  // Fall back to data.totals for the selected period
+  const allTotals = data?.all_totals;
+  const totals: PeriodTotals = allTotals?.[selectedPeriod] || data?.totals || {
     total_amount: 0,
     total_deals: 0,
     average_deal: 0,
   };
-  const allTotals = data?.all_totals;
   const deals = data?.deals || [];
   const leaderboard = data?.leaderboard || [];
 
@@ -254,7 +257,7 @@ export default function SalesPage() {
           >
             <div className="relative">
               <div className="text-8xl lg:text-9xl font-black tracking-tighter leading-none number-flow-container">
-                {dataLoading ? (
+                {initialLoading ? (
                   <div className="animate-pulse bg-muted/50 h-32 w-96 mx-auto rounded-xl" />
                 ) : (
                   <NumberFlow
@@ -284,7 +287,7 @@ export default function SalesPage() {
                 transition={{ duration: 0.3 }}
                 className="text-xl text-muted-foreground mt-2 relative z-10"
               >
-                {dataLoading ? (
+                {initialLoading ? (
                   <div className="animate-pulse bg-muted/50 h-6 w-48 mx-auto rounded" />
                 ) : (
                   `${totals.total_deals} deal${totals.total_deals !== 1 ? "s" : ""} closed ${periodLabel(selectedPeriod)}`
@@ -319,7 +322,7 @@ export default function SalesPage() {
           </motion.div>
 
           {/* ── Summary Stats Row ── */}
-          {allTotals && !dataLoading && (
+          {allTotals && !initialLoading && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -401,7 +404,7 @@ export default function SalesPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                {dataLoading ? (
+                {initialLoading ? (
                   <div className="space-y-3">
                     {[1, 2, 3].map((i) => (
                       <div key={i} className="flex items-center gap-3">
@@ -483,7 +486,7 @@ export default function SalesPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                {dataLoading ? (
+                {initialLoading ? (
                   <div className="space-y-3">
                     {[1, 2, 3, 4].map((i) => (
                       <div key={i} className="flex items-center gap-3">
@@ -554,7 +557,7 @@ export default function SalesPage() {
           </motion.div>
 
           {/* ── Average Deal Size ── */}
-          {!dataLoading && totals.average_deal > 0 && (
+          {!initialLoading && totals.average_deal > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
