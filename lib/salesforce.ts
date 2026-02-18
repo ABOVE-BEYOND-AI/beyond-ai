@@ -42,7 +42,6 @@ async function authenticate(): Promise<{ access_token: string; instance_url: str
     grant_type: 'client_credentials',
     client_id: clientId,
     client_secret: clientSecret,
-    scope: 'full',
   })
 
   const response = await fetch(`${loginUrl}/services/oauth2/token`, {
