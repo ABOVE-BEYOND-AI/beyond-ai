@@ -17,6 +17,7 @@ import {
   LogOut,
   Settings,
   DollarSign,
+  Phone,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGoogleAuth } from "@/components/google-auth-provider-clean";
@@ -38,6 +39,12 @@ const navigation = [
     name: "Sales",
     href: "/sales",
     icon: DollarSign,
+    active: true,
+  },
+  {
+    name: "Calls",
+    href: "/calls",
+    icon: Phone,
     active: true,
   },
   {
