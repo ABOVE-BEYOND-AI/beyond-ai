@@ -40,17 +40,8 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Recent calls for feed (last 50, with contact info)
-    const recentCalls: {
-      id: number
-      direction: string
-      duration: number
-      started_at: number
-      status: string
-      agent_name: string
-      contact_name: string
-      has_transcript: boolean
-    }[] = calls.slice(0, 50).map((c: AircallCall) => ({
+    // Map a call to a slim response object
+    const mapCall = (c: AircallCall) => ({
       id: c.id,
       direction: c.direction,
       duration: c.duration,
@@ -60,8 +51,14 @@ export async function GET(request: NextRequest) {
       contact_name: c.contact
         ? [c.contact.first_name, c.contact.last_name].filter(Boolean).join(' ') || c.raw_digits
         : c.raw_digits || 'Unknown',
-      has_transcript: c.duration >= 120,
-    }))
+      has_recording: !!(c.recording || c.asset),
+    })
+
+    // Recent calls for the feed (last 50)
+    const recentCalls = calls.slice(0, 50).map(mapCall)
+
+    // ALL meaningful calls (2+ mins) — separate list for Intelligence tab
+    const analysableCalls = meaningfulCalls.slice(0, 100).map(mapCall)
 
     return NextResponse.json({
       success: true,
@@ -70,6 +67,7 @@ export async function GET(request: NextRequest) {
         stats,
         repStats,
         recentCalls,
+        analysableCalls,
         meaningfulCallCount: meaningfulCalls.length,
         hourlyDistribution,
       },

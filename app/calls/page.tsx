@@ -72,7 +72,7 @@ interface RecentCall {
   status: string;
   agent_name: string;
   contact_name: string;
-  has_transcript: boolean;
+  has_recording: boolean;
 }
 
 interface HourlyData {
@@ -84,6 +84,7 @@ interface CallDataResponse {
   stats: CallStats;
   repStats: RepCallStats[];
   recentCalls: RecentCall[];
+  analysableCalls: RecentCall[];
   meaningfulCallCount: number;
   hourlyDistribution: HourlyData;
 }
@@ -447,7 +448,7 @@ function CallRow({ call, onClick }: { call: RecentCall; onClick: () => void }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <p className="text-sm font-medium truncate">{call.contact_name}</p>
-          {call.has_transcript && (
+          {call.has_recording && (
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 shrink-0">
               AI
             </span>
@@ -818,18 +819,13 @@ export default function CallsPage() {
     }
   };
 
-  // ── Auto-fetch digest when switching to that tab ──
-
-  useEffect(() => {
-    if (activeTab === "digest" && !digest && !digestLoading) {
-      generateDigest();
-    }
-  }, [activeTab]);
+  // Digest is only generated when user clicks the button — no auto-fetch
 
   // ── Derived values ──
   const stats = callData?.stats;
   const repStats = callData?.repStats || [];
   const recentCalls = callData?.recentCalls || [];
+  const analysableCalls = callData?.analysableCalls || [];
   const hourlyData = callData?.hourlyDistribution || {};
   const maxRepCalls = repStats.length > 0 ? repStats[0].total_calls : 0;
 
@@ -872,9 +868,10 @@ export default function CallsPage() {
                 <div className="text-center">
                   <Brain className="h-10 w-10 text-purple-400 mx-auto mb-4 animate-pulse" />
                   <p className="text-lg font-semibold mb-1">Analysing Call</p>
-                  <p className="text-sm text-muted-foreground">
-                    Reading transcript & generating insights...
+                  <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                    Downloading recording → Transcribing with Whisper → Analysing with Claude...
                   </p>
+                  <p className="text-xs text-muted-foreground/50 mt-2">This may take 15-30 seconds</p>
                 </div>
               </motion.div>
             ) : callAnalysis ? (
@@ -1209,7 +1206,7 @@ export default function CallsPage() {
                             key={call.id}
                             call={call}
                             onClick={() => {
-                              if (call.has_transcript) {
+                              if (call.has_recording) {
                                 analyseCallById(call.id);
                               }
                             }}
@@ -1239,8 +1236,8 @@ export default function CallsPage() {
                   <div>
                     <h2 className="text-xl font-bold">AI Call Analysis</h2>
                     <p className="text-sm text-muted-foreground mt-0.5">
-                      Click any call with 2+ minutes to get instant AI-powered insights,
-                      objection detection, action items, and coaching feedback.
+                      Click any call to transcribe the recording and get AI-powered insights —
+                      objections, action items, opportunities, and coaching feedback.
                     </p>
                   </div>
                 </div>
@@ -1254,17 +1251,15 @@ export default function CallsPage() {
                   <div className="h-4 w-px bg-white/[0.1]" />
                   <div className="flex items-center gap-2">
                     <span className="text-muted-foreground">
-                      Powered by Claude Sonnet
+                      Whisper transcription → Claude Sonnet analysis
                     </span>
                   </div>
                 </div>
               </motion.div>
 
-              {/* Call list for analysis */}
+              {/* Call list for analysis — all meaningful calls (2+ minutes) */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {recentCalls
-                  .filter((c) => c.has_transcript)
-                  .map((call, index) => (
+                {analysableCalls.map((call, index) => (
                     <motion.button
                       key={call.id}
                       initial={{ opacity: 0, y: 12 }}
@@ -1302,7 +1297,7 @@ export default function CallsPage() {
                   ))}
               </div>
 
-              {recentCalls.filter((c) => c.has_transcript).length === 0 && !initialLoading && (
+              {analysableCalls.length === 0 && !initialLoading && (
                 <div className="text-center py-16 text-muted-foreground">
                   <Brain className="h-12 w-12 mx-auto mb-4 opacity-20" />
                   <p className="text-lg font-semibold mb-1">No analysable calls yet</p>
