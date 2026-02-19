@@ -207,28 +207,12 @@ function timeAgo(unixTimestamp: number): string {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
-function sentimentBg(sentiment: string): string {
-  switch (sentiment) {
-    case "positive":
-      return "bg-green-500/10 border-green-500/20";
-    case "negative":
-      return "bg-red-500/10 border-red-500/20";
-    case "mixed":
-      return "bg-yellow-500/10 border-yellow-500/20";
-    default:
-      return "bg-foreground/[0.04] border-foreground/[0.06]";
-  }
+function sentimentBg(): string {
+  return "bg-foreground/[0.06] border-foreground/[0.08]";
 }
 
-function priorityBadge(priority: string): string {
-  switch (priority) {
-    case "high":
-      return "bg-red-500/20 text-red-600 dark:text-red-300 border-red-500/30";
-    case "medium":
-      return "bg-yellow-500/20 text-yellow-600 dark:text-yellow-300 border-yellow-500/30";
-    default:
-      return "bg-foreground/[0.06] text-muted-foreground border-foreground/[0.08]";
-  }
+function priorityBadge(): string {
+  return "bg-foreground/[0.06] text-muted-foreground border-foreground/[0.08]";
 }
 
 // ── Stat Card ──
@@ -239,7 +223,6 @@ function StatCard({
   icon: Icon,
   suffix,
   trend,
-  color = "text-foreground",
   delay = 0,
 }: {
   label: string;
@@ -247,7 +230,6 @@ function StatCard({
   icon: React.ElementType;
   suffix?: string;
   trend?: number;
-  color?: string;
   delay?: number;
 }) {
   return (
@@ -259,12 +241,12 @@ function StatCard({
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Icon className={`size-4 ${color}`} />
+          <Icon className="size-4 text-muted-foreground" />
           <span className="text-sm text-muted-foreground">{label}</span>
         </div>
         {trend !== undefined && trend !== 0 && (
           <span
-            className={`text-xs flex items-center gap-0.5 ${trend > 0 ? "text-green-500 dark:text-green-400" : "text-red-500 dark:text-red-400"}`}
+            className="text-xs flex items-center gap-0.5 text-muted-foreground"
           >
             {trend > 0 ? (
               <ArrowUpRight className="size-3" />
@@ -275,7 +257,7 @@ function StatCard({
           </span>
         )}
       </div>
-      <div className={`text-3xl font-bold tracking-tight ${color}`}>
+      <div className="text-3xl font-bold tracking-tight text-foreground">
         <NumberFlow
           value={value}
           transformTiming={{ duration: 500, easing: "ease-out" }}
@@ -313,7 +295,7 @@ function ActivityChart({ data }: { data: HourlyData }) {
                 initial={{ height: 0 }}
                 animate={{ height: `${(outbound / maxVal) * 80}px` }}
                 transition={{ duration: 0.5, delay: hour * 0.03 }}
-                className="bg-blue-500/60 rounded-t-sm min-h-0"
+                className="bg-foreground/25 rounded-t-sm min-h-0"
                 style={{ minHeight: outbound > 0 ? 2 : 0 }}
               />
               {/* Inbound bar */}
@@ -321,7 +303,7 @@ function ActivityChart({ data }: { data: HourlyData }) {
                 initial={{ height: 0 }}
                 animate={{ height: `${(inbound / maxVal) * 80}px` }}
                 transition={{ duration: 0.5, delay: hour * 0.03 + 0.1 }}
-                className="bg-emerald-500/60 rounded-t-sm min-h-0"
+                className="bg-foreground/10 rounded-t-sm min-h-0"
                 style={{ minHeight: inbound > 0 ? 2 : 0 }}
               />
             </div>
@@ -361,13 +343,9 @@ function RepRow({
     >
       <div
         className={`size-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
-          index === 0
-            ? "bg-gradient-to-br from-yellow-300 to-yellow-500 text-yellow-900"
-            : index === 1
-              ? "bg-gradient-to-br from-gray-200 to-gray-400 text-gray-700"
-              : index === 2
-                ? "bg-gradient-to-br from-amber-500 to-amber-700 text-amber-100"
-                : "bg-muted/60 text-muted-foreground"
+          index < 3
+            ? "bg-foreground/10 text-foreground"
+            : "bg-muted/60 text-muted-foreground"
         }`}
       >
         {index + 1}
@@ -382,15 +360,7 @@ function RepRow({
             initial={{ width: 0 }}
             animate={{ width: `${barWidth}%` }}
             transition={{ duration: 0.6, delay: index * 0.04 }}
-            className={`h-full rounded-full ${
-              index === 0
-                ? "bg-yellow-500/70"
-                : index === 1
-                  ? "bg-gray-400/70"
-                  : index === 2
-                    ? "bg-amber-500/70"
-                    : "bg-foreground/20"
-            }`}
+            className="h-full rounded-full bg-foreground/20"
           />
         </div>
         <div className="flex items-center gap-3 mt-1">
@@ -416,13 +386,7 @@ function CallRow({ call, onClick }: { call: RecentCall; onClick: () => void }) {
       onClick={onClick}
       className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-foreground/[0.04] transition-colors text-left group"
     >
-      <div
-        className={`size-9 rounded-full flex items-center justify-center shrink-0 ${
-          call.direction === "inbound"
-            ? "bg-emerald-500/10 text-emerald-500 dark:text-emerald-400"
-            : "bg-blue-500/10 text-blue-500 dark:text-blue-400"
-        }`}
-      >
+      <div className="size-9 rounded-full flex items-center justify-center shrink-0 bg-foreground/[0.04] text-muted-foreground">
         {call.direction === "inbound" ? (
           <PhoneIncoming className="size-4" />
         ) : (
@@ -433,7 +397,7 @@ function CallRow({ call, onClick }: { call: RecentCall; onClick: () => void }) {
         <div className="flex items-center gap-2">
           <p className="text-sm font-medium truncate">{call.contact_name}</p>
           {call.has_recording && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-500 dark:text-purple-400 border border-purple-500/20 shrink-0">
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-foreground/[0.06] text-muted-foreground border border-foreground/[0.08] shrink-0">
               AI
             </span>
           )}
@@ -469,10 +433,10 @@ function AnalysisPanel({
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <Brain className="size-5 text-purple-500 dark:text-purple-400" />
+            <Brain className="size-5 text-muted-foreground" />
             <h2 className="text-lg font-semibold">Call Analysis</h2>
             <span
-              className={`text-xs px-2 py-0.5 rounded-full border capitalize ${sentimentBg(analysis.sentiment)}`}
+              className={`text-xs px-2 py-0.5 rounded-full border capitalize ${sentimentBg()}`}
             >
               {analysis.sentiment} · {analysis.sentiment_score}/100
             </span>
@@ -512,12 +476,12 @@ function AnalysisPanel({
         {/* Objections */}
         {analysis.objections.length > 0 && (
           <div className="mb-6">
-            <h3 className="text-sm font-semibold text-red-500 dark:text-red-400 mb-2 flex items-center gap-2">
-              <Warning className="size-3.5" /> Objections Detected
+            <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+              <Warning className="size-3.5 text-muted-foreground" /> Objections Detected
             </h3>
             <div className="space-y-2">
               {analysis.objections.map((obj, i) => (
-                <div key={i} className="text-sm p-3 rounded-lg bg-red-500/5 border border-red-500/10">
+                <div key={i} className="text-sm p-3 rounded-lg bg-foreground/[0.03] border border-foreground/[0.06]">
                   {obj}
                 </div>
               ))}
@@ -528,8 +492,8 @@ function AnalysisPanel({
         {/* Action Items */}
         {analysis.action_items.length > 0 && (
           <div className="mb-6">
-            <h3 className="text-sm font-semibold text-blue-500 dark:text-blue-400 mb-2 flex items-center gap-2">
-              <Target className="size-3.5" /> Action Items
+            <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+              <Target className="size-3.5 text-muted-foreground" /> Action Items
             </h3>
             <div className="space-y-2">
               {analysis.action_items.map((item, i) => (
@@ -538,7 +502,7 @@ function AnalysisPanel({
                   className="flex items-start gap-3 text-sm p-3 rounded-lg bg-foreground/[0.03] border border-foreground/[0.06]"
                 >
                   <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded border shrink-0 mt-0.5 uppercase font-bold ${priorityBadge(item.priority)}`}
+                    className={`text-[10px] px-1.5 py-0.5 rounded border shrink-0 mt-0.5 uppercase font-bold ${priorityBadge()}`}
                   >
                     {item.priority}
                   </span>
@@ -555,21 +519,21 @@ function AnalysisPanel({
         {/* Opportunity Signals */}
         {analysis.opportunity_signals.length > 0 && (
           <div className="mb-6">
-            <h3 className="text-sm font-semibold text-green-500 dark:text-green-400 mb-2 flex items-center gap-2">
-              <TrendUp className="size-3.5" /> Opportunities
+            <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+              <TrendUp className="size-3.5 text-muted-foreground" /> Opportunities
             </h3>
             <div className="space-y-2">
               {analysis.opportunity_signals.map((opp, i) => (
                 <div
                   key={i}
-                  className="text-sm p-3 rounded-lg bg-green-500/5 border border-green-500/10"
+                  className="text-sm p-3 rounded-lg bg-foreground/[0.02] border border-foreground/[0.06]"
                 >
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-600 dark:text-green-300 border border-green-500/30 uppercase font-bold">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-foreground/[0.06] text-muted-foreground border border-foreground/[0.08] uppercase font-bold">
                       {opp.type.replace("_", " ")}
                     </span>
                     {opp.estimated_value && (
-                      <span className="text-xs text-green-500 dark:text-green-400 font-semibold">{opp.estimated_value}</span>
+                      <span className="text-xs text-foreground font-semibold">{opp.estimated_value}</span>
                     )}
                   </div>
                   <p>{opp.description}</p>
@@ -587,7 +551,7 @@ function AnalysisPanel({
               {analysis.events_mentioned.map((event, i) => (
                 <span
                   key={i}
-                  className="text-xs px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-300 border border-amber-500/20"
+                  className="text-xs px-2.5 py-1 rounded-full bg-foreground/[0.06] border border-foreground/[0.08]"
                 >
                   {event}
                 </span>
@@ -599,21 +563,21 @@ function AnalysisPanel({
         {/* Talk-to-Listen Ratio */}
         <div className="mb-6">
           <h3 className="text-sm font-semibold text-muted-foreground mb-2">Talk-to-Listen Ratio</h3>
-          <div className="flex items-center gap-2 h-3 rounded-full overflow-hidden">
+          <div className="flex items-center gap-1 h-3 rounded-full overflow-hidden">
             <div
-              className="bg-blue-500/60 h-full rounded-l-full"
+              className="bg-foreground/25 h-full rounded-l-full"
               style={{ width: `${analysis.talk_to_listen_ratio.agent_pct}%` }}
             />
             <div
-              className="bg-emerald-500/60 h-full rounded-r-full"
+              className="bg-foreground/10 h-full rounded-r-full"
               style={{ width: `${analysis.talk_to_listen_ratio.contact_pct}%` }}
             />
           </div>
           <div className="flex justify-between mt-1">
-            <span className="text-xs text-blue-500 dark:text-blue-400 tabular-nums">
+            <span className="text-xs text-muted-foreground tabular-nums">
               Agent {analysis.talk_to_listen_ratio.agent_pct}%
             </span>
-            <span className="text-xs text-emerald-500 dark:text-emerald-400 tabular-nums">
+            <span className="text-xs text-muted-foreground tabular-nums">
               Contact {analysis.talk_to_listen_ratio.contact_pct}%
             </span>
           </div>
@@ -622,10 +586,10 @@ function AnalysisPanel({
         {/* Coaching Notes */}
         {analysis.coaching_notes && (
           <div className="mb-6">
-            <h3 className="text-sm font-semibold text-yellow-500 dark:text-yellow-400 mb-2 flex items-center gap-2">
-              <FontAwesomeIcon icon={faLightbulb} className="h-3.5 w-3.5" /> Coaching
+            <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+              <FontAwesomeIcon icon={faLightbulb} className="h-3.5 w-3.5 text-muted-foreground" /> Coaching
             </h3>
-            <p className="text-sm p-3 rounded-lg bg-yellow-500/5 border border-yellow-500/10">
+            <p className="text-sm p-3 rounded-lg bg-foreground/[0.03] border border-foreground/[0.06]">
               {analysis.coaching_notes}
             </p>
           </div>
@@ -851,7 +815,7 @@ export default function CallsPage() {
                 className="fixed inset-y-0 right-0 w-full max-w-xl z-50 bg-background/98 backdrop-blur-sm border-l border-border flex items-center justify-center"
               >
                 <div className="text-center">
-                  <Brain className="size-10 text-purple-500 dark:text-purple-400 mx-auto mb-4 animate-pulse" />
+                  <Brain className="size-10 text-muted-foreground mx-auto mb-4 animate-pulse" />
                   <p className="text-lg font-semibold mb-1">Analysing Call</p>
                   <p className="text-sm text-muted-foreground max-w-xs mx-auto">
                     Downloading recording → Transcribing with Whisper → Analysing with Claude...
@@ -880,16 +844,11 @@ export default function CallsPage() {
             animate={{ opacity: 1, y: 0 }}
             className="flex items-center justify-between mb-6"
           >
-            <div className="flex items-center gap-4">
-              <div className="size-10 rounded-xl bg-muted flex items-center justify-center">
-                <Phone className="size-5 text-foreground" weight="duotone" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight text-balance">Call Intelligence</h1>
-                <p className="text-sm text-muted-foreground">
-                  Powered by Aircall + AI
-                </p>
-              </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-balance">Call Intelligence</h1>
+              <p className="text-sm text-muted-foreground">
+                Powered by Aircall + AI
+              </p>
             </div>
             <div className="flex items-center gap-3">
               {/* Live indicator */}
@@ -988,21 +947,18 @@ export default function CallsPage() {
                   label="Total Calls"
                   value={stats?.total_calls || 0}
                   icon={Phone}
-                  color="text-foreground"
                   delay={0}
                 />
                 <StatCard
                   label="Outbound"
                   value={stats?.outbound_calls || 0}
                   icon={PhoneOutgoing}
-                  color="text-blue-500 dark:text-blue-400"
                   delay={0.05}
                 />
                 <StatCard
                   label="Inbound"
                   value={stats?.inbound_calls || 0}
                   icon={PhoneIncoming}
-                  color="text-emerald-500 dark:text-emerald-400"
                   delay={0.1}
                 />
                 <StatCard
@@ -1010,14 +966,12 @@ export default function CallsPage() {
                   value={Math.round(stats?.avg_duration || 0)}
                   icon={Clock}
                   suffix="s"
-                  color="text-amber-500 dark:text-amber-400"
                   delay={0.15}
                 />
                 <StatCard
                   label="Analysable (3m+)"
                   value={callData?.meaningfulCallCount || 0}
                   icon={Brain}
-                  color="text-purple-500 dark:text-purple-400"
                   delay={0.2}
                 />
               </div>
@@ -1033,16 +987,16 @@ export default function CallsPage() {
                 >
                   <div className="px-5 py-4 border-b border-foreground/[0.06] flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <Pulse className="size-[18px] text-blue-500 dark:text-blue-400" />
+                      <Pulse className="size-[18px] text-muted-foreground" />
                       <h2 className="text-base font-semibold">Call Activity</h2>
                     </div>
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1.5">
-                        <span className="size-2 rounded-sm bg-blue-500/60" />
+                        <span className="size-2 rounded-sm bg-foreground/25" />
                         Outbound
                       </span>
                       <span className="flex items-center gap-1.5">
-                        <span className="size-2 rounded-sm bg-emerald-500/60" />
+                        <span className="size-2 rounded-sm bg-foreground/10" />
                         Inbound
                       </span>
                     </div>
@@ -1066,7 +1020,7 @@ export default function CallsPage() {
                   className="rounded-2xl bg-foreground/[0.04] border border-foreground/[0.06] p-5"
                 >
                   <div className="flex items-center gap-3 mb-5">
-                    <Clock className="size-[18px] text-amber-500 dark:text-amber-400" />
+                    <Clock className="size-[18px] text-muted-foreground" />
                     <h2 className="text-base font-semibold">Talk Time</h2>
                   </div>
 
@@ -1094,14 +1048,14 @@ export default function CallsPage() {
                       <div className="h-px bg-foreground/[0.06]" />
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">Answered</span>
-                        <span className="text-lg font-bold text-emerald-500 dark:text-emerald-400 tabular-nums">
+                        <span className="text-lg font-bold tabular-nums">
                           {stats?.answered_calls || 0}
                         </span>
                       </div>
                       <div className="h-px bg-foreground/[0.06]" />
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">Missed</span>
-                        <span className="text-lg font-bold text-red-500 dark:text-red-400 tabular-nums">
+                        <span className="text-lg font-bold tabular-nums">
                           {stats?.missed_calls || 0}
                         </span>
                       </div>
@@ -1120,7 +1074,7 @@ export default function CallsPage() {
                   className="rounded-2xl bg-foreground/[0.04] border border-foreground/[0.06] overflow-hidden"
                 >
                   <div className="px-5 py-4 border-b border-foreground/[0.06] flex items-center gap-3">
-                    <Users className="size-[18px] text-yellow-500" />
+                    <Users className="size-[18px] text-muted-foreground" />
                     <h2 className="text-base font-semibold">Calls by Rep</h2>
                   </div>
                   <div className="p-3 max-h-[420px] overflow-y-auto scrollbar-hide">
@@ -1160,7 +1114,7 @@ export default function CallsPage() {
                 >
                   <div className="px-5 py-4 border-b border-foreground/[0.06] flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <Phone className="size-[18px] text-blue-500 dark:text-blue-400" />
+                      <Phone className="size-[18px] text-muted-foreground" />
                       <h2 className="text-base font-semibold">Recent Calls</h2>
                     </div>
                     <span className="text-xs text-muted-foreground/50">
@@ -1213,11 +1167,11 @@ export default function CallsPage() {
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="rounded-2xl bg-purple-500/5 border border-purple-500/20 p-6"
+                className="rounded-2xl bg-foreground/[0.04] border border-foreground/[0.06] p-6"
               >
                 <div className="flex items-center gap-4">
-                  <div className="size-12 rounded-xl bg-purple-500/10 flex items-center justify-center">
-                    <Brain className="size-6 text-purple-500 dark:text-purple-400" />
+                  <div className="size-12 rounded-xl bg-foreground/[0.06] flex items-center justify-center">
+                    <Brain className="size-6 text-foreground" />
                   </div>
                   <div>
                     <h2 className="text-xl font-bold">AI Call Analysis</h2>
@@ -1229,7 +1183,7 @@ export default function CallsPage() {
                 </div>
                 <div className="mt-4 flex items-center gap-6 text-sm">
                   <div className="flex items-center gap-2">
-                    <span className="text-purple-500 dark:text-purple-400 font-bold text-lg tabular-nums">
+                    <span className="text-foreground font-bold text-lg tabular-nums">
                       {callData?.meaningfulCallCount || 0}
                     </span>
                     <span className="text-muted-foreground">analysable calls</span>
@@ -1252,15 +1206,9 @@ export default function CallsPage() {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.03 }}
                       onClick={() => analyseCallById(call.id)}
-                      className="flex items-center gap-4 p-4 rounded-2xl bg-foreground/[0.04] border border-foreground/[0.06] hover:bg-foreground/[0.06] hover:border-purple-500/20 transition-colors text-left group"
+                      className="flex items-center gap-4 p-4 rounded-2xl bg-foreground/[0.04] border border-foreground/[0.06] hover:bg-foreground/[0.06] hover:border-foreground/[0.12] transition-colors text-left group"
                     >
-                      <div
-                        className={`size-11 rounded-xl flex items-center justify-center shrink-0 ${
-                          call.direction === "inbound"
-                            ? "bg-emerald-500/10 text-emerald-500 dark:text-emerald-400"
-                            : "bg-blue-500/10 text-blue-500 dark:text-blue-400"
-                        }`}
-                      >
+                      <div className="size-11 rounded-xl flex items-center justify-center shrink-0 bg-foreground/[0.04] text-muted-foreground">
                         {call.direction === "inbound" ? (
                           <PhoneIncoming className="size-5" />
                         ) : (
@@ -1274,10 +1222,10 @@ export default function CallsPage() {
                         </p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-xs px-2 py-1 rounded-lg bg-purple-500/10 text-purple-500 dark:text-purple-400 border border-purple-500/20 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span className="text-xs px-2 py-1 rounded-lg bg-foreground/[0.06] text-muted-foreground border border-foreground/[0.08] opacity-0 group-hover:opacity-100 transition-opacity">
                           Analyse
                         </span>
-                        <CaretRight className="size-4 text-muted-foreground/30 group-hover:text-purple-500 dark:group-hover:text-purple-400 transition-colors" />
+                        <CaretRight className="size-4 text-muted-foreground/30 group-hover:text-foreground transition-colors" />
                       </div>
                     </motion.button>
                   ))}
@@ -1302,12 +1250,12 @@ export default function CallsPage() {
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="rounded-2xl bg-amber-500/5 border border-amber-500/20 p-6"
+                className="rounded-2xl bg-foreground/[0.04] border border-foreground/[0.06] p-6"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="size-12 rounded-xl bg-amber-500/10 flex items-center justify-center">
-                      <MagicWand className="size-6 text-amber-500 dark:text-amber-400" />
+                    <div className="size-12 rounded-xl bg-foreground/[0.06] flex items-center justify-center">
+                      <MagicWand className="size-6 text-foreground" />
                     </div>
                     <div>
                       <h2 className="text-xl font-bold">AI Sales Digest</h2>
@@ -1321,7 +1269,7 @@ export default function CallsPage() {
                   <button
                     onClick={() => generateDigest(true)}
                     disabled={digestLoading}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-300 hover:bg-amber-500/20 transition-colors text-sm font-medium disabled:opacity-50"
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-foreground/[0.06] text-foreground hover:bg-foreground/[0.1] transition-colors text-sm font-medium disabled:opacity-50"
                   >
                     {digestLoading ? (
                       <SpinnerGap className="size-4 animate-spin" />
@@ -1339,7 +1287,7 @@ export default function CallsPage() {
                   animate={{ opacity: 1 }}
                   className="text-center py-20"
                 >
-                  <MagicWand className="size-12 text-amber-500 dark:text-amber-400 mx-auto mb-4 animate-pulse" />
+                  <MagicWand className="size-12 text-muted-foreground mx-auto mb-4 animate-pulse" />
                   <p className="text-lg font-semibold mb-2">Generating AI Digest</p>
                   <p className="text-sm text-muted-foreground max-w-md mx-auto">
                     Analysing call transcripts, detecting patterns, and generating team-wide insights. This may take 30-60 seconds...
@@ -1362,7 +1310,7 @@ export default function CallsPage() {
                       <DigestSection
                         title="Objection Radar"
                         icon={Warning}
-                        iconColor="text-red-500 dark:text-red-400"
+                        iconColor="text-muted-foreground"
                         delay={0.1}
                       >
                         <div className="space-y-4">
@@ -1370,7 +1318,7 @@ export default function CallsPage() {
                             <div key={i}>
                               <div className="flex items-center justify-between mb-1">
                                 <p className="text-sm font-semibold">{obj.objection}</p>
-                                <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/10 text-red-500 dark:text-red-400 tabular-nums">
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-foreground/[0.06] text-muted-foreground tabular-nums">
                                   {obj.frequency}x
                                 </span>
                               </div>
@@ -1388,14 +1336,14 @@ export default function CallsPage() {
                       <DigestSection
                         title="What's Working"
                         icon={Trophy}
-                        iconColor="text-green-500 dark:text-green-400"
+                        iconColor="text-muted-foreground"
                         delay={0.15}
                       >
                         <div className="space-y-3">
                           {digest.winning_pitches.map((pitch, i) => (
                             <div
                               key={i}
-                              className="p-3 rounded-lg bg-green-500/5 border border-green-500/10"
+                              className="p-3 rounded-lg bg-foreground/[0.02] border border-foreground/[0.06]"
                             >
                               <p className="text-sm">{pitch.description}</p>
                               <p className="text-xs text-muted-foreground mt-1">
@@ -1412,7 +1360,7 @@ export default function CallsPage() {
                       <DigestSection
                         title="Event Demand"
                         icon={TrendUp}
-                        iconColor="text-amber-500 dark:text-amber-400"
+                        iconColor="text-muted-foreground"
                         delay={0.2}
                       >
                         <div className="space-y-3">
@@ -1422,7 +1370,7 @@ export default function CallsPage() {
                                 <p className="text-sm font-semibold">{event.event}</p>
                                 <p className="text-xs text-muted-foreground">{event.sentiment}</p>
                               </div>
-                              <span className="text-sm font-bold text-amber-500 dark:text-amber-400 tabular-nums">
+                              <span className="text-sm font-bold text-foreground tabular-nums">
                                 {event.mentions} mentions
                               </span>
                             </div>
@@ -1436,7 +1384,7 @@ export default function CallsPage() {
                       <DigestSection
                         title="Competitor Intel"
                         icon={Target}
-                        iconColor="text-orange-500 dark:text-orange-400"
+                        iconColor="text-muted-foreground"
                         delay={0.25}
                       >
                         <div className="space-y-3">
@@ -1460,30 +1408,20 @@ export default function CallsPage() {
                       <DigestSection
                         title="Coaching Insights"
                         icon={Lightning}
-                        iconColor="text-yellow-500 dark:text-yellow-400"
+                        iconColor="text-muted-foreground"
                         delay={0.3}
                       >
                         <div className="space-y-3">
                           {digest.coaching_highlights.map((highlight, i) => (
                             <div
                               key={i}
-                              className={`p-3 rounded-lg border ${
-                                highlight.type === "strength"
-                                  ? "bg-green-500/5 border-green-500/10"
-                                  : "bg-yellow-500/5 border-yellow-500/10"
-                              }`}
+                              className="p-3 rounded-lg border bg-foreground/[0.02] border-foreground/[0.06]"
                             >
                               <div className="flex items-center gap-2 mb-1">
                                 <span className="text-xs font-bold uppercase">
                                   {highlight.rep}
                                 </span>
-                                <span
-                                  className={`text-[10px] px-1.5 py-0.5 rounded border uppercase ${
-                                    highlight.type === "strength"
-                                      ? "bg-green-500/20 text-green-600 dark:text-green-300 border-green-500/30"
-                                      : "bg-yellow-500/20 text-yellow-600 dark:text-yellow-300 border-yellow-500/30"
-                                  }`}
-                                >
+                                <span className="text-[10px] px-1.5 py-0.5 rounded border uppercase bg-foreground/[0.06] text-muted-foreground border-foreground/[0.08]">
                                   {highlight.type}
                                 </span>
                               </div>
@@ -1501,7 +1439,7 @@ export default function CallsPage() {
                       <DigestSection
                         title="Key Deals"
                         icon={Target}
-                        iconColor="text-blue-500 dark:text-blue-400"
+                        iconColor="text-muted-foreground"
                         delay={0.35}
                       >
                         <div className="space-y-3">
@@ -1517,7 +1455,7 @@ export default function CallsPage() {
                               <p className="text-xs text-muted-foreground mb-1">
                                 Status: {deal.status}
                               </p>
-                              <p className="text-xs text-blue-500 dark:text-blue-400">→ {deal.next_steps}</p>
+                              <p className="text-xs text-foreground">→ {deal.next_steps}</p>
                             </div>
                           ))}
                         </div>
@@ -1529,16 +1467,16 @@ export default function CallsPage() {
                       <DigestSection
                         title="Follow-up Gaps"
                         icon={Warning}
-                        iconColor="text-orange-500 dark:text-orange-400"
+                        iconColor="text-muted-foreground"
                         delay={0.4}
                       >
                         <div className="space-y-2">
                           {digest.follow_up_gaps.map((gap, i) => (
                             <div
                               key={i}
-                              className="flex items-start gap-3 text-sm p-3 rounded-lg bg-orange-500/5 border border-orange-500/10"
+                              className="flex items-start gap-3 text-sm p-3 rounded-lg bg-foreground/[0.02] border border-foreground/[0.06]"
                             >
-                              <span className="text-xs font-bold text-orange-500 dark:text-orange-400 shrink-0">
+                              <span className="text-xs font-bold text-foreground shrink-0">
                                 {gap.rep}
                               </span>
                               <p className="text-xs text-muted-foreground">{gap.description}</p>
@@ -1558,7 +1496,7 @@ export default function CallsPage() {
                   </p>
                   <button
                     onClick={() => generateDigest()}
-                    className="px-6 py-3 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-300 hover:bg-amber-500/20 transition-colors text-sm font-medium"
+                    className="px-6 py-3 rounded-xl bg-foreground/[0.06] text-foreground hover:bg-foreground/[0.1] transition-colors text-sm font-medium"
                   >
                     Generate Digest
                   </button>
