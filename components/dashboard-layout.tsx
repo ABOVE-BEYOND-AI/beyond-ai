@@ -11,7 +11,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
 
   return (
-    <div className="relative h-screen bg-background">
+    <div className="relative h-dvh bg-background">
       {/* Main content - full width, no padding (children handle their own padding) */}
       <main className="h-full overflow-hidden">
         <div className="h-full">

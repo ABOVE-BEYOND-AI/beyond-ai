@@ -28,11 +28,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: `try{if(localStorage.theme==='dark')document.documentElement.classList.add('dark')}catch(e){}` }} />
+      </head>
       <body
         className={cn(
           jakartaSans.variable,
-          "font-sans antialiased bg-background text-foreground transition-colors duration-300"
+          "font-sans antialiased bg-background text-foreground"
         )}
       >
         <GoogleAuthProvider>

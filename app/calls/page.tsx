@@ -5,29 +5,27 @@ import {
   Phone,
   PhoneIncoming,
   PhoneOutgoing,
-  PhoneMissed,
   Clock,
   Users,
-  TrendingUp,
-  TrendingDown,
-  RefreshCw,
+  TrendUp,
+  ArrowsClockwise,
   Brain,
-  Zap,
-  AlertTriangle,
+  Lightning,
+  Warning,
   Target,
   Trophy,
-  MessageSquare,
-  ChevronRight,
-  Sparkles,
+  ChatText,
+  CaretRight,
+  MagicWand,
   X,
   ArrowUpRight,
   ArrowDownRight,
-  Loader2,
-  BarChart3,
-  Activity,
-} from "lucide-react";
+  SpinnerGap,
+  ChartBar,
+  Pulse,
+} from "@phosphor-icons/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faBolt, faCrown, faFire, faLightbulb, faShieldHalved } from "@fortawesome/free-solid-svg-icons";
+import { faLightbulb } from "@fortawesome/free-solid-svg-icons";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGoogleAuth } from "@/components/google-auth-provider-clean";
 import { useRouter } from "next/navigation";
@@ -159,9 +157,9 @@ interface DailyDigest {
 // ── Config ──
 
 const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
-  { key: "overview", label: "Overview", icon: BarChart3 },
+  { key: "overview", label: "Overview", icon: ChartBar },
   { key: "intelligence", label: "Call Intelligence", icon: Brain },
-  { key: "digest", label: "AI Digest", icon: Sparkles },
+  { key: "digest", label: "AI Digest", icon: MagicWand },
 ];
 
 const PERIODS: { key: CallPeriod; label: string }[] = [
@@ -209,19 +207,6 @@ function timeAgo(unixTimestamp: number): string {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
-function sentimentColor(sentiment: string): string {
-  switch (sentiment) {
-    case "positive":
-      return "text-green-400";
-    case "negative":
-      return "text-red-400";
-    case "mixed":
-      return "text-yellow-400";
-    default:
-      return "text-muted-foreground";
-  }
-}
-
 function sentimentBg(sentiment: string): string {
   switch (sentiment) {
     case "positive":
@@ -231,18 +216,18 @@ function sentimentBg(sentiment: string): string {
     case "mixed":
       return "bg-yellow-500/10 border-yellow-500/20";
     default:
-      return "bg-white/[0.04] border-white/[0.06]";
+      return "bg-foreground/[0.04] border-foreground/[0.06]";
   }
 }
 
 function priorityBadge(priority: string): string {
   switch (priority) {
     case "high":
-      return "bg-red-500/20 text-red-300 border-red-500/30";
+      return "bg-red-500/20 text-red-600 dark:text-red-300 border-red-500/30";
     case "medium":
-      return "bg-yellow-500/20 text-yellow-300 border-yellow-500/30";
+      return "bg-yellow-500/20 text-yellow-600 dark:text-yellow-300 border-yellow-500/30";
     default:
-      return "bg-white/[0.06] text-muted-foreground border-white/[0.08]";
+      return "bg-foreground/[0.06] text-muted-foreground border-foreground/[0.08]";
   }
 }
 
@@ -270,21 +255,21 @@ function StatCard({
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay }}
-      className="rounded-2xl bg-white/[0.04] border border-white/[0.06] p-5 flex flex-col gap-3"
+      className="rounded-2xl bg-foreground/[0.04] border border-foreground/[0.06] p-5 flex flex-col gap-3"
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Icon className={`h-4 w-4 ${color}`} />
+          <Icon className={`size-4 ${color}`} />
           <span className="text-sm text-muted-foreground">{label}</span>
         </div>
         {trend !== undefined && trend !== 0 && (
           <span
-            className={`text-xs flex items-center gap-0.5 ${trend > 0 ? "text-green-400" : "text-red-400"}`}
+            className={`text-xs flex items-center gap-0.5 ${trend > 0 ? "text-green-500 dark:text-green-400" : "text-red-500 dark:text-red-400"}`}
           >
             {trend > 0 ? (
-              <ArrowUpRight className="h-3 w-3" />
+              <ArrowUpRight className="size-3" />
             ) : (
-              <ArrowDownRight className="h-3 w-3" />
+              <ArrowDownRight className="size-3" />
             )}
             {Math.abs(trend)}%
           </span>
@@ -319,7 +304,6 @@ function ActivityChart({ data }: { data: HourlyData }) {
         const inbound = data[hour]?.inbound || 0;
         const outbound = data[hour]?.outbound || 0;
         const total = inbound + outbound;
-        const pct = (total / maxVal) * 100;
 
         return (
           <div key={hour} className="flex-1 flex flex-col items-center gap-1 group relative">
@@ -341,7 +325,7 @@ function ActivityChart({ data }: { data: HourlyData }) {
                 style={{ minHeight: inbound > 0 ? 2 : 0 }}
               />
             </div>
-            <span className="text-[10px] text-muted-foreground/50">{hour}</span>
+            <span className="text-[10px] text-muted-foreground/50 tabular-nums">{hour}</span>
             {/* Tooltip */}
             {total > 0 && (
               <div className="absolute bottom-full mb-2 px-2 py-1 bg-card border border-border rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 whitespace-nowrap">
@@ -373,10 +357,10 @@ function RepRow({
       initial={{ opacity: 0, x: -16 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.04 }}
-      className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/[0.03] transition-colors"
+      className="flex items-center gap-4 p-3 rounded-xl hover:bg-foreground/[0.03] transition-colors"
     >
       <div
-        className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
+        className={`size-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
           index === 0
             ? "bg-gradient-to-br from-yellow-300 to-yellow-500 text-yellow-900"
             : index === 1
@@ -393,7 +377,7 @@ function RepRow({
           <p className="text-sm font-semibold truncate">{rep.name}</p>
           <span className="text-sm font-bold tabular-nums">{rep.total_calls}</span>
         </div>
-        <div className="w-full bg-white/[0.04] rounded-full h-1.5 overflow-hidden">
+        <div className="w-full bg-foreground/[0.04] rounded-full h-1.5 overflow-hidden">
           <motion.div
             initial={{ width: 0 }}
             animate={{ width: `${barWidth}%` }}
@@ -405,15 +389,15 @@ function RepRow({
                   ? "bg-gray-400/70"
                   : index === 2
                     ? "bg-amber-500/70"
-                    : "bg-white/20"
+                    : "bg-foreground/20"
             }`}
           />
         </div>
         <div className="flex items-center gap-3 mt-1">
-          <span className="text-xs text-muted-foreground/60">
+          <span className="text-xs text-muted-foreground/60 tabular-nums">
             {rep.outbound_calls} out · {rep.inbound_calls} in
           </span>
-          <span className="text-xs text-muted-foreground/40">
+          <span className="text-xs text-muted-foreground/40 tabular-nums">
             {formatDurationShort(Math.round(rep.avg_duration))} avg
           </span>
         </div>
@@ -430,26 +414,26 @@ function CallRow({ call, onClick }: { call: RecentCall; onClick: () => void }) {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       onClick={onClick}
-      className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/[0.04] transition-colors text-left group"
+      className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-foreground/[0.04] transition-colors text-left group"
     >
       <div
-        className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
+        className={`size-9 rounded-full flex items-center justify-center shrink-0 ${
           call.direction === "inbound"
-            ? "bg-emerald-500/10 text-emerald-400"
-            : "bg-blue-500/10 text-blue-400"
+            ? "bg-emerald-500/10 text-emerald-500 dark:text-emerald-400"
+            : "bg-blue-500/10 text-blue-500 dark:text-blue-400"
         }`}
       >
         {call.direction === "inbound" ? (
-          <PhoneIncoming className="h-4 w-4" />
+          <PhoneIncoming className="size-4" />
         ) : (
-          <PhoneOutgoing className="h-4 w-4" />
+          <PhoneOutgoing className="size-4" />
         )}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <p className="text-sm font-medium truncate">{call.contact_name}</p>
           {call.has_recording && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 shrink-0">
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-500 dark:text-purple-400 border border-purple-500/20 shrink-0">
               AI
             </span>
           )}
@@ -479,13 +463,13 @@ function AnalysisPanel({
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 20 }}
-      className="fixed inset-y-0 right-0 w-full max-w-xl z-50 bg-background/98 backdrop-blur-xl border-l border-white/[0.08] overflow-y-auto"
+      className="fixed inset-y-0 right-0 w-full max-w-xl z-50 bg-background/98 backdrop-blur-sm border-l border-border overflow-y-auto"
     >
       <div className="p-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <Brain className="h-5 w-5 text-purple-400" />
+            <Brain className="size-5 text-purple-500 dark:text-purple-400" />
             <h2 className="text-lg font-semibold">Call Analysis</h2>
             <span
               className={`text-xs px-2 py-0.5 rounded-full border capitalize ${sentimentBg(analysis.sentiment)}`}
@@ -495,9 +479,10 @@ function AnalysisPanel({
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+            className="p-2 rounded-lg hover:bg-foreground/10 transition-colors"
+            aria-label="Close analysis panel"
           >
-            <X className="h-5 w-5" />
+            <X className="size-5" />
           </button>
         </div>
 
@@ -515,7 +500,7 @@ function AnalysisPanel({
               {analysis.key_topics.map((topic, i) => (
                 <span
                   key={i}
-                  className="text-xs px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.08]"
+                  className="text-xs px-2.5 py-1 rounded-full bg-foreground/[0.06] border border-foreground/[0.08]"
                 >
                   {topic}
                 </span>
@@ -527,8 +512,8 @@ function AnalysisPanel({
         {/* Objections */}
         {analysis.objections.length > 0 && (
           <div className="mb-6">
-            <h3 className="text-sm font-semibold text-red-400 mb-2 flex items-center gap-2">
-              <AlertTriangle className="h-3.5 w-3.5" /> Objections Detected
+            <h3 className="text-sm font-semibold text-red-500 dark:text-red-400 mb-2 flex items-center gap-2">
+              <Warning className="size-3.5" /> Objections Detected
             </h3>
             <div className="space-y-2">
               {analysis.objections.map((obj, i) => (
@@ -543,14 +528,14 @@ function AnalysisPanel({
         {/* Action Items */}
         {analysis.action_items.length > 0 && (
           <div className="mb-6">
-            <h3 className="text-sm font-semibold text-blue-400 mb-2 flex items-center gap-2">
-              <Target className="h-3.5 w-3.5" /> Action Items
+            <h3 className="text-sm font-semibold text-blue-500 dark:text-blue-400 mb-2 flex items-center gap-2">
+              <Target className="size-3.5" /> Action Items
             </h3>
             <div className="space-y-2">
               {analysis.action_items.map((item, i) => (
                 <div
                   key={i}
-                  className="flex items-start gap-3 text-sm p-3 rounded-lg bg-white/[0.03] border border-white/[0.06]"
+                  className="flex items-start gap-3 text-sm p-3 rounded-lg bg-foreground/[0.03] border border-foreground/[0.06]"
                 >
                   <span
                     className={`text-[10px] px-1.5 py-0.5 rounded border shrink-0 mt-0.5 uppercase font-bold ${priorityBadge(item.priority)}`}
@@ -570,8 +555,8 @@ function AnalysisPanel({
         {/* Opportunity Signals */}
         {analysis.opportunity_signals.length > 0 && (
           <div className="mb-6">
-            <h3 className="text-sm font-semibold text-green-400 mb-2 flex items-center gap-2">
-              <TrendingUp className="h-3.5 w-3.5" /> Opportunities
+            <h3 className="text-sm font-semibold text-green-500 dark:text-green-400 mb-2 flex items-center gap-2">
+              <TrendUp className="size-3.5" /> Opportunities
             </h3>
             <div className="space-y-2">
               {analysis.opportunity_signals.map((opp, i) => (
@@ -580,11 +565,11 @@ function AnalysisPanel({
                   className="text-sm p-3 rounded-lg bg-green-500/5 border border-green-500/10"
                 >
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-300 border border-green-500/30 uppercase font-bold">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-600 dark:text-green-300 border border-green-500/30 uppercase font-bold">
                       {opp.type.replace("_", " ")}
                     </span>
                     {opp.estimated_value && (
-                      <span className="text-xs text-green-400 font-semibold">{opp.estimated_value}</span>
+                      <span className="text-xs text-green-500 dark:text-green-400 font-semibold">{opp.estimated_value}</span>
                     )}
                   </div>
                   <p>{opp.description}</p>
@@ -602,7 +587,7 @@ function AnalysisPanel({
               {analysis.events_mentioned.map((event, i) => (
                 <span
                   key={i}
-                  className="text-xs px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20"
+                  className="text-xs px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-300 border border-amber-500/20"
                 >
                   {event}
                 </span>
@@ -616,19 +601,19 @@ function AnalysisPanel({
           <h3 className="text-sm font-semibold text-muted-foreground mb-2">Talk-to-Listen Ratio</h3>
           <div className="flex items-center gap-2 h-3 rounded-full overflow-hidden">
             <div
-              className="bg-blue-500/60 h-full rounded-l-full transition-all"
+              className="bg-blue-500/60 h-full rounded-l-full"
               style={{ width: `${analysis.talk_to_listen_ratio.agent_pct}%` }}
             />
             <div
-              className="bg-emerald-500/60 h-full rounded-r-full transition-all"
+              className="bg-emerald-500/60 h-full rounded-r-full"
               style={{ width: `${analysis.talk_to_listen_ratio.contact_pct}%` }}
             />
           </div>
           <div className="flex justify-between mt-1">
-            <span className="text-xs text-blue-400">
+            <span className="text-xs text-blue-500 dark:text-blue-400 tabular-nums">
               Agent {analysis.talk_to_listen_ratio.agent_pct}%
             </span>
-            <span className="text-xs text-emerald-400">
+            <span className="text-xs text-emerald-500 dark:text-emerald-400 tabular-nums">
               Contact {analysis.talk_to_listen_ratio.contact_pct}%
             </span>
           </div>
@@ -637,7 +622,7 @@ function AnalysisPanel({
         {/* Coaching Notes */}
         {analysis.coaching_notes && (
           <div className="mb-6">
-            <h3 className="text-sm font-semibold text-yellow-400 mb-2 flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-yellow-500 dark:text-yellow-400 mb-2 flex items-center gap-2">
               <FontAwesomeIcon icon={faLightbulb} className="h-3.5 w-3.5" /> Coaching
             </h3>
             <p className="text-sm p-3 rounded-lg bg-yellow-500/5 border border-yellow-500/10">
@@ -650,9 +635,9 @@ function AnalysisPanel({
         {analysis.draft_follow_up && (
           <div className="mb-6">
             <h3 className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-2">
-              <MessageSquare className="h-3.5 w-3.5" /> Suggested Follow-up
+              <ChatText className="size-3.5" /> Suggested Follow-up
             </h3>
-            <div className="text-sm p-4 rounded-lg bg-white/[0.03] border border-white/[0.06] whitespace-pre-line italic">
+            <div className="text-sm p-4 rounded-lg bg-foreground/[0.03] border border-foreground/[0.06] whitespace-pre-line italic">
               {analysis.draft_follow_up}
             </div>
           </div>
@@ -682,10 +667,10 @@ function DigestSection({
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay }}
-      className="rounded-2xl bg-white/[0.04] border border-white/[0.06] overflow-hidden"
+      className="rounded-2xl bg-foreground/[0.04] border border-foreground/[0.06] overflow-hidden"
     >
-      <div className="px-5 py-4 border-b border-white/[0.06] flex items-center gap-3">
-        <Icon className={`h-4.5 w-4.5 ${iconColor}`} />
+      <div className="px-5 py-4 border-b border-foreground/[0.06] flex items-center gap-3">
+        <Icon className={`size-[18px] ${iconColor}`} />
         <h3 className="text-base font-semibold">{title}</h3>
       </div>
       <div className="p-5">{children}</div>
@@ -831,9 +816,9 @@ export default function CallsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-dvh flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
+          <div className="animate-spin rounded-full size-12 border-b-2 border-primary mx-auto mb-4" />
           <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
@@ -852,7 +837,7 @@ export default function CallsPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-40 bg-black/60"
+              className="fixed inset-0 z-40 bg-background/60"
               onClick={() => {
                 setSelectedCallId(null);
                 setCallAnalysis(null);
@@ -863,10 +848,10 @@ export default function CallsPage() {
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 20 }}
-                className="fixed inset-y-0 right-0 w-full max-w-xl z-50 bg-background/98 backdrop-blur-xl border-l border-white/[0.08] flex items-center justify-center"
+                className="fixed inset-y-0 right-0 w-full max-w-xl z-50 bg-background/98 backdrop-blur-sm border-l border-border flex items-center justify-center"
               >
                 <div className="text-center">
-                  <Brain className="h-10 w-10 text-purple-400 mx-auto mb-4 animate-pulse" />
+                  <Brain className="size-10 text-purple-500 dark:text-purple-400 mx-auto mb-4 animate-pulse" />
                   <p className="text-lg font-semibold mb-1">Analysing Call</p>
                   <p className="text-sm text-muted-foreground max-w-xs mx-auto">
                     Downloading recording → Transcribing with Whisper → Analysing with Claude...
@@ -896,11 +881,11 @@ export default function CallsPage() {
             className="flex items-center justify-between mb-6"
           >
             <div className="flex items-center gap-4">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center">
-                <Phone className="h-5 w-5 text-white" />
+              <div className="size-10 rounded-xl bg-muted flex items-center justify-center">
+                <Phone className="size-5 text-foreground" weight="duotone" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold tracking-tight">Call Intelligence</h1>
+                <h1 className="text-2xl font-bold tracking-tight text-balance">Call Intelligence</h1>
                 <p className="text-sm text-muted-foreground">
                   Powered by Aircall + AI
                 </p>
@@ -909,14 +894,14 @@ export default function CallsPage() {
             <div className="flex items-center gap-3">
               {/* Live indicator */}
               <div className="flex items-center gap-1.5">
-                <span className="relative flex h-2 w-2">
+                <span className="relative flex size-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+                  <span className="relative inline-flex rounded-full size-2 bg-green-500" />
                 </span>
                 <span className="text-xs text-muted-foreground">Live</span>
               </div>
               {lastUpdated && (
-                <span className="text-xs text-muted-foreground/50">
+                <span className="text-xs text-muted-foreground/50 tabular-nums">
                   {lastUpdated.toLocaleTimeString("en-GB", {
                     hour: "2-digit",
                     minute: "2-digit",
@@ -926,9 +911,10 @@ export default function CallsPage() {
               <button
                 onClick={() => fetchCallData(true)}
                 disabled={isRefreshing}
-                className="p-2 rounded-lg text-muted-foreground/40 hover:text-foreground hover:bg-white/[0.06] transition-all"
+                className="p-2 rounded-lg text-muted-foreground/40 hover:text-foreground hover:bg-foreground/[0.06] transition-colors"
+                aria-label="Refresh call data"
               >
-                <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+                <ArrowsClockwise className={`size-4 ${isRefreshing ? "animate-spin" : ""}`} />
               </button>
             </div>
           </motion.div>
@@ -941,32 +927,32 @@ export default function CallsPage() {
             className="flex items-center justify-between mb-6"
           >
             {/* Tabs */}
-            <div className="flex bg-white/[0.04] rounded-xl p-1 border border-white/[0.06]">
+            <div className="flex bg-foreground/[0.04] rounded-xl p-1 border border-foreground/[0.06]">
               {TABS.map((tab) => (
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     activeTab === tab.key
-                      ? "bg-white/[0.1] text-foreground"
+                      ? "bg-foreground/[0.08] text-foreground"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  <tab.icon className="h-4 w-4" />
+                  <tab.icon className="size-4" weight={activeTab === tab.key ? "fill" : "regular"} />
                   {tab.label}
                 </button>
               ))}
             </div>
 
             {/* Period selector */}
-            <div className="flex bg-white/[0.04] rounded-lg p-1 border border-white/[0.06]">
+            <div className="flex bg-foreground/[0.04] rounded-lg p-1 border border-foreground/[0.06]">
               {PERIODS.map((p) => (
                 <button
                   key={p.key}
                   onClick={() => setPeriod(p.key)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                     period === p.key
-                      ? "bg-white/[0.1] text-foreground"
+                      ? "bg-foreground/[0.08] text-foreground"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
@@ -981,12 +967,12 @@ export default function CallsPage() {
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm"
+              className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-300 text-sm"
             >
               {error}
               <button
                 onClick={() => fetchCallData()}
-                className="ml-2 underline hover:text-red-200"
+                className="ml-2 underline hover:opacity-80"
               >
                 Try again
               </button>
@@ -1009,14 +995,14 @@ export default function CallsPage() {
                   label="Outbound"
                   value={stats?.outbound_calls || 0}
                   icon={PhoneOutgoing}
-                  color="text-blue-400"
+                  color="text-blue-500 dark:text-blue-400"
                   delay={0.05}
                 />
                 <StatCard
                   label="Inbound"
                   value={stats?.inbound_calls || 0}
                   icon={PhoneIncoming}
-                  color="text-emerald-400"
+                  color="text-emerald-500 dark:text-emerald-400"
                   delay={0.1}
                 />
                 <StatCard
@@ -1024,14 +1010,14 @@ export default function CallsPage() {
                   value={Math.round(stats?.avg_duration || 0)}
                   icon={Clock}
                   suffix="s"
-                  color="text-amber-400"
+                  color="text-amber-500 dark:text-amber-400"
                   delay={0.15}
                 />
                 <StatCard
                   label="Analysable (3m+)"
                   value={callData?.meaningfulCallCount || 0}
                   icon={Brain}
-                  color="text-purple-400"
+                  color="text-purple-500 dark:text-purple-400"
                   delay={0.2}
                 />
               </div>
@@ -1043,20 +1029,20 @@ export default function CallsPage() {
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.25 }}
-                  className="lg:col-span-2 rounded-2xl bg-white/[0.04] border border-white/[0.06] overflow-hidden"
+                  className="lg:col-span-2 rounded-2xl bg-foreground/[0.04] border border-foreground/[0.06] overflow-hidden"
                 >
-                  <div className="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between">
+                  <div className="px-5 py-4 border-b border-foreground/[0.06] flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <Activity className="h-4.5 w-4.5 text-blue-400" />
+                      <Pulse className="size-[18px] text-blue-500 dark:text-blue-400" />
                       <h2 className="text-base font-semibold">Call Activity</h2>
                     </div>
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-sm bg-blue-500/60" />
+                        <span className="size-2 rounded-sm bg-blue-500/60" />
                         Outbound
                       </span>
                       <span className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-sm bg-emerald-500/60" />
+                        <span className="size-2 rounded-sm bg-emerald-500/60" />
                         Inbound
                       </span>
                     </div>
@@ -1064,7 +1050,7 @@ export default function CallsPage() {
                   <div className="p-5">
                     {initialLoading ? (
                       <div className="h-28 flex items-center justify-center">
-                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        <SpinnerGap className="size-6 animate-spin text-muted-foreground" />
                       </div>
                     ) : (
                       <ActivityChart data={hourlyData} />
@@ -1077,10 +1063,10 @@ export default function CallsPage() {
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 }}
-                  className="rounded-2xl bg-white/[0.04] border border-white/[0.06] p-5"
+                  className="rounded-2xl bg-foreground/[0.04] border border-foreground/[0.06] p-5"
                 >
                   <div className="flex items-center gap-3 mb-5">
-                    <Clock className="h-4.5 w-4.5 text-amber-400" />
+                    <Clock className="size-[18px] text-amber-500 dark:text-amber-400" />
                     <h2 className="text-base font-semibold">Talk Time</h2>
                   </div>
 
@@ -1094,28 +1080,28 @@ export default function CallsPage() {
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">Total Talk Time</span>
-                        <span className="text-lg font-bold">
+                        <span className="text-lg font-bold tabular-nums">
                           {formatDuration(stats?.total_talk_time || 0)}
                         </span>
                       </div>
-                      <div className="h-px bg-white/[0.06]" />
+                      <div className="h-px bg-foreground/[0.06]" />
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">Avg per Call</span>
-                        <span className="text-lg font-bold">
+                        <span className="text-lg font-bold tabular-nums">
                           {formatDuration(Math.round(stats?.avg_talk_time || 0))}
                         </span>
                       </div>
-                      <div className="h-px bg-white/[0.06]" />
+                      <div className="h-px bg-foreground/[0.06]" />
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">Answered</span>
-                        <span className="text-lg font-bold text-emerald-400">
+                        <span className="text-lg font-bold text-emerald-500 dark:text-emerald-400 tabular-nums">
                           {stats?.answered_calls || 0}
                         </span>
                       </div>
-                      <div className="h-px bg-white/[0.06]" />
+                      <div className="h-px bg-foreground/[0.06]" />
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">Missed</span>
-                        <span className="text-lg font-bold text-red-400">
+                        <span className="text-lg font-bold text-red-500 dark:text-red-400 tabular-nums">
                           {stats?.missed_calls || 0}
                         </span>
                       </div>
@@ -1131,10 +1117,10 @@ export default function CallsPage() {
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.35 }}
-                  className="rounded-2xl bg-white/[0.04] border border-white/[0.06] overflow-hidden"
+                  className="rounded-2xl bg-foreground/[0.04] border border-foreground/[0.06] overflow-hidden"
                 >
-                  <div className="px-5 py-4 border-b border-white/[0.06] flex items-center gap-3">
-                    <Users className="h-4.5 w-4.5 text-yellow-500" />
+                  <div className="px-5 py-4 border-b border-foreground/[0.06] flex items-center gap-3">
+                    <Users className="size-[18px] text-yellow-500" />
                     <h2 className="text-base font-semibold">Calls by Rep</h2>
                   </div>
                   <div className="p-3 max-h-[420px] overflow-y-auto scrollbar-hide">
@@ -1142,7 +1128,7 @@ export default function CallsPage() {
                       <div className="space-y-3 p-2">
                         {[1, 2, 3, 4].map((i) => (
                           <div key={i} className="flex items-center gap-3 p-3 rounded-xl">
-                            <div className="animate-pulse bg-muted h-8 w-8 rounded-full" />
+                            <div className="animate-pulse bg-muted size-8 rounded-full" />
                             <div className="flex-1">
                               <div className="animate-pulse bg-muted h-3 w-24 rounded mb-2" />
                               <div className="animate-pulse bg-muted h-1.5 w-full rounded" />
@@ -1152,7 +1138,7 @@ export default function CallsPage() {
                       </div>
                     ) : repStats.length === 0 ? (
                       <div className="text-center py-12 text-muted-foreground">
-                        <Users className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                        <Users className="size-10 mx-auto mb-3 opacity-30" />
                         <p className="text-sm">No call data yet</p>
                       </div>
                     ) : (
@@ -1170,11 +1156,11 @@ export default function CallsPage() {
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.4 }}
-                  className="rounded-2xl bg-white/[0.04] border border-white/[0.06] overflow-hidden"
+                  className="rounded-2xl bg-foreground/[0.04] border border-foreground/[0.06] overflow-hidden"
                 >
-                  <div className="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between">
+                  <div className="px-5 py-4 border-b border-foreground/[0.06] flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <Phone className="h-4.5 w-4.5 text-blue-400" />
+                      <Phone className="size-[18px] text-blue-500 dark:text-blue-400" />
                       <h2 className="text-base font-semibold">Recent Calls</h2>
                     </div>
                     <span className="text-xs text-muted-foreground/50">
@@ -1186,7 +1172,7 @@ export default function CallsPage() {
                       <div className="space-y-2 p-2">
                         {[1, 2, 3, 4, 5].map((i) => (
                           <div key={i} className="flex items-center gap-3 p-3 rounded-xl">
-                            <div className="animate-pulse bg-muted h-9 w-9 rounded-full" />
+                            <div className="animate-pulse bg-muted size-9 rounded-full" />
                             <div className="flex-1">
                               <div className="animate-pulse bg-muted h-3 w-28 rounded mb-2" />
                               <div className="animate-pulse bg-muted h-2.5 w-20 rounded" />
@@ -1196,7 +1182,7 @@ export default function CallsPage() {
                       </div>
                     ) : recentCalls.length === 0 ? (
                       <div className="text-center py-12 text-muted-foreground">
-                        <Phone className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                        <Phone className="size-10 mx-auto mb-3 opacity-30" />
                         <p className="text-sm">No calls yet</p>
                       </div>
                     ) : (
@@ -1227,11 +1213,11 @@ export default function CallsPage() {
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="rounded-2xl bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/20 p-6"
+                className="rounded-2xl bg-purple-500/5 border border-purple-500/20 p-6"
               >
                 <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-xl bg-purple-500/20 flex items-center justify-center">
-                    <Brain className="h-6 w-6 text-purple-400" />
+                  <div className="size-12 rounded-xl bg-purple-500/10 flex items-center justify-center">
+                    <Brain className="size-6 text-purple-500 dark:text-purple-400" />
                   </div>
                   <div>
                     <h2 className="text-xl font-bold">AI Call Analysis</h2>
@@ -1243,12 +1229,12 @@ export default function CallsPage() {
                 </div>
                 <div className="mt-4 flex items-center gap-6 text-sm">
                   <div className="flex items-center gap-2">
-                    <span className="text-purple-400 font-bold text-lg">
+                    <span className="text-purple-500 dark:text-purple-400 font-bold text-lg tabular-nums">
                       {callData?.meaningfulCallCount || 0}
                     </span>
                     <span className="text-muted-foreground">analysable calls</span>
                   </div>
-                  <div className="h-4 w-px bg-white/[0.1]" />
+                  <div className="h-4 w-px bg-foreground/[0.1]" />
                   <div className="flex items-center gap-2">
                     <span className="text-muted-foreground">
                       Whisper transcription → Claude Sonnet analysis
@@ -1266,32 +1252,32 @@ export default function CallsPage() {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.03 }}
                       onClick={() => analyseCallById(call.id)}
-                      className="flex items-center gap-4 p-4 rounded-2xl bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.06] hover:border-purple-500/20 transition-all text-left group"
+                      className="flex items-center gap-4 p-4 rounded-2xl bg-foreground/[0.04] border border-foreground/[0.06] hover:bg-foreground/[0.06] hover:border-purple-500/20 transition-colors text-left group"
                     >
                       <div
-                        className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
+                        className={`size-11 rounded-xl flex items-center justify-center shrink-0 ${
                           call.direction === "inbound"
-                            ? "bg-emerald-500/10 text-emerald-400"
-                            : "bg-blue-500/10 text-blue-400"
+                            ? "bg-emerald-500/10 text-emerald-500 dark:text-emerald-400"
+                            : "bg-blue-500/10 text-blue-500 dark:text-blue-400"
                         }`}
                       >
                         {call.direction === "inbound" ? (
-                          <PhoneIncoming className="h-5 w-5" />
+                          <PhoneIncoming className="size-5" />
                         ) : (
-                          <PhoneOutgoing className="h-5 w-5" />
+                          <PhoneOutgoing className="size-5" />
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold truncate">{call.contact_name}</p>
-                        <p className="text-xs text-muted-foreground truncate">
+                        <p className="text-xs text-muted-foreground truncate tabular-nums">
                           {call.agent_name} · {formatDuration(call.duration)} · {formatTime(call.started_at)}
                         </p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-xs px-2 py-1 rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span className="text-xs px-2 py-1 rounded-lg bg-purple-500/10 text-purple-500 dark:text-purple-400 border border-purple-500/20 opacity-0 group-hover:opacity-100 transition-opacity">
                           Analyse
                         </span>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-purple-400 transition-colors" />
+                        <CaretRight className="size-4 text-muted-foreground/30 group-hover:text-purple-500 dark:group-hover:text-purple-400 transition-colors" />
                       </div>
                     </motion.button>
                   ))}
@@ -1299,7 +1285,7 @@ export default function CallsPage() {
 
               {analysableCalls.length === 0 && !initialLoading && (
                 <div className="text-center py-16 text-muted-foreground">
-                  <Brain className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                  <Brain className="size-12 mx-auto mb-4 opacity-20" />
                   <p className="text-lg font-semibold mb-1">No analysable calls yet</p>
                   <p className="text-sm">
                     Calls longer than 3 minutes will appear here for AI analysis
@@ -1316,12 +1302,12 @@ export default function CallsPage() {
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="rounded-2xl bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 p-6"
+                className="rounded-2xl bg-amber-500/5 border border-amber-500/20 p-6"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 rounded-xl bg-amber-500/20 flex items-center justify-center">
-                      <Sparkles className="h-6 w-6 text-amber-400" />
+                    <div className="size-12 rounded-xl bg-amber-500/10 flex items-center justify-center">
+                      <MagicWand className="size-6 text-amber-500 dark:text-amber-400" />
                     </div>
                     <div>
                       <h2 className="text-xl font-bold">AI Sales Digest</h2>
@@ -1335,12 +1321,12 @@ export default function CallsPage() {
                   <button
                     onClick={() => generateDigest(true)}
                     disabled={digestLoading}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 transition-colors text-sm font-medium disabled:opacity-50"
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-300 hover:bg-amber-500/20 transition-colors text-sm font-medium disabled:opacity-50"
                   >
                     {digestLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <SpinnerGap className="size-4 animate-spin" />
                     ) : (
-                      <RefreshCw className="h-4 w-4" />
+                      <ArrowsClockwise className="size-4" />
                     )}
                     {digestLoading ? "Generating..." : "Refresh"}
                   </button>
@@ -1353,7 +1339,7 @@ export default function CallsPage() {
                   animate={{ opacity: 1 }}
                   className="text-center py-20"
                 >
-                  <Sparkles className="h-12 w-12 text-amber-400 mx-auto mb-4 animate-pulse" />
+                  <MagicWand className="size-12 text-amber-500 dark:text-amber-400 mx-auto mb-4 animate-pulse" />
                   <p className="text-lg font-semibold mb-2">Generating AI Digest</p>
                   <p className="text-sm text-muted-foreground max-w-md mx-auto">
                     Analysing call transcripts, detecting patterns, and generating team-wide insights. This may take 30-60 seconds...
@@ -1365,7 +1351,7 @@ export default function CallsPage() {
                   <motion.div
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="rounded-2xl bg-white/[0.04] border border-white/[0.06] p-6"
+                    className="rounded-2xl bg-foreground/[0.04] border border-foreground/[0.06] p-6"
                   >
                     <p className="text-base leading-relaxed">{digest.team_summary}</p>
                   </motion.div>
@@ -1375,8 +1361,8 @@ export default function CallsPage() {
                     {digest.top_objections.length > 0 && (
                       <DigestSection
                         title="Objection Radar"
-                        icon={AlertTriangle}
-                        iconColor="text-red-400"
+                        icon={Warning}
+                        iconColor="text-red-500 dark:text-red-400"
                         delay={0.1}
                       >
                         <div className="space-y-4">
@@ -1384,7 +1370,7 @@ export default function CallsPage() {
                             <div key={i}>
                               <div className="flex items-center justify-between mb-1">
                                 <p className="text-sm font-semibold">{obj.objection}</p>
-                                <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/10 text-red-400">
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/10 text-red-500 dark:text-red-400 tabular-nums">
                                   {obj.frequency}x
                                 </span>
                               </div>
@@ -1402,7 +1388,7 @@ export default function CallsPage() {
                       <DigestSection
                         title="What's Working"
                         icon={Trophy}
-                        iconColor="text-green-400"
+                        iconColor="text-green-500 dark:text-green-400"
                         delay={0.15}
                       >
                         <div className="space-y-3">
@@ -1425,8 +1411,8 @@ export default function CallsPage() {
                     {digest.event_demand.length > 0 && (
                       <DigestSection
                         title="Event Demand"
-                        icon={TrendingUp}
-                        iconColor="text-amber-400"
+                        icon={TrendUp}
+                        iconColor="text-amber-500 dark:text-amber-400"
                         delay={0.2}
                       >
                         <div className="space-y-3">
@@ -1436,7 +1422,7 @@ export default function CallsPage() {
                                 <p className="text-sm font-semibold">{event.event}</p>
                                 <p className="text-xs text-muted-foreground">{event.sentiment}</p>
                               </div>
-                              <span className="text-sm font-bold text-amber-400">
+                              <span className="text-sm font-bold text-amber-500 dark:text-amber-400 tabular-nums">
                                 {event.mentions} mentions
                               </span>
                             </div>
@@ -1450,7 +1436,7 @@ export default function CallsPage() {
                       <DigestSection
                         title="Competitor Intel"
                         icon={Target}
-                        iconColor="text-orange-400"
+                        iconColor="text-orange-500 dark:text-orange-400"
                         delay={0.25}
                       >
                         <div className="space-y-3">
@@ -1458,7 +1444,7 @@ export default function CallsPage() {
                             <div key={i}>
                               <div className="flex items-center justify-between mb-0.5">
                                 <p className="text-sm font-semibold">{comp.competitor}</p>
-                                <span className="text-xs text-muted-foreground">
+                                <span className="text-xs text-muted-foreground tabular-nums">
                                   {comp.mentions}x mentioned
                                 </span>
                               </div>
@@ -1473,8 +1459,8 @@ export default function CallsPage() {
                     {digest.coaching_highlights.length > 0 && (
                       <DigestSection
                         title="Coaching Insights"
-                        icon={Zap}
-                        iconColor="text-yellow-400"
+                        icon={Lightning}
+                        iconColor="text-yellow-500 dark:text-yellow-400"
                         delay={0.3}
                       >
                         <div className="space-y-3">
@@ -1494,8 +1480,8 @@ export default function CallsPage() {
                                 <span
                                   className={`text-[10px] px-1.5 py-0.5 rounded border uppercase ${
                                     highlight.type === "strength"
-                                      ? "bg-green-500/20 text-green-300 border-green-500/30"
-                                      : "bg-yellow-500/20 text-yellow-300 border-yellow-500/30"
+                                      ? "bg-green-500/20 text-green-600 dark:text-green-300 border-green-500/30"
+                                      : "bg-yellow-500/20 text-yellow-600 dark:text-yellow-300 border-yellow-500/30"
                                   }`}
                                 >
                                   {highlight.type}
@@ -1515,14 +1501,14 @@ export default function CallsPage() {
                       <DigestSection
                         title="Key Deals"
                         icon={Target}
-                        iconColor="text-blue-400"
+                        iconColor="text-blue-500 dark:text-blue-400"
                         delay={0.35}
                       >
                         <div className="space-y-3">
                           {digest.key_deals.map((deal, i) => (
                             <div
                               key={i}
-                              className="p-3 rounded-lg bg-white/[0.03] border border-white/[0.06]"
+                              className="p-3 rounded-lg bg-foreground/[0.03] border border-foreground/[0.06]"
                             >
                               <div className="flex items-center justify-between mb-1">
                                 <p className="text-sm font-semibold">{deal.contact}</p>
@@ -1531,7 +1517,7 @@ export default function CallsPage() {
                               <p className="text-xs text-muted-foreground mb-1">
                                 Status: {deal.status}
                               </p>
-                              <p className="text-xs text-blue-400">→ {deal.next_steps}</p>
+                              <p className="text-xs text-blue-500 dark:text-blue-400">→ {deal.next_steps}</p>
                             </div>
                           ))}
                         </div>
@@ -1542,8 +1528,8 @@ export default function CallsPage() {
                     {digest.follow_up_gaps.length > 0 && (
                       <DigestSection
                         title="Follow-up Gaps"
-                        icon={AlertTriangle}
-                        iconColor="text-orange-400"
+                        icon={Warning}
+                        iconColor="text-orange-500 dark:text-orange-400"
                         delay={0.4}
                       >
                         <div className="space-y-2">
@@ -1552,7 +1538,7 @@ export default function CallsPage() {
                               key={i}
                               className="flex items-start gap-3 text-sm p-3 rounded-lg bg-orange-500/5 border border-orange-500/10"
                             >
-                              <span className="text-xs font-bold text-orange-400 shrink-0">
+                              <span className="text-xs font-bold text-orange-500 dark:text-orange-400 shrink-0">
                                 {gap.rep}
                               </span>
                               <p className="text-xs text-muted-foreground">{gap.description}</p>
@@ -1565,14 +1551,14 @@ export default function CallsPage() {
                 </div>
               ) : (
                 <div className="text-center py-16 text-muted-foreground">
-                  <Sparkles className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                  <MagicWand className="size-12 mx-auto mb-4 opacity-20" />
                   <p className="text-lg font-semibold mb-1">No digest generated yet</p>
                   <p className="text-sm mb-4">
                     Click Refresh to generate an AI digest of today&apos;s calls
                   </p>
                   <button
                     onClick={() => generateDigest()}
-                    className="px-6 py-3 rounded-xl bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 transition-colors text-sm font-medium"
+                    className="px-6 py-3 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-300 hover:bg-amber-500/20 transition-colors text-sm font-medium"
                   >
                     Generate Digest
                   </button>

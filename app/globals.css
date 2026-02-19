@@ -14,6 +14,10 @@
 }
 
 @layer base {
+  html {
+    color-scheme: light dark;
+  }
+
   :root {
     /* Light mode - elegant and refined */
     --background: 0 0% 96%; /* Softer white */
@@ -278,7 +282,7 @@
 
   /* Premium transitions */
   .transition-premium {
-    @apply transition-all duration-300 ease-out;
+    @apply transition-[opacity,transform] duration-300 ease-out;
   }
 
   /* Mask gradients for text fade */

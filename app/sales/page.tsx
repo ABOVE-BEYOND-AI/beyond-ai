@@ -5,7 +5,7 @@ import {
   Card,
   CardContent,
 } from "@/components/ui/card";
-import { TrendingUp, RefreshCw, PoundSterling, Maximize2, X } from "lucide-react";
+import { TrendUp, ArrowsClockwise, CurrencyGbp, ArrowsOut, X } from "@phosphor-icons/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCrown, faTrophy } from "@fortawesome/free-solid-svg-icons";
 import { motion, AnimatePresence } from "framer-motion";
@@ -112,7 +112,7 @@ type FullscreenView = null | "leaderboard" | "deals";
 
 function LeaderboardRow({ rep, index, large = false }: { rep: LeaderboardEntry; index: number; large?: boolean }) {
   const isTop3 = index < 3;
-  const rankSize = large ? "w-14 h-14 text-xl" : "w-10 h-10 text-base";
+  const rankSize = large ? "size-14 text-xl" : "size-10 text-base";
   const nameSize = large
     ? (isTop3 ? "text-xl" : "text-lg text-foreground/80")
     : (isTop3 ? "text-base" : "text-sm text-foreground/80");
@@ -126,7 +126,7 @@ function LeaderboardRow({ rep, index, large = false }: { rep: LeaderboardEntry; 
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.03 }}
       className={`flex items-center gap-4 ${large ? "p-5" : "p-4"} rounded-xl transition-colors ${
-        isTop3 ? "bg-white/[0.04] border border-white/[0.06]" : ""
+        isTop3 ? "bg-foreground/[0.04] border border-foreground/[0.06]" : ""
       }`}
     >
       <div
@@ -167,7 +167,7 @@ function DealRow({ deal, index, large = false }: { deal: SalesforceOpportunity; 
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.03 }}
-      className={`flex items-center gap-4 ${large ? "p-5" : "p-4"} rounded-xl bg-white/[0.03] border border-white/[0.04]`}
+      className={`flex items-center gap-4 ${large ? "p-5" : "p-4"} rounded-xl bg-foreground/[0.03] border border-foreground/[0.04]`}
     >
       <div className="flex-1 min-w-0">
         <p className={`font-semibold truncate ${large ? "text-lg" : "text-sm"}`}>
@@ -219,9 +219,10 @@ function FullscreenModal({
         {/* Close button */}
         <button
           onClick={onClose}
-          className="absolute top-6 right-6 z-50 p-3 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+          className="absolute top-6 right-6 z-50 p-3 rounded-full bg-foreground/10 hover:bg-foreground/20 transition-colors"
+          aria-label="Close fullscreen"
         >
-          <X className="h-6 w-6" />
+          <X className="size-6" />
         </button>
 
         <div className="h-full overflow-y-auto p-8 lg:p-12">
@@ -230,9 +231,9 @@ function FullscreenModal({
             {view === "leaderboard" ? (
               <FontAwesomeIcon icon={faTrophy} className="h-8 w-8 text-yellow-500" />
             ) : (
-              <PoundSterling className="h-8 w-8 text-green-500" />
+              <CurrencyGbp className="size-8 text-green-500" weight="bold" />
             )}
-            <h1 className="text-3xl font-bold tracking-tight">
+            <h1 className="text-3xl font-bold tracking-tight text-balance">
               {view === "leaderboard" ? "Sales Leaderboard" : "Recent Deals"}
             </h1>
             <span className="text-xl text-muted-foreground">{periodLabel(period)}</span>
@@ -335,9 +336,9 @@ export default function SalesPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-dvh flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
+          <div className="animate-spin rounded-full size-12 border-b-2 border-primary mx-auto mb-4" />
           <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
@@ -357,7 +358,7 @@ export default function SalesPage() {
         period={selectedPeriod}
       />
 
-      <div className="min-h-screen bg-gradient-to-br from-background to-muted/20 p-6 lg:p-8 pl-24">
+      <div className="min-h-dvh bg-gradient-to-br from-background to-muted/20 p-6 lg:p-8 pl-24">
         <div className="max-w-7xl mx-auto">
 
           {/* ── Period Tabs ── */}
@@ -440,9 +441,9 @@ export default function SalesPage() {
             {/* Live indicator */}
             <div className="flex items-center justify-center gap-3 mt-3">
               <div className="flex items-center gap-1.5">
-                <span className="relative flex h-2 w-2">
+                <span className="relative flex size-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+                  <span className="relative inline-flex rounded-full size-2 bg-green-500" />
                 </span>
                 <span className="text-xs text-muted-foreground">Live</span>
               </div>
@@ -455,8 +456,9 @@ export default function SalesPage() {
                 onClick={() => fetchData(true)}
                 disabled={isRefreshing}
                 className="text-muted-foreground/40 hover:text-foreground transition-colors"
+                aria-label="Refresh data"
               >
-                <RefreshCw className={`h-3 w-3 ${isRefreshing ? "animate-spin" : ""}`} />
+                <ArrowsClockwise className={`size-3 ${isRefreshing ? "animate-spin" : ""}`} />
               </button>
             </div>
           </motion.div>
@@ -483,9 +485,9 @@ export default function SalesPage() {
             className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-6xl mx-auto"
           >
             {/* ── LEADERBOARD CONTAINER ── */}
-            <div className="rounded-2xl bg-white/[0.06] border border-white/[0.08] overflow-hidden">
+            <div className="rounded-2xl bg-foreground/[0.04] border border-foreground/[0.06] overflow-hidden">
               {/* Header */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06]">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-foreground/[0.06]">
                 <div className="flex items-center gap-3">
                   <FontAwesomeIcon icon={faTrophy} className="h-5 w-5 text-yellow-500" />
                   <h2 className="text-lg font-semibold tracking-tight">Leaderboard</h2>
@@ -493,10 +495,10 @@ export default function SalesPage() {
                 </div>
                 <button
                   onClick={() => setFullscreenView("leaderboard")}
-                  className="p-2 rounded-lg hover:bg-white/10 transition-colors text-muted-foreground hover:text-foreground"
-                  title="Full screen"
+                  className="p-2 rounded-lg hover:bg-foreground/10 transition-colors text-muted-foreground hover:text-foreground"
+                  aria-label="View leaderboard fullscreen"
                 >
-                  <Maximize2 className="h-4.5 w-4.5" />
+                  <ArrowsOut className="size-[18px]" />
                 </button>
               </div>
 
@@ -506,7 +508,7 @@ export default function SalesPage() {
                   <div className="space-y-3">
                     {[1, 2, 3].map((i) => (
                       <div key={i} className="flex items-center gap-3 p-4 rounded-xl">
-                        <div className="animate-pulse bg-muted h-10 w-10 rounded-full" />
+                        <div className="animate-pulse bg-muted size-10 rounded-full" />
                         <div className="flex-1">
                           <div className="animate-pulse bg-muted h-4 w-28 rounded" />
                         </div>
@@ -530,20 +532,20 @@ export default function SalesPage() {
             </div>
 
             {/* ── RECENT DEALS CONTAINER ── */}
-            <div className="rounded-2xl bg-white/[0.06] border border-white/[0.08] overflow-hidden">
+            <div className="rounded-2xl bg-foreground/[0.04] border border-foreground/[0.06] overflow-hidden">
               {/* Header */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06]">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-foreground/[0.06]">
                 <div className="flex items-center gap-3">
-                  <PoundSterling className="h-5 w-5 text-green-500" />
+                  <CurrencyGbp className="size-5 text-green-500" weight="bold" />
                   <h2 className="text-lg font-semibold tracking-tight">Recent Deals</h2>
                   <span className="text-sm text-muted-foreground">{periodLabel(selectedPeriod)}</span>
                 </div>
                 <button
                   onClick={() => setFullscreenView("deals")}
-                  className="p-2 rounded-lg hover:bg-white/10 transition-colors text-muted-foreground hover:text-foreground"
-                  title="Full screen"
+                  className="p-2 rounded-lg hover:bg-foreground/10 transition-colors text-muted-foreground hover:text-foreground"
+                  aria-label="View deals fullscreen"
                 >
-                  <Maximize2 className="h-4.5 w-4.5" />
+                  <ArrowsOut className="size-[18px]" />
                 </button>
               </div>
 
@@ -563,7 +565,7 @@ export default function SalesPage() {
                   </div>
                 ) : deals.length === 0 ? (
                   <div className="text-center py-12 text-muted-foreground">
-                    <PoundSterling className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                    <CurrencyGbp className="size-10 mx-auto mb-3 opacity-30" />
                     <p className="text-sm">No deals closed {periodLabel(selectedPeriod)}</p>
                   </div>
                 ) : (
@@ -595,10 +597,10 @@ export default function SalesPage() {
                       className="flex items-center gap-3 text-muted-foreground/60 hover:text-foreground transition-colors group"
                     >
                       <span className="text-xs uppercase tracking-wider">{p.label}</span>
-                      <span className="text-sm font-semibold text-foreground/50 group-hover:text-foreground transition-colors">
+                      <span className="text-sm font-semibold text-foreground/50 group-hover:text-foreground transition-colors tabular-nums">
                         {formatCompact(t?.total_amount || 0)}
                       </span>
-                      <span className="text-xs text-muted-foreground/40">
+                      <span className="text-xs text-muted-foreground/40 tabular-nums">
                         {t?.total_deals || 0} deals
                       </span>
                     </button>
@@ -606,9 +608,9 @@ export default function SalesPage() {
                 })}
                 {totals.average_deal > 0 && (
                   <div className="flex items-center gap-2 text-muted-foreground/40 pl-4 border-l border-border/20">
-                    <TrendingUp className="h-3.5 w-3.5" />
+                    <TrendUp className="size-3.5" />
                     <span className="text-xs">Avg deal</span>
-                    <span className="text-sm font-semibold text-foreground/50">
+                    <span className="text-sm font-semibold text-foreground/50 tabular-nums">
                       {formatCompact(totals.average_deal)}
                     </span>
                   </div>

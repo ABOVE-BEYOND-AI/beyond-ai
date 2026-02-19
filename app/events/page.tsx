@@ -180,8 +180,8 @@ export default function EventsPage() {
 
   return (
     <DashboardLayout>
-      <div className="h-screen overflow-y-auto bg-gradient-to-br from-background to-muted/20 p-6 lg:p-8 pl-24">
-        <div className="max-w-7xl mx-auto pb-24 border border-white/10 rounded-2xl p-4">
+      <div className="h-dvh overflow-y-auto bg-gradient-to-br from-background to-muted/20 p-6 lg:p-8 pl-24">
+        <div className="max-w-7xl mx-auto pb-24 border border-border/50 rounded-2xl p-4">
           <div className="mb-6">
             <div className="grid grid-cols-3 items-center gap-3">
               {/* Left: Search */}
@@ -303,7 +303,7 @@ export default function EventsPage() {
                             key={dayKey}
                             className={`min-h-24 rounded-lg border p-2 ${
                               isToday
-                                ? 'bg-gray-100 text-black dark:bg-white/15 dark:text-foreground border-white'
+                                ? 'bg-primary/10 text-foreground border-primary/30'
                                 : 'bg-card/60'
                             }`}
                           >

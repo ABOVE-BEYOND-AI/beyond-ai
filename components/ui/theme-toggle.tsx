@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Sun, Moon } from "lucide-react";
+import { SunDim, Moon } from "@phosphor-icons/react";
 import { Button } from "./button";
 
 interface ThemeToggleProps {
@@ -9,20 +9,20 @@ interface ThemeToggleProps {
 }
 
 export function ThemeToggle({ showLabel = true }: ThemeToggleProps) {
-  const [isDark, setIsDark] = useState(true);
+  const [isDark, setIsDark] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    // Get saved theme from localStorage or default to dark
+    // Get saved theme from localStorage or default to light
     const savedTheme = localStorage.getItem("theme");
-    const isDarkMode = savedTheme ? savedTheme === "dark" : true;
+    const isDarkMode = savedTheme === "dark";
     setIsDark(isDarkMode);
   }, []);
 
   useEffect(() => {
     if (!mounted) return;
-    
+
     const root = window.document.documentElement;
     if (isDark) {
       root.classList.add("dark");
@@ -44,9 +44,10 @@ export function ThemeToggle({ showLabel = true }: ThemeToggleProps) {
         variant="ghost"
         size="sm"
         onClick={() => setIsDark(!isDark)}
-        className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+        className="size-8 p-0 text-muted-foreground hover:text-foreground"
+        aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
       >
-        {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        {isDark ? <SunDim className="size-4" weight="bold" /> : <Moon className="size-4" weight="bold" />}
       </Button>
     );
   }
@@ -58,17 +59,19 @@ export function ThemeToggle({ showLabel = true }: ThemeToggleProps) {
           variant="ghost"
           size="sm"
           onClick={() => setIsDark(false)}
-          className={`h-8 w-8 p-0 ${!isDark ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+          className={`size-8 p-0 ${!isDark ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+          aria-label="Switch to light mode"
         >
-          <Sun className="h-4 w-4" />
+          <SunDim className="size-4" weight="bold" />
         </Button>
         <Button
           variant="ghost"
           size="sm"
           onClick={() => setIsDark(true)}
-          className={`h-8 w-8 p-0 ${isDark ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+          className={`size-8 p-0 ${isDark ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+          aria-label="Switch to dark mode"
         >
-          <Moon className="h-4 w-4" />
+          <Moon className="size-4" weight="bold" />
         </Button>
       </div>
       {showLabel && (

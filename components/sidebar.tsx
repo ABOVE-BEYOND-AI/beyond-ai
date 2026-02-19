@@ -6,39 +6,40 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
-  Calendar,
-  Menu,
-  Shield,
-  Sparkles,
-  User,
-  X,
-  Mail,
-  Home,
-  LogOut,
-  Settings,
-  DollarSign,
+  House,
+  MagicWand,
+  CurrencyGbp,
   Phone,
-} from "lucide-react";
+  CalendarBlank,
+  ShieldCheck,
+  Envelope,
+  UserCircle,
+  List,
+  X,
+  SignOut,
+  GearSix,
+} from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGoogleAuth } from "@/components/google-auth-provider-clean";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 const navigation = [
   {
     name: "Dashboard",
     href: "/",
-    icon: Home,
+    icon: House,
     active: true,
   },
   {
     name: "Itinerary Creator",
     href: "/itinerary",
-    icon: Sparkles,
+    icon: MagicWand,
     active: true,
   },
   {
     name: "Sales",
     href: "/sales",
-    icon: DollarSign,
+    icon: CurrencyGbp,
     active: true,
   },
   {
@@ -50,25 +51,25 @@ const navigation = [
   {
     name: "Upcoming Events",
     href: "/events",
-    icon: Calendar,
+    icon: CalendarBlank,
     active: true,
   },
   {
     name: "Upgrades",
     href: "#",
-    icon: Shield,
+    icon: ShieldCheck,
     active: false,
   },
   {
     name: "Contact",
     href: "#",
-    icon: Mail,
+    icon: Envelope,
     active: false,
   },
   {
     name: "Profile",
     href: "#",
-    icon: User,
+    icon: UserCircle,
     active: false,
   },
 ];
@@ -97,9 +98,10 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
       {/* Mobile menu button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed top-6 left-6 z-50 lg:hidden bg-card/80 backdrop-blur-xl p-3 rounded-lg shadow-lg"
+        className="fixed top-6 left-6 z-50 lg:hidden bg-card/80 backdrop-blur-sm p-3 rounded-lg shadow-lg"
+        aria-label={isOpen ? "Close menu" : "Open menu"}
       >
-        {isOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        {isOpen ? <X className="size-5" /> : <List className="size-5" />}
       </button>
 
       {/* Mobile Overlay */}
@@ -120,16 +122,16 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         className={cn(
-          "h-screen bg-card/95 backdrop-blur-2xl border-r border-border/50 flex-shrink-0 overflow-hidden",
+          "h-dvh bg-card border-r border-border/50 flex-shrink-0 overflow-hidden",
           "fixed left-0 top-0 z-40 transform transition-transform duration-300 ease-out",
           isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
-        animate={{ 
+        animate={{
           width: isExpanded ? 288 : 80
         }}
-        transition={{ 
-          duration: 0.4, 
-          ease: [0.25, 0.46, 0.45, 0.94] // Custom easing for smoother animation
+        transition={{
+          duration: 0.4,
+          ease: [0.25, 0.46, 0.45, 0.94]
         }}
       >
         <div className="flex flex-col h-full">
@@ -144,19 +146,19 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
                       key="icon-logo"
                       src="/aboveandbeyond-ai-icon-logo.svg"
                       alt="Above + Beyond AI Icon"
-                      className="h-8 w-8 logo-sidebar"
+                      className="size-8 logo-sidebar"
                       initial={{ opacity: 0, rotate: -180 }}
                       animate={{ opacity: 1, rotate: 0 }}
                       exit={{ opacity: 0, rotate: 180 }}
-                      transition={{ 
-                        duration: 0.5, 
+                      transition={{
+                        duration: 0.5,
                         ease: [0.175, 0.885, 0.32, 1.275]
                       }}
                     />
                   ) : null}
                 </AnimatePresence>
               </div>
-              
+
               {/* Full logo - appears to the left when expanded */}
               <AnimatePresence>
                 {isExpanded && (
@@ -189,10 +191,10 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
                   key={item.name}
                   href={item.href}
                   className={cn(
-                    "flex items-center rounded-lg transition-all duration-200 group h-12 relative mx-2",
+                    "flex items-center rounded-lg transition-colors duration-200 group h-12 relative mx-2",
                     isActive
-                      ? "text-black dark:text-white bg-white/5 dark:bg-white/5"
-                      : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300",
+                      ? "text-foreground bg-foreground/5"
+                      : "text-muted-foreground hover:text-foreground",
                     !item.active && "opacity-60 cursor-not-allowed"
                   )}
                   onClick={(e) => {
@@ -205,16 +207,12 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
                 >
                   {/* Icon - fixed at 24px from left edge */}
                   <div className="absolute left-6 -translate-x-1/2 flex items-center justify-center h-full">
-                    <item.icon 
-                      className={cn(
-                        "h-5 w-5 transition-all duration-200",
-                        isActive 
-                          ? "fill-black dark:fill-white stroke-black dark:stroke-white" 
-                          : ""
-                      )} 
+                    <item.icon
+                      className="size-5"
+                      weight={isActive ? "fill" : "regular"}
                     />
                   </div>
-                  
+
                   {/* Text - appears when expanded */}
                   <AnimatePresence>
                     {isExpanded && (
@@ -222,7 +220,7 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
                         initial={{ opacity: 0, x: -10 }}
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: -10 }}
-                        transition={{ 
+                        transition={{
                           duration: 0.3,
                           delay: 0.1
                         }}
@@ -242,7 +240,7 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
                       </motion.div>
                     )}
                   </AnimatePresence>
-                  
+
                   {/* Tooltip for collapsed state */}
                   {!isExpanded && (
                     <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 px-3 py-2 bg-card border border-border rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
@@ -255,12 +253,25 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
             })}
           </nav>
 
-          {/* User Profile Section */}
+          {/* Theme Toggle + User Profile Section */}
+          <div className="border-t border-border/50">
+            {/* Theme toggle row */}
+            <div className="px-4 py-3 flex items-center">
+              {isExpanded ? (
+                <ThemeToggle showLabel />
+              ) : (
+                <div className="w-full flex justify-center">
+                  <ThemeToggle showLabel={false} />
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="border-t border-border/50 relative group">
             {loading ? (
               // Loading state
               <div className="p-4 flex items-center">
-                <div className="w-8 h-8 bg-muted rounded-full animate-pulse flex-shrink-0"></div>
+                <div className="size-8 bg-muted rounded-full animate-pulse flex-shrink-0"></div>
                 {isExpanded && (
                   <motion.div
                     initial={{ opacity: 0 }}
@@ -287,14 +298,14 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
                         className="rounded-full ring-2 ring-green-500/20"
                       />
                     ) : (
-                      <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center ring-2 ring-green-500/20">
-                        <span className="text-white text-sm font-medium">
+                      <div className="size-8 bg-muted rounded-full flex items-center justify-center ring-2 ring-green-500/20">
+                        <span className="text-foreground text-sm font-medium">
                           {(user.name || user.email)?.charAt(0).toUpperCase()}
                         </span>
                       </div>
                     )}
                     {/* Online indicator */}
-                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-card"></div>
+                    <div className="absolute -bottom-0.5 -right-0.5 size-3 bg-green-500 rounded-full border-2 border-card"></div>
                   </div>
 
                   {/* User info and actions - shown when expanded */}
@@ -316,21 +327,21 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
                               {user.email}
                             </p>
                           </div>
-                          
+
                           {/* Action buttons */}
                           <div className="flex items-center gap-1 ml-2">
                             <button
                               className="p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-muted/50"
-                              title="Settings"
+                              aria-label="Settings"
                             >
-                              <Settings className="w-4 h-4" />
+                              <GearSix className="size-4" />
                             </button>
                             <button
                               onClick={signOut}
                               className="p-1.5 text-muted-foreground hover:text-red-500 transition-colors rounded-md hover:bg-red-500/10"
-                              title="Sign out"
+                              aria-label="Sign out"
                             >
-                              <LogOut className="w-4 h-4" />
+                              <SignOut className="size-4" />
                             </button>
                           </div>
                         </div>
@@ -343,7 +354,7 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
                 {!isExpanded && (
                   <div className="absolute left-full ml-2 bottom-4 px-3 py-2 bg-card border border-border rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <div className="size-2 bg-green-500 rounded-full"></div>
                       <span className="text-sm font-medium">
                         {user.name || user.email?.split('@')[0]}
                       </span>
@@ -357,8 +368,8 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
               <div className="p-4">
                 <div className="flex items-center">
                   {/* Anonymous user icon */}
-                  <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center flex-shrink-0">
-                    <User className="w-4 h-4 text-muted-foreground" />
+                  <div className="size-8 bg-muted rounded-full flex items-center justify-center flex-shrink-0">
+                    <UserCircle className="size-4 text-muted-foreground" />
                   </div>
 
                   {/* Sign in prompt - shown when expanded */}
@@ -391,7 +402,7 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
                 {!isExpanded && (
                   <div className="absolute left-full ml-2 bottom-4 px-3 py-2 bg-card border border-border rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-muted rounded-full"></div>
+                      <div className="size-2 bg-muted rounded-full"></div>
                       <span className="text-sm font-medium">Not signed in</span>
                     </div>
                     <p className="text-xs text-muted-foreground">Click to sign in</p>

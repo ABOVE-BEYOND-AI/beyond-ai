@@ -3,7 +3,7 @@
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Globe, Sparkles, Zap, Shield } from "lucide-react";
+import { ArrowRight, Globe, MagicWand, Lightning, ShieldCheck } from "@phosphor-icons/react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useGoogleAuth } from "@/components/google-auth-provider-clean";
@@ -14,26 +14,22 @@ const features = [
   {
     title: "AI-Powered Research",
             description: "Advanced AI search with enhanced results on destinations, accommodations, and activities",
-    icon: Sparkles,
-    gradient: "from-yellow-400 to-orange-500",
+    icon: MagicWand,
   },
   {
     title: "Instant Generation",
     description: "Transform briefs into polished itineraries in under 30 seconds",
-    icon: Zap,
-    gradient: "from-blue-400 to-purple-500",
+    icon: Lightning,
   },
   {
     title: "Global Coverage",
     description: "Access to luxury destinations and experiences worldwide",
     icon: Globe,
-    gradient: "from-green-400 to-teal-500",
   },
   {
     title: "Enterprise Security",
     description: "Bank-level encryption and data protection",
-    icon: Shield,
-    gradient: "from-red-400 to-pink-500",
+    icon: ShieldCheck,
   },
 ];
 
@@ -65,9 +61,9 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-dvh flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full size-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
@@ -89,19 +85,19 @@ export default function DashboardPage() {
           transition={{ duration: 0.5 }}
           className="mb-12"
         >
-          <h1 className="text-4xl lg:text-6xl font-extrabold tracking-tight mb-4">
+          <h1 className="text-4xl lg:text-6xl font-extrabold tracking-tight mb-4 text-balance">
             Welcome to{" "}
             <span className="text-gradient">Above + Beyond</span>
           </h1>
-          <p className="text-lg lg:text-xl text-muted-foreground max-w-3xl">
-            Transform client briefs into extraordinary travel experiences with AI-powered research 
+          <p className="text-lg lg:text-xl text-muted-foreground max-w-3xl text-pretty">
+            Transform client briefs into extraordinary travel experiences with AI-powered research
             and beautiful Canva templates. Create luxury itineraries that exceed expectations.
           </p>
           <div className="flex gap-4 mt-8">
             <Link href="/itinerary">
               <Button size="lg" variant="premium" className="group">
                 Create Itinerary
-                <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                <ArrowRight className="ml-2 size-4 transition-transform group-hover:translate-x-1" />
               </Button>
             </Link>
             <Button size="lg" variant="outline">
@@ -120,7 +116,7 @@ export default function DashboardPage() {
           <motion.div variants={item}>
             <Card className="glass border-primary/20">
               <CardContent className="p-6">
-                <div className="text-4xl font-bold text-primary mb-2">3-5</div>
+                <div className="text-4xl font-bold text-primary mb-2 tabular-nums">3-5</div>
                 <p className="text-sm text-muted-foreground">
                   Unique trip options per brief
                 </p>
@@ -130,7 +126,7 @@ export default function DashboardPage() {
           <motion.div variants={item}>
             <Card className="glass border-primary/20">
               <CardContent className="p-6">
-                <div className="text-4xl font-bold text-primary mb-2">30s</div>
+                <div className="text-4xl font-bold text-primary mb-2 tabular-nums">30s</div>
                 <p className="text-sm text-muted-foreground">
                   Average generation time
                 </p>
@@ -140,7 +136,7 @@ export default function DashboardPage() {
           <motion.div variants={item}>
             <Card className="glass border-primary/20">
               <CardContent className="p-6">
-                <div className="text-4xl font-bold text-primary mb-2">100%</div>
+                <div className="text-4xl font-bold text-primary mb-2 tabular-nums">100%</div>
                 <p className="text-sm text-muted-foreground">
                   Professional PDF output
                 </p>
@@ -158,11 +154,11 @@ export default function DashboardPage() {
         >
           {features.map((feature) => (
             <motion.div key={feature.title} variants={item}>
-              <Card className="group hover:shadow-glow transition-all duration-300 hover:-translate-y-1">
+              <Card className="group hover:shadow-lg transition-shadow duration-300 hover:-translate-y-1">
                 <CardHeader>
                   <div className="flex items-center gap-4">
-                    <div className={`p-3 rounded-lg bg-gradient-to-br ${feature.gradient} shadow-lg`}>
-                      <feature.icon className="h-6 w-6 text-white" />
+                    <div className="p-3 rounded-lg bg-muted">
+                      <feature.icon className="size-6 text-foreground" weight="duotone" />
                     </div>
                     <div>
                       <CardTitle className="text-xl">{feature.title}</CardTitle>
