@@ -167,7 +167,7 @@ const PERIODS: { key: CallPeriod; label: string; shortLabel: string }[] = [
   { key: "month", label: "This Month", shortLabel: "this month" },
 ];
 
-const POLL_INTERVAL_MS = 60_000;
+const POLL_INTERVAL_MS = 180_000; // 3 minutes — Aircall rate limit is 60 req/min
 
 // ── Helpers ──
 
