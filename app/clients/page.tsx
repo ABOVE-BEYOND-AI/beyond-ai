@@ -12,12 +12,8 @@ import {
   EnvelopeSimple,
   LinkedinLogo,
   Buildings,
-  CurrencyGbp,
-  CalendarBlank,
   User,
   Tag,
-  Star,
-  NotePencil,
   ArrowLeft,
 } from "@phosphor-icons/react";
 import type {
@@ -66,46 +62,28 @@ function ClientCard({
   return (
     <motion.button
       onClick={onClick}
-      initial={{ opacity: 0, y: 8 }}
+      initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`w-full text-left p-4 rounded-xl border transition-all duration-200 group ${
+      className={`w-full text-left p-3 rounded-md transition-all duration-150 group flex flex-col ${
         isSelected
-          ? "bg-primary/10 border-primary/30 shadow-lg shadow-primary/5"
-          : "bg-foreground/[0.03] border-foreground/[0.06] hover:bg-foreground/[0.06] hover:border-foreground/[0.10]"
+          ? "bg-primary/5 shadow-sm"
+          : "hover:bg-muted/50"
       }`}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-3 w-full">
         <div className="min-w-0 flex-1">
-          <p className="font-semibold text-sm truncate">{contact.Name}</p>
+          <p className="font-medium text-sm truncate text-foreground">{contact.Name}</p>
           {contact.Account?.Name && (
             <p className="text-xs text-muted-foreground truncate mt-0.5">
               {contact.Account.Name}
             </p>
           )}
-          {contact.Title && (
-            <p className="text-xs text-muted-foreground/60 truncate">
-              {contact.Title}
-            </p>
-          )}
         </div>
         <div className="text-right shrink-0">
-          <p className="text-sm font-bold tabular-nums text-emerald-400">
+          <p className="text-sm font-semibold tabular-nums text-emerald-500">
             {formatCurrency(spend)}
           </p>
-          <p className="text-[10px] text-muted-foreground/50 mt-0.5">
-            lifetime
-          </p>
         </div>
-      </div>
-      <div className="flex items-center justify-between mt-3 pt-2 border-t border-foreground/[0.04]">
-        <span className="text-[11px] text-muted-foreground/50">
-          {contact.LastActivityDate
-            ? formatRelativeTime(contact.LastActivityDate)
-            : "No activity"}
-        </span>
-        <span className="text-[11px] text-muted-foreground/40">
-          {contact.Owner?.Name || "Unassigned"}
-        </span>
       </div>
     </motion.button>
   );
@@ -174,14 +152,14 @@ function ClientDetail({
       </button>
 
       {/* Header Card */}
-      <div className="rounded-2xl bg-foreground/[0.04] border border-foreground/[0.06] p-6 mb-4">
+      <div className="mb-8">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight">
+            <h2 className="text-3xl font-bold tracking-tight text-foreground">
               {contact.Name}
             </h2>
             {contact.Account?.Name && (
-              <div className="flex items-center gap-2 mt-1 text-muted-foreground">
+              <div className="flex items-center gap-2 mt-1.5 text-muted-foreground font-medium">
                 <Buildings className="size-4" />
                 <span className="text-sm">{contact.Account.Name}</span>
                 {contact.Title && (
@@ -195,9 +173,9 @@ function ClientDetail({
           </div>
           <button
             onClick={onClose}
-            className="hidden lg:flex p-2 rounded-lg hover:bg-foreground/10 transition-colors text-muted-foreground"
+            className="hidden lg:flex p-2 rounded-md hover:bg-muted/50 transition-colors text-muted-foreground"
           >
-            <X className="size-5" />
+            <X className="size-4" />
           </button>
         </div>
 
@@ -206,18 +184,18 @@ function ClientDetail({
           {contact.Phone && (
             <a
               href={`tel:${contact.Phone}`}
-              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
             >
-              <Phone className="size-4" />
+              <Phone className="size-4" weight="fill" />
               {contact.Phone}
             </a>
           )}
           {contact.Email && (
             <a
               href={`mailto:${contact.Email}`}
-              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
             >
-              <EnvelopeSimple className="size-4" />
+              <EnvelopeSimple className="size-4" weight="fill" />
               {contact.Email}
             </a>
           )}
@@ -226,7 +204,7 @@ function ClientDetail({
               href={contact.LinkedIn__c}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 text-sm text-blue-400 hover:text-blue-300 transition-colors"
+              className="flex items-center gap-1.5 text-sm font-medium text-blue-500 hover:text-blue-600 transition-colors"
             >
               <LinkedinLogo className="size-4" weight="fill" />
               LinkedIn
@@ -236,27 +214,24 @@ function ClientDetail({
       </div>
 
       {/* Lifetime Stats */}
-      <div className="grid grid-cols-3 gap-3 mb-4">
-        <div className="rounded-xl bg-foreground/[0.04] border border-foreground/[0.06] p-4 text-center">
-          <CurrencyGbp className="size-5 mx-auto mb-2 text-emerald-400" weight="bold" />
-          <p className="text-xl font-bold tabular-nums text-emerald-400">
+      <div className="grid grid-cols-3 gap-3 mb-8">
+        <div className="rounded-lg bg-card border border-border p-4 shadow-sm text-center">
+          <p className="text-2xl font-bold tabular-nums text-foreground">
             {formatCurrency(lifetimeValue)}
           </p>
-          <p className="text-[11px] text-muted-foreground/60 mt-1">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-1">
             Total Spend
           </p>
         </div>
-        <div className="rounded-xl bg-foreground/[0.04] border border-foreground/[0.06] p-4 text-center">
-          <CalendarBlank className="size-5 mx-auto mb-2 text-blue-400" />
-          <p className="text-xl font-bold tabular-nums">{totalBookings}</p>
-          <p className="text-[11px] text-muted-foreground/60 mt-1">
-            Total Bookings
+        <div className="rounded-lg bg-card border border-border p-4 shadow-sm text-center">
+          <p className="text-2xl font-bold tabular-nums text-foreground">{totalBookings}</p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-1">
+            Bookings
           </p>
         </div>
-        <div className="rounded-xl bg-foreground/[0.04] border border-foreground/[0.06] p-4 text-center">
-          <Star className="size-5 mx-auto mb-2 text-amber-400" />
-          <p className="text-xl font-bold tabular-nums">{memberSince}</p>
-          <p className="text-[11px] text-muted-foreground/60 mt-1">
+        <div className="rounded-lg bg-card border border-border p-4 shadow-sm text-center">
+          <p className="text-2xl font-bold tabular-nums text-foreground">{memberSince}</p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-1">
             Member Since
           </p>
         </div>
@@ -291,20 +266,19 @@ function ClientDetail({
       )}
 
       {/* Event History */}
-      <div className="rounded-xl bg-foreground/[0.04] border border-foreground/[0.06] p-4 mb-4">
-        <div className="flex items-center gap-2 mb-4">
-          <CalendarBlank className="size-4 text-muted-foreground" />
-          <h3 className="text-sm font-semibold">Event History</h3>
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4 border-b border-border pb-2">
+          <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Event History</h3>
         </div>
         {sortedYears.length === 0 ? (
           <p className="text-sm text-muted-foreground/50 text-center py-4">
             No opportunities found
           </p>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {sortedYears.map((year) => (
               <div key={year}>
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">
+                <p className="text-xs font-bold text-muted-foreground mb-3">
                   {year}
                 </p>
                 <div className="space-y-2">
@@ -316,28 +290,28 @@ function ClientDetail({
                     return (
                       <div
                         key={opp.Id}
-                        className="flex items-center gap-3 p-3 rounded-lg bg-foreground/[0.03] border border-foreground/[0.04]"
+                        className="flex items-center gap-3 p-3 rounded-md bg-card border border-border/50 hover:bg-muted/30 transition-colors"
                       >
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">
+                          <p className="text-sm font-medium truncate text-foreground">
                             {eventName}
                           </p>
-                          <div className="flex items-center gap-2 mt-0.5">
+                          <div className="flex items-center gap-2 mt-1">
                             <span
-                              className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${stageBadge(
+                              className={`text-[10px] px-2 py-0.5 rounded-sm font-semibold uppercase tracking-wider ${stageBadge(
                                 opp.StageName
                               )}`}
                             >
                               {opp.StageName}
                             </span>
                             {opp.Event__r?.Category__c && (
-                              <span className="text-[10px] text-muted-foreground/50">
+                              <span className="text-[10px] font-medium text-muted-foreground/70">
                                 {opp.Event__r.Category__c}
                               </span>
                             )}
                           </div>
                         </div>
-                        <p className="text-sm font-bold tabular-nums shrink-0">
+                        <p className="text-sm font-bold tabular-nums shrink-0 text-foreground">
                           {formatCurrency(amount)}
                         </p>
                       </div>
@@ -352,10 +326,9 @@ function ClientDetail({
 
       {/* Notes */}
       {notes.length > 0 && (
-        <div className="rounded-xl bg-foreground/[0.04] border border-foreground/[0.06] p-4">
-          <div className="flex items-center gap-2 mb-4">
-            <NotePencil className="size-4 text-muted-foreground" />
-            <h3 className="text-sm font-semibold">
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4 border-b border-border pb-2">
+            <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">
               Notes ({notes.length})
             </h3>
           </div>
@@ -363,19 +336,20 @@ function ClientDetail({
             {notes.map((note) => (
               <div
                 key={note.Id}
-                className="p-3 rounded-lg bg-foreground/[0.03] border border-foreground/[0.04]"
+                className="p-4 rounded-md bg-muted/30 border border-border/50"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-semibold text-muted-foreground">
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                     {note.Name}
                   </p>
-                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground/50">
+                  <div className="flex items-center gap-2 text-[10px] font-medium text-muted-foreground/60">
                     <span>{note.Owner?.Alias || "Unknown"}</span>
+                    <span>&middot;</span>
                     <span>{formatRelativeTime(note.CreatedDate)}</span>
                   </div>
                 </div>
                 {note.Body__c && (
-                  <p className="text-sm text-muted-foreground/80 whitespace-pre-wrap leading-relaxed">
+                  <p className="text-sm text-foreground/90 whitespace-pre-wrap leading-relaxed font-medium">
                     {note.Body__c}
                   </p>
                 )}
@@ -494,8 +468,8 @@ export default function ClientsPage() {
 
   return (
     <DashboardLayout>
-      <div className="min-h-screen bg-gradient-to-br from-background to-muted/20 p-6 pl-24 lg:p-8 lg:pl-24">
-        <div className="max-w-7xl mx-auto">
+      <div className="min-h-dvh bg-background p-6 pl-24 lg:p-8 lg:pl-32">
+        <div className="max-w-[1400px] mx-auto">
           {/* Header */}
           <motion.div
             initial={{ opacity: 0, y: -10 }}
@@ -525,7 +499,7 @@ export default function ClientsPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search by name, company, or email..."
-                className="w-full pl-10 pr-10 py-3 rounded-xl bg-foreground/[0.04] border border-foreground/[0.08] text-sm placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 transition-all"
+                className="w-full pl-9 pr-9 py-2 rounded-lg bg-card border border-border text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
               />
               {search && (
                 <button
@@ -568,20 +542,20 @@ export default function ClientsPage() {
                     {Array.from({ length: 8 }).map((_, i) => (
                       <div
                         key={i}
-                        className="p-4 rounded-xl bg-foreground/[0.03] border border-foreground/[0.06] animate-pulse"
+                        className="p-3 rounded-md bg-muted/30 border border-border animate-pulse flex flex-col"
                       >
                         <div className="flex justify-between">
                           <div>
-                            <div className="h-4 w-32 bg-muted rounded mb-2" />
-                            <div className="h-3 w-24 bg-muted/60 rounded" />
-                          </div>
-                          <div className="h-4 w-16 bg-muted rounded" />
+                          <div className="h-4 w-32 bg-muted rounded mb-2" />
+                          <div className="h-3 w-24 bg-muted rounded" />
                         </div>
-                        <div className="mt-3 pt-2 border-t border-foreground/[0.04] flex justify-between">
-                          <div className="h-3 w-12 bg-muted/40 rounded" />
-                          <div className="h-3 w-20 bg-muted/40 rounded" />
-                        </div>
+                        <div className="h-4 w-16 bg-muted rounded" />
                       </div>
+                      <div className="mt-3 pt-2 flex justify-between">
+                        <div className="h-3 w-12 bg-muted rounded" />
+                        <div className="h-3 w-20 bg-muted rounded" />
+                      </div>
+                    </div>
                     ))}
                   </div>
                 ) : contacts.length === 0 ? (

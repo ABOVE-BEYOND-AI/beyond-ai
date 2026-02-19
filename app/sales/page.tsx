@@ -112,39 +112,39 @@ type FullscreenView = null | "leaderboard" | "deals";
 
 function LeaderboardRow({ rep, index, large = false }: { rep: LeaderboardEntry; index: number; large?: boolean }) {
   const isTop3 = index < 3;
-  const rankSize = large ? "size-14 text-xl" : "size-10 text-base";
+  const rankSize = large ? "size-10 text-lg" : "size-8 text-sm";
   const nameSize = large
-    ? (isTop3 ? "text-xl" : "text-lg text-foreground/80")
-    : (isTop3 ? "text-base" : "text-sm text-foreground/80");
+    ? (isTop3 ? "text-lg" : "text-base text-foreground/80")
+    : (isTop3 ? "text-sm" : "text-xs text-foreground/80");
   const amountSize = large
-    ? (isTop3 ? "text-2xl" : "text-lg text-foreground/70")
-    : (isTop3 ? "text-lg" : "text-sm text-foreground/70");
+    ? (isTop3 ? "text-xl" : "text-base text-foreground/70")
+    : (isTop3 ? "text-base" : "text-sm text-foreground/70");
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: -20 }}
+      initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.03 }}
-      className={`flex items-center gap-4 ${large ? "p-5" : "p-4"} rounded-xl transition-colors ${
-        isTop3 ? "bg-foreground/[0.04] border border-foreground/[0.06]" : ""
+      className={`flex items-center gap-3 ${large ? "p-4" : "p-2.5"} rounded-md transition-colors ${
+        isTop3 ? "bg-muted/30 border border-border/50" : ""
       }`}
     >
       <div
         className={`flex items-center justify-center ${rankSize} rounded-full font-bold shrink-0 ${
           index === 0
-            ? "bg-gradient-to-br from-yellow-300 to-yellow-500 text-yellow-900 shadow-lg shadow-yellow-500/20"
+            ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-500"
             : index === 1
-              ? "bg-gradient-to-br from-gray-200 to-gray-400 text-gray-700 shadow-lg shadow-gray-400/20"
+              ? "bg-slate-100 text-slate-700 dark:bg-slate-800/50 dark:text-slate-400"
               : index === 2
-                ? "bg-gradient-to-br from-amber-500 to-amber-700 text-amber-100 shadow-lg shadow-amber-600/20"
-                : "bg-muted/60 text-muted-foreground"
+                ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-500"
+                : "bg-muted text-muted-foreground"
         }`}
       >
         {index + 1}
       </div>
       <div className="flex-1 min-w-0">
         <p className={`font-semibold truncate ${nameSize}`}>{rep.name}</p>
-        <p className={`text-muted-foreground ${large ? "text-sm" : "text-xs"}`}>
+        <p className={`text-muted-foreground ${large ? "text-sm" : "text-[10px]"}`}>
           {rep.deal_count} deal{rep.deal_count !== 1 ? "s" : ""}
         </p>
       </div>
@@ -164,26 +164,26 @@ function DealRow({ deal, index, large = false }: { deal: SalesforceOpportunity; 
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: 5 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.03 }}
-      className={`flex items-center gap-4 ${large ? "p-5" : "p-4"} rounded-xl bg-foreground/[0.03] border border-foreground/[0.04]`}
+      className={`flex items-center gap-3 ${large ? "p-4" : "p-2.5"} rounded-md bg-card border border-border/50 hover:bg-muted/30 transition-colors`}
     >
       <div className="flex-1 min-w-0">
-        <p className={`font-semibold truncate ${large ? "text-lg" : "text-sm"}`}>
+        <p className={`font-medium truncate ${large ? "text-base" : "text-sm text-foreground"}`}>
           {clientName(deal.Name)}
         </p>
         <div className={`flex items-center gap-2 mt-0.5 ${large ? "text-sm" : ""}`}>
-          <span className={`text-muted-foreground ${large ? "text-sm" : "text-xs"}`}>{owner}</span>
+          <span className={`text-muted-foreground ${large ? "text-sm" : "text-[10px]"}`}>{owner}</span>
           {event && (
             <>
               <span className="text-muted-foreground/30">·</span>
-              <span className={`text-muted-foreground/70 truncate ${large ? "text-sm" : "text-xs"}`}>{event}</span>
+              <span className={`text-muted-foreground/70 truncate ${large ? "text-sm" : "text-[10px]"}`}>{event}</span>
             </>
           )}
         </div>
       </div>
-      <p className={`font-bold tabular-nums shrink-0 ${large ? "text-xl" : "text-base"}`}>
+      <p className={`font-bold tabular-nums shrink-0 ${large ? "text-lg" : "text-sm"}`}>
         {formatCurrency(amount)}
       </p>
     </motion.div>
@@ -358,7 +358,7 @@ export default function SalesPage() {
         period={selectedPeriod}
       />
 
-      <div className="min-h-dvh bg-gradient-to-br from-background to-muted/20 p-6 pl-24 lg:p-8 lg:pl-24">
+      <div className="min-h-dvh bg-background p-6 pl-24 lg:p-8 lg:pl-32">
         <div className="max-w-7xl mx-auto">
 
           {/* ── Period Tabs ── */}
@@ -368,22 +368,22 @@ export default function SalesPage() {
             transition={{ duration: 0.5, delay: 0.1 }}
             className="flex justify-center mb-8 mt-6"
           >
-            <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-full p-2 shadow-lg relative">
+            <div className="bg-muted/30 border border-border rounded-lg p-1.5 shadow-sm relative">
               <div className="flex relative">
                 <motion.div
-                  className="absolute bg-primary rounded-full shadow-lg"
+                  className="absolute bg-card border border-border rounded-md shadow-sm"
                   initial={false}
                   animate={{ x: getPillX(selectedPeriod), width: getPillWidth(selectedPeriod) }}
                   transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                  style={{ height: "40px", top: "0px" }}
+                  style={{ height: "32px", top: "0px" }}
                 />
                 {PERIODS.map((p) => (
                   <button
                     key={p.key}
                     onClick={() => setSelectedPeriod(p.key)}
-                    className={`relative z-10 py-2.5 text-sm font-medium transition-colors duration-200 text-center ${
+                    className={`relative z-10 py-1.5 text-xs font-semibold uppercase tracking-wider transition-colors duration-200 text-center ${
                       selectedPeriod === p.key
-                        ? "text-primary-foreground"
+                        ? "text-foreground"
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                     style={{ width: `${p.width}px` }}
@@ -485,20 +485,20 @@ export default function SalesPage() {
             className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-6xl mx-auto"
           >
             {/* ── LEADERBOARD CONTAINER ── */}
-            <div className="rounded-2xl bg-foreground/[0.04] border border-foreground/[0.06] overflow-hidden">
+            <div className="rounded-lg bg-card border border-border shadow-sm overflow-hidden">
               {/* Header */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-foreground/[0.06]">
-                <div className="flex items-center gap-3">
-                  <FontAwesomeIcon icon={faTrophy} className="h-5 w-5 text-yellow-500" />
-                  <h2 className="text-lg font-semibold tracking-tight">Leaderboard</h2>
-                  <span className="text-sm text-muted-foreground">{periodLabel(selectedPeriod)}</span>
+              <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/20">
+                <div className="flex items-center gap-2">
+                  <FontAwesomeIcon icon={faTrophy} className="h-4 w-4 text-yellow-500" />
+                  <h2 className="text-sm font-bold uppercase tracking-wider text-foreground">Leaderboard</h2>
+                  <span className="text-xs text-muted-foreground ml-2">{periodLabel(selectedPeriod)}</span>
                 </div>
                 <button
                   onClick={() => setFullscreenView("leaderboard")}
-                  className="p-2 rounded-lg hover:bg-foreground/10 transition-colors text-muted-foreground hover:text-foreground"
+                  className="p-1.5 rounded-md hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
                   aria-label="View leaderboard fullscreen"
                 >
-                  <ArrowsOut className="size-[18px]" />
+                  <ArrowsOut className="size-4" />
                 </button>
               </div>
 
@@ -532,20 +532,20 @@ export default function SalesPage() {
             </div>
 
             {/* ── RECENT DEALS CONTAINER ── */}
-            <div className="rounded-2xl bg-foreground/[0.04] border border-foreground/[0.06] overflow-hidden">
+            <div className="rounded-lg bg-card border border-border shadow-sm overflow-hidden">
               {/* Header */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-foreground/[0.06]">
-                <div className="flex items-center gap-3">
-                  <CurrencyGbp className="size-5 text-green-500" weight="bold" />
-                  <h2 className="text-lg font-semibold tracking-tight">Recent Deals</h2>
-                  <span className="text-sm text-muted-foreground">{periodLabel(selectedPeriod)}</span>
+              <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/20">
+                <div className="flex items-center gap-2">
+                  <CurrencyGbp className="size-4 text-emerald-500" weight="bold" />
+                  <h2 className="text-sm font-bold uppercase tracking-wider text-foreground">Recent Deals</h2>
+                  <span className="text-xs text-muted-foreground ml-2">{periodLabel(selectedPeriod)}</span>
                 </div>
                 <button
                   onClick={() => setFullscreenView("deals")}
-                  className="p-2 rounded-lg hover:bg-foreground/10 transition-colors text-muted-foreground hover:text-foreground"
+                  className="p-1.5 rounded-md hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
                   aria-label="View deals fullscreen"
                 >
-                  <ArrowsOut className="size-[18px]" />
+                  <ArrowsOut className="size-4" />
                 </button>
               </div>
 

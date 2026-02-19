@@ -85,7 +85,7 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         className={cn(
-          "h-dvh bg-card border-r border-border/50 flex-shrink-0 overflow-hidden",
+          "h-dvh bg-card border-r border-border flex-shrink-0 overflow-hidden",
           "fixed left-0 top-0 z-40 transform transition-transform duration-300 ease-out",
           isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
@@ -99,7 +99,7 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="h-20 border-b border-border/50 relative overflow-hidden">
+          <div className="h-16 border-b border-border relative overflow-hidden">
             <Link href="/" className="absolute inset-0 flex items-center" onClick={() => setIsOpen(false)}>
               {/* Favicon - shown when collapsed */}
               <div className="absolute left-6 top-1/2 -translate-y-1/2">
@@ -151,18 +151,18 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 py-6 space-y-1">
+          <nav className="flex-1 py-4 space-y-0.5">
             {navigation.map((item) => {
               const isActive = item.href === pathname || (item.href === "/itinerary" && pathname === "/itinerary");
               return (
-                <Link
+                  <Link
                   key={item.name}
                   href={item.href}
                   className={cn(
-                    "flex items-center rounded-lg transition-colors duration-200 group h-12 relative mx-2",
+                    "flex items-center rounded-md transition-colors duration-200 group h-10 relative mx-3 my-0.5",
                     isActive
-                      ? "text-foreground bg-foreground/5"
-                      : "text-muted-foreground hover:text-foreground",
+                      ? "text-foreground bg-foreground/5 font-medium"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
                     !item.active && "opacity-60 cursor-not-allowed"
                   )}
                   onClick={(e) => {
@@ -194,7 +194,7 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
                         }}
                         className="flex items-center justify-between w-full pl-14 pr-4"
                       >
-                        <span className="font-medium whitespace-nowrap">{item.name}</span>
+                        <span className="text-sm tracking-tight whitespace-nowrap">{item.name}</span>
                         {!item.active && (
                           <motion.span
                             initial={{ opacity: 0, scale: 0.8 }}
@@ -235,7 +235,7 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
             </div>
           </div>
 
-          <div className="border-t border-border/50 relative group">
+          <div className="border-t border-border relative group">
             {loading ? (
               // Loading state
               <div className="p-4 flex items-center">

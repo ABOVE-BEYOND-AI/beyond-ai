@@ -5,7 +5,6 @@ import {
   Phone,
   PhoneIncoming,
   PhoneOutgoing,
-  Clock,
   Users,
   TrendUp,
   ArrowsClockwise,

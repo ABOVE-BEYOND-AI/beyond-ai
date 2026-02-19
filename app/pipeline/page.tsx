@@ -12,7 +12,6 @@ import {
   Trophy,
   XCircle,
   CaretDown,
-  DotOutline,
   User,
   CalendarBlank,
 } from "@phosphor-icons/react";
@@ -152,16 +151,16 @@ function KanbanCard({
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, y: 8 }}
+      initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.95 }}
+      exit={{ opacity: 0, scale: 0.98 }}
       transition={{ duration: 0.2 }}
       draggable
       onDragStart={(e) =>
         onDragStart(e as unknown as React.DragEvent, opp.Id)
       }
       onDragEnd={onDragEnd}
-      className="group cursor-grab active:cursor-grabbing rounded-xl border border-border/50 bg-card/80 backdrop-blur-sm p-4 hover:border-border hover:shadow-lg hover:shadow-black/10 transition-all duration-200"
+      className="group cursor-grab active:cursor-grabbing rounded-lg border border-border bg-card p-3 hover:border-foreground/20 shadow-sm transition-all duration-200"
     >
       {/* Top: Event name + category badge */}
       <div className="flex items-start justify-between gap-2 mb-2">
@@ -170,7 +169,7 @@ function KanbanCard({
         </p>
         {opp.Event__r?.Category__c && (
           <span
-            className={`shrink-0 text-[10px] font-medium px-2 py-0.5 rounded-full ${catColors.bg} ${catColors.text}`}
+            className={`shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded-md ${catColors.bg} ${catColors.text}`}
           >
             {opp.Event__r.Category__c}
           </span>
@@ -178,47 +177,47 @@ function KanbanCard({
       </div>
 
       {/* Contact / Account */}
-      <div className="flex items-center gap-1.5 mb-3">
-        <User className="size-3 text-muted-foreground/60" weight="bold" />
-        <span className="text-xs text-muted-foreground truncate">
+      <div className="flex items-center gap-1.5 mb-2.5">
+        <User className="size-3.5 text-muted-foreground/60" weight="fill" />
+        <span className="text-xs font-medium text-muted-foreground truncate">
           {contactName}
         </span>
       </div>
 
       {/* Amount + Guests row */}
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-lg font-bold tabular-nums text-foreground">
+      <div className="flex items-center justify-between mb-3 bg-muted/30 rounded-md p-1.5">
+        <span className="text-sm font-bold tabular-nums text-foreground">
           {formatCurrency(amount)}
         </span>
         {opp.Total_Number_of_Guests__c != null &&
           opp.Total_Number_of_Guests__c > 0 && (
-            <span className="text-xs text-muted-foreground flex items-center gap-1">
-              <Users className="size-3" weight="bold" />
-              {opp.Total_Number_of_Guests__c} guests
+            <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+              <Users className="size-3.5" weight="fill" />
+              {opp.Total_Number_of_Guests__c}
             </span>
           )}
       </div>
 
       {/* Payment progress bar */}
-      <div className="mb-3">
+      <div className="mb-2.5">
         <div className="flex items-center justify-between mb-1">
-          <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
+          <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
             Paid
           </span>
-          <span className="text-[10px] text-muted-foreground tabular-nums">
+          <span className="text-[10px] text-muted-foreground font-semibold tabular-nums">
             {Math.round(paidPct)}%
           </span>
         </div>
-        <div className="h-1.5 w-full rounded-full bg-muted/50 overflow-hidden">
+        <div className="h-1 w-full rounded-full bg-border overflow-hidden">
           <div
             className={`h-full rounded-full transition-all duration-500 ${
               paidPct >= 100
-                ? "bg-green-500"
+                ? "bg-emerald-500"
                 : paidPct >= 50
                   ? "bg-blue-500"
                   : paidPct > 0
                     ? "bg-amber-500"
-                    : "bg-muted-foreground/20"
+                    : "bg-muted-foreground/30"
             }`}
             style={{ width: `${Math.min(paidPct, 100)}%` }}
           />
@@ -229,16 +228,16 @@ function KanbanCard({
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-1.5">
           <span
-            className={`size-2 rounded-full ${health.dot}`}
+            className={`size-1.5 rounded-full ${health.dot}`}
             title={health.label}
           />
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-[10px] font-medium text-muted-foreground">
             {days}d in stage
           </span>
         </div>
         {opp.Event__r?.Start_Date__c && (
-          <span className="text-[10px] text-muted-foreground/60 flex items-center gap-1">
-            <CalendarBlank className="size-3" />
+          <span className="text-[10px] font-medium text-muted-foreground flex items-center gap-1">
+            <CalendarBlank className="size-3" weight="bold" />
             {new Date(opp.Event__r.Start_Date__c).toLocaleDateString("en-GB", {
               day: "numeric",
               month: "short",
@@ -249,14 +248,14 @@ function KanbanCard({
 
       {/* Next step */}
       {opp.NextStep && (
-        <p className="text-[11px] text-muted-foreground/80 italic truncate mb-2">
+        <p className="text-[11px] text-muted-foreground/80 font-medium truncate mb-2">
           Next: {opp.NextStep}
         </p>
       )}
 
       {/* Owner */}
       {opp.Owner?.Name && (
-        <p className="text-[10px] text-muted-foreground/50 truncate">
+        <p className="text-[10px] font-medium text-muted-foreground/50 truncate">
           {opp.Owner.Name}
         </p>
       )}
@@ -270,13 +269,11 @@ function StatCard({
   label,
   count,
   value,
-  color,
   delay,
 }: {
   label: string;
   count: number;
   value: number;
-  color: string;
   delay: number;
 }) {
   return (
@@ -284,18 +281,17 @@ function StatCard({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay }}
-      className="rounded-xl border border-border/50 bg-card/60 backdrop-blur-sm p-4"
+      className="rounded-lg border border-border bg-card p-5 shadow-sm hover:shadow-md transition-shadow"
     >
-      <div className="flex items-center gap-2 mb-1">
-        <DotOutline className={`size-5 ${color}`} weight="fill" />
-        <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
           {label}
         </span>
       </div>
-      <p className="text-2xl font-bold tabular-nums text-foreground">
+      <p className="text-3xl font-black tabular-nums text-foreground tracking-tight">
         {formatCurrency(value)}
       </p>
-      <p className="text-xs text-muted-foreground mt-0.5">
+      <p className="text-sm font-semibold text-muted-foreground mt-1">
         {count} deal{count !== 1 ? "s" : ""}
       </p>
     </motion.div>
@@ -527,7 +523,7 @@ export default function PipelinePage() {
 
   return (
     <DashboardLayout>
-      <div className="min-h-dvh bg-gradient-to-br from-background to-muted/20 p-6 pl-24 lg:p-8 lg:pl-24">
+      <div className="min-h-dvh bg-background p-6 pl-24 lg:p-8 lg:pl-32">
         <div className="max-w-[1600px] mx-auto">
           {/* ── Header ── */}
           <motion.div
@@ -621,28 +617,24 @@ export default function PipelinePage() {
               label="New"
               count={columns["New"].length}
               value={sumAmount(columns["New"])}
-              color="text-blue-400"
               delay={0.05}
             />
             <StatCard
               label="Deposit Taken"
               count={columns["Deposit Taken"].length}
               value={sumAmount(columns["Deposit Taken"])}
-              color="text-yellow-400"
               delay={0.1}
             />
             <StatCard
               label="Agreement Sent"
               count={columns["Agreement Sent"].length}
               value={sumAmount(columns["Agreement Sent"])}
-              color="text-orange-400"
               delay={0.15}
             />
             <StatCard
               label="Total Pipeline"
               count={totalPipeline.length}
               value={sumAmount(totalPipeline)}
-              color="text-foreground"
               delay={0.2}
             />
           </div>
@@ -653,14 +645,14 @@ export default function PipelinePage() {
               {[0, 1, 2].map((col) => (
                 <div
                   key={col}
-                  className="rounded-xl border border-border/30 bg-card/30 p-4"
+                  className="rounded-lg border border-border bg-card p-4"
                 >
-                  <div className="animate-pulse bg-muted/50 h-6 w-32 rounded mb-4" />
+                  <div className="animate-pulse bg-muted h-6 w-32 rounded mb-4" />
                   <div className="space-y-3">
                     {[1, 2, 3].map((i) => (
                       <div
                         key={i}
-                        className="animate-pulse bg-muted/30 h-40 rounded-xl"
+                        className="animate-pulse bg-muted h-32 rounded-lg"
                       />
                     ))}
                   </div>
@@ -681,35 +673,35 @@ export default function PipelinePage() {
                     onDragOver={(e) => handleDragOver(e, col.stage)}
                     onDragLeave={handleDragLeave}
                     onDrop={(e) => handleDrop(e, col.stage)}
-                    className={`rounded-xl border transition-all duration-200 ${
+                    className={`rounded-lg border transition-all duration-200 flex flex-col h-full ${
                       isOver
-                        ? `ring-2 ${col.glowColor} ${col.borderColor}`
-                        : "border-border/30 bg-card/20"
+                        ? `ring-2 ring-primary border-primary`
+                        : "border-border bg-muted/10 hover:bg-muted/20"
                     }`}
                   >
                     {/* Column header */}
-                    <div className="flex items-center justify-between px-4 py-3 border-b border-border/20">
+                    <div className="flex items-center justify-between px-4 py-3.5 border-b border-border bg-muted/30">
                       <div className="flex items-center gap-2">
                         <span
-                          className="size-2.5 rounded-full"
+                          className="size-2 rounded-full"
                           style={{
                             backgroundColor: stageConfig?.color || "#888",
                           }}
                         />
-                        <h3 className="text-sm font-semibold text-foreground">
+                        <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">
                           {col.label}
                         </h3>
-                        <span className="text-xs text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded-full tabular-nums">
+                        <span className="text-xs font-semibold text-muted-foreground bg-background border border-border px-2 py-0.5 rounded-md tabular-nums">
                           {stageOpps.length}
                         </span>
                       </div>
-                      <span className="text-xs text-muted-foreground font-medium tabular-nums">
+                      <span className="text-sm font-bold text-foreground tabular-nums">
                         {formatCurrency(stageTotal)}
                       </span>
                     </div>
 
                     {/* Cards */}
-                    <div className="p-3 space-y-3 min-h-[200px] max-h-[calc(100vh-400px)] overflow-y-auto scrollbar-hide">
+                    <div className="p-3 space-y-3 flex-1 min-h-[300px] overflow-y-auto scrollbar-hide">
                       <AnimatePresence mode="popLayout">
                         {stageOpps.length === 0 ? (
                           <motion.div
@@ -734,9 +726,9 @@ export default function PipelinePage() {
 
                       {/* Drop indicator when dragging over empty area */}
                       {isOver && (
-                        <div className="border-2 border-dashed border-primary/30 rounded-xl h-20 flex items-center justify-center">
-                          <span className="text-xs text-primary/50">
-                            Drop here
+                        <div className="border-2 border-dashed border-primary/40 rounded-lg h-24 flex items-center justify-center bg-primary/5">
+                          <span className="text-sm font-bold text-primary/60 uppercase tracking-wider">
+                            Drop deal here
                           </span>
                         </div>
                       )}
@@ -756,18 +748,18 @@ export default function PipelinePage() {
               className="grid grid-cols-1 lg:grid-cols-2 gap-6"
             >
               {/* Won panel */}
-              <div className="rounded-xl border border-green-500/20 bg-green-500/[0.03] p-5">
+              <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/[0.03] p-5">
                 <div className="flex items-center gap-3 mb-3">
-                  <Trophy className="size-5 text-green-400" weight="fill" />
-                  <h3 className="text-sm font-semibold text-green-400">
+                  <Trophy className="size-5 text-emerald-500" weight="fill" />
+                  <h3 className="text-sm font-bold text-emerald-500 uppercase tracking-wider">
                     Won Deals
                   </h3>
                 </div>
                 <div className="flex items-baseline gap-4">
-                  <p className="text-3xl font-bold tabular-nums text-green-400">
+                  <p className="text-3xl font-bold tabular-nums text-emerald-500">
                     {formatCurrency(sumAmount(wonDeals))}
                   </p>
-                  <p className="text-sm text-green-400/60">
+                  <p className="text-sm font-medium text-emerald-500/60">
                     {wonDeals.length} deal{wonDeals.length !== 1 ? "s" : ""}
                   </p>
                 </div>
@@ -781,7 +773,7 @@ export default function PipelinePage() {
                       return (
                         <span
                           key={stage}
-                          className="text-[10px] text-green-400/60 bg-green-500/10 px-2 py-0.5 rounded-full"
+                          className="text-[10px] font-medium text-emerald-500/70 bg-emerald-500/10 px-2 py-0.5 rounded-sm uppercase tracking-wider"
                         >
                           {stage}: {count}
                         </span>
@@ -792,18 +784,18 @@ export default function PipelinePage() {
               </div>
 
               {/* Lost panel */}
-              <div className="rounded-xl border border-red-500/20 bg-red-500/[0.03] p-5">
+              <div className="rounded-lg border border-red-500/20 bg-red-500/[0.03] p-5">
                 <div className="flex items-center gap-3 mb-3">
-                  <XCircle className="size-5 text-red-400" weight="fill" />
-                  <h3 className="text-sm font-semibold text-red-400">
+                  <XCircle className="size-5 text-red-500" weight="fill" />
+                  <h3 className="text-sm font-bold text-red-500 uppercase tracking-wider">
                     Lost Deals
                   </h3>
                 </div>
                 <div className="flex items-baseline gap-4">
-                  <p className="text-3xl font-bold tabular-nums text-red-400">
+                  <p className="text-3xl font-bold tabular-nums text-red-500">
                     {formatCurrency(sumAmount(lostDeals))}
                   </p>
-                  <p className="text-sm text-red-400/60">
+                  <p className="text-sm font-medium text-red-500/60">
                     {lostDeals.length} deal{lostDeals.length !== 1 ? "s" : ""}
                   </p>
                 </div>
@@ -817,7 +809,7 @@ export default function PipelinePage() {
                       return (
                         <span
                           key={stage}
-                          className="text-[10px] text-red-400/60 bg-red-500/10 px-2 py-0.5 rounded-full"
+                          className="text-[10px] font-medium text-red-500/70 bg-red-500/10 px-2 py-0.5 rounded-sm uppercase tracking-wider"
                         >
                           {stage}: {count}
                         </span>

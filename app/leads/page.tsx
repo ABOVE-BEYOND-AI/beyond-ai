@@ -409,29 +409,29 @@ function LeadDetailPanel({
         <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border px-6 py-4">
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
-              <h2 className="text-xl font-bold truncate">{lead.Name}</h2>
+              <h2 className="text-xl font-bold truncate text-foreground">{lead.Name}</h2>
               {lead.Title && (
-                <p className="text-sm text-muted-foreground mt-0.5">
+                <p className="text-sm text-muted-foreground mt-0.5 font-medium">
                   {lead.Title}
                 </p>
               )}
               {lead.Company && (
-                <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-0.5">
-                  <Buildings className="size-3.5" />
+                <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-1 font-medium">
+                  <Buildings className="size-4" />
                   {lead.Company}
                 </p>
               )}
             </div>
             <button
               onClick={onClose}
-              className="p-2 rounded-lg hover:bg-muted/50 transition-colors text-muted-foreground"
+              className="p-2 rounded-md hover:bg-muted/50 transition-colors text-muted-foreground"
             >
-              <X className="size-5" />
+              <X className="size-4" />
             </button>
           </div>
 
           {/* Score + Status row */}
-          <div className="flex items-center gap-3 mt-3">
+          <div className="flex items-center gap-3 mt-4">
             <div
               className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${getScoreBgColor(score)}`}
             >
@@ -439,19 +439,19 @@ function LeadDetailPanel({
                 {score}
               </span>
               <span
-                className={`text-xs ${getScoreColor(score)} opacity-70`}
+                className={`text-[10px] font-bold uppercase tracking-wider ${getScoreColor(score)} opacity-70`}
               >
                 Score
               </span>
             </div>
             <span
-              className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(lead.Status)}`}
+              className={`inline-flex items-center px-2.5 py-1 rounded-sm text-xs font-semibold uppercase tracking-wider ${getStatusBadgeClass(lead.Status)}`}
             >
               {lead.Status}
             </span>
             {lead.Owner?.Name && (
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <User className="size-3" />
+              <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                <User className="size-3.5" />
                 {lead.Owner.Name}
               </span>
             )}
@@ -459,17 +459,17 @@ function LeadDetailPanel({
         </div>
 
         {/* Body */}
-        <div className="px-6 py-5 space-y-6">
+        <div className="px-6 py-6 space-y-8">
           {/* Contact Info */}
           <div>
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+            <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-3">
               Contact Information
             </h3>
-            <div className="space-y-2.5">
+            <div className="space-y-3">
               {lead.Email && (
                 <a
                   href={`mailto:${lead.Email}`}
-                  className="flex items-center gap-3 text-sm text-foreground hover:text-primary transition-colors group"
+                  className="flex items-center gap-3 text-sm font-medium text-foreground hover:text-primary transition-colors group"
                 >
                   <EnvelopeSimple className="size-4 text-muted-foreground group-hover:text-primary" />
                   {lead.Email}
@@ -478,7 +478,7 @@ function LeadDetailPanel({
               {lead.Phone && (
                 <a
                   href={`tel:${lead.Phone}`}
-                  className="flex items-center gap-3 text-sm text-foreground hover:text-primary transition-colors group"
+                  className="flex items-center gap-3 text-sm font-medium text-foreground hover:text-primary transition-colors group"
                 >
                   <Phone className="size-4 text-muted-foreground group-hover:text-primary" />
                   {lead.Phone}
@@ -487,11 +487,11 @@ function LeadDetailPanel({
               {lead.MobilePhone && lead.MobilePhone !== lead.Phone && (
                 <a
                   href={`tel:${lead.MobilePhone}`}
-                  className="flex items-center gap-3 text-sm text-foreground hover:text-primary transition-colors group"
+                  className="flex items-center gap-3 text-sm font-medium text-foreground hover:text-primary transition-colors group"
                 >
                   <Phone className="size-4 text-muted-foreground group-hover:text-primary" />
                   {lead.MobilePhone}
-                  <span className="text-xs text-muted-foreground">Mobile</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 ml-2">Mobile</span>
                 </a>
               )}
             </div>
@@ -500,13 +500,13 @@ function LeadDetailPanel({
           {/* Event Interest */}
           {lead.Event_of_Interest__c && (
             <div>
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+              <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-3">
                 Event of Interest
               </h3>
-              <div className="bg-muted/20 border border-border/40 rounded-lg px-4 py-3">
-                <p className="text-sm font-medium">{lead.Event_of_Interest__c}</p>
+              <div className="bg-card border border-border rounded-md px-4 py-3 shadow-sm">
+                <p className="text-sm font-semibold text-foreground">{lead.Event_of_Interest__c}</p>
                 {lead.No_of_Guests__c != null && lead.No_of_Guests__c > 0 && (
-                  <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
+                  <p className="text-xs font-medium text-muted-foreground mt-1.5 flex items-center gap-1.5">
                     <Users className="size-3.5" />
                     {lead.No_of_Guests__c} guest{lead.No_of_Guests__c !== 1 ? "s" : ""}
                   </p>
@@ -518,17 +518,18 @@ function LeadDetailPanel({
           {/* Interests */}
           {interests.length > 0 && (
             <div>
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+              <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-3">
                 Interests
               </h3>
               <div className="flex flex-wrap gap-2">
                 {interests.map((interest) => (
                   <span
                     key={interest.label}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider"
                     style={{
-                      backgroundColor: `${interest.color}20`,
+                      backgroundColor: `${interest.color}15`,
                       color: interest.color,
+                      border: `1px solid ${interest.color}30`
                     }}
                   >
                     <span
@@ -544,25 +545,25 @@ function LeadDetailPanel({
 
           {/* Lead Details */}
           <div>
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+            <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-3">
               Lead Details
             </h3>
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-muted/10 border border-border/30 rounded-lg px-3 py-2.5">
-                <p className="text-xs text-muted-foreground">Source</p>
-                <p className="text-sm font-medium mt-0.5">
+              <div className="bg-muted/20 border border-border rounded-md px-3 py-2.5">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Source</p>
+                <p className="text-sm font-semibold mt-1 text-foreground">
                   {lead.LeadSource || "Unknown"}
                 </p>
               </div>
-              <div className="bg-muted/10 border border-border/30 rounded-lg px-3 py-2.5">
-                <p className="text-xs text-muted-foreground">Source Group</p>
-                <p className="text-sm font-medium mt-0.5">
+              <div className="bg-muted/20 border border-border rounded-md px-3 py-2.5">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Source Group</p>
+                <p className="text-sm font-semibold mt-1 text-foreground">
                   {getSourceGroup(lead.LeadSource)}
                 </p>
               </div>
-              <div className="bg-muted/10 border border-border/30 rounded-lg px-3 py-2.5">
-                <p className="text-xs text-muted-foreground">Created</p>
-                <p className="text-sm font-medium mt-0.5">
+              <div className="bg-muted/20 border border-border rounded-md px-3 py-2.5">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Created</p>
+                <p className="text-sm font-semibold mt-1 text-foreground">
                   {new Date(lead.CreatedDate).toLocaleDateString("en-GB", {
                     day: "numeric",
                     month: "short",
@@ -570,22 +571,22 @@ function LeadDetailPanel({
                   })}
                 </p>
               </div>
-              <div className="bg-muted/10 border border-border/30 rounded-lg px-3 py-2.5">
-                <p className="text-xs text-muted-foreground">Last Activity</p>
-                <p className="text-sm font-medium mt-0.5">
+              <div className="bg-muted/20 border border-border rounded-md px-3 py-2.5">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Last Activity</p>
+                <p className="text-sm font-semibold mt-1 text-foreground">
                   {formatRelativeTime(lead.LastActivityDate)}
                 </p>
               </div>
               {lead.Rating && (
-                <div className="bg-muted/10 border border-border/30 rounded-lg px-3 py-2.5">
-                  <p className="text-xs text-muted-foreground">Rating</p>
-                  <p className="text-sm font-medium mt-0.5">{lead.Rating}</p>
+                <div className="bg-muted/20 border border-border rounded-md px-3 py-2.5">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Rating</p>
+                  <p className="text-sm font-semibold mt-1 text-foreground">{lead.Rating}</p>
                 </div>
               )}
               {lead.Form_Type__c && (
-                <div className="bg-muted/10 border border-border/30 rounded-lg px-3 py-2.5">
-                  <p className="text-xs text-muted-foreground">Form Type</p>
-                  <p className="text-sm font-medium mt-0.5">{lead.Form_Type__c}</p>
+                <div className="bg-muted/20 border border-border rounded-md px-3 py-2.5">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Form Type</p>
+                  <p className="text-sm font-semibold mt-1 text-foreground">{lead.Form_Type__c}</p>
                 </div>
               )}
             </div>
@@ -594,11 +595,11 @@ function LeadDetailPanel({
           {/* Form Comments */}
           {lead.Form_Comments__c && (
             <div>
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+              <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-3">
                 Form Comments
               </h3>
-              <div className="bg-muted/10 border border-border/30 rounded-lg px-4 py-3">
-                <p className="text-sm text-foreground/80 whitespace-pre-wrap leading-relaxed">
+              <div className="bg-muted/20 border border-border rounded-md px-4 py-3">
+                <p className="text-sm font-medium text-foreground/90 whitespace-pre-wrap leading-relaxed">
                   {lead.Form_Comments__c}
                 </p>
               </div>
@@ -608,11 +609,11 @@ function LeadDetailPanel({
           {/* Recent Note */}
           {lead.Recent_Note__c && (
             <div>
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+              <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-3">
                 Recent Note
               </h3>
-              <div className="bg-muted/10 border border-border/30 rounded-lg px-4 py-3">
-                <p className="text-sm text-foreground/80 whitespace-pre-wrap leading-relaxed">
+              <div className="bg-muted/20 border border-border rounded-md px-4 py-3">
+                <p className="text-sm font-medium text-foreground/90 whitespace-pre-wrap leading-relaxed">
                   {lead.Recent_Note__c}
                 </p>
               </div>
@@ -962,7 +963,7 @@ export default function LeadsPage() {
 
   return (
     <DashboardLayout>
-      <div className="min-h-dvh bg-gradient-to-br from-background to-muted/20 p-6 pl-24 lg:p-8 lg:pl-24">
+      <div className="min-h-dvh bg-background p-6 pl-24 lg:p-8 lg:pl-32">
         <div className="max-w-[1600px] mx-auto">
           {/* ── Header ── */}
           <motion.div
@@ -1005,7 +1006,7 @@ export default function LeadsPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search leads by name, company, or email..."
-                className="w-full bg-card border border-border/50 rounded-xl pl-10 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all"
+                className="w-full bg-card border border-border rounded-md pl-10 pr-4 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
               />
               {searchQuery && (
                 <button
@@ -1107,10 +1108,10 @@ export default function LeadsPage() {
                   <button
                     key={tab.key}
                     onClick={() => setActiveView(tab.key)}
-                    className={`relative inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
+                    className={`relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all whitespace-nowrap ${
                       isActive
-                        ? "bg-primary text-primary-foreground shadow-md"
-                        : "bg-card/60 border border-border/40 text-muted-foreground hover:text-foreground hover:bg-card hover:border-border/60"
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-muted"
                     }`}
                   >
                     <Icon
@@ -1153,7 +1154,7 @@ export default function LeadsPage() {
           >
             <Card className="overflow-hidden">
               {/* Table header */}
-              <div className="grid grid-cols-[48px_1fr_auto_auto_auto_auto_auto_auto_auto] gap-3 items-center px-4 py-2.5 bg-muted/20 border-b border-border/50 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              <div className="grid grid-cols-[48px_1fr_auto_auto_auto_auto_auto_auto_auto] gap-3 items-center px-4 py-2 bg-muted/30 border-b border-border text-xs font-bold text-muted-foreground uppercase tracking-wider">
                 <span className="text-center">Score</span>
                 <span>Name</span>
                 <span className="hidden md:block min-w-[80px]">Status</span>
@@ -1213,7 +1214,7 @@ export default function LeadsPage() {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: isUpdating ? 0.5 : 1 }}
                         transition={{ delay: index < 20 ? index * 0.02 : 0 }}
-                        className="grid grid-cols-[48px_1fr_auto_auto_auto_auto_auto_auto_auto] gap-3 items-center px-4 py-3 hover:bg-muted/10 transition-colors cursor-pointer group"
+                        className="grid grid-cols-[48px_1fr_auto_auto_auto_auto_auto_auto_auto] gap-3 items-center px-4 py-2 hover:bg-muted/10 transition-colors cursor-pointer group border-b border-border/50 last:border-0"
                         onClick={() => setSelectedLead(lead)}
                       >
                         {/* Score */}
