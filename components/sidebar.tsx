@@ -138,28 +138,33 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
           {/* Logo */}
           <div className="h-20 border-b border-border/50 relative overflow-hidden">
             <Link href="/" className="absolute inset-0 flex items-center" onClick={() => setIsOpen(false)}>
-              {/* Star icon - fixed position at 40px from left (center of 80px) */}
+              {/* Favicon - shown when collapsed */}
               <div className="absolute left-6 top-1/2 -translate-y-1/2">
                 <AnimatePresence mode="wait">
                   {!isExpanded ? (
-                    <motion.img
+                    <motion.div
                       key="icon-logo"
-                      src="/aboveandbeyond-ai-icon-logo.svg"
-                      alt="Above + Beyond AI Icon"
-                      className="size-8 logo-sidebar"
-                      initial={{ opacity: 0, rotate: -180 }}
-                      animate={{ opacity: 1, rotate: 0 }}
-                      exit={{ opacity: 0, rotate: 180 }}
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.8 }}
                       transition={{
-                        duration: 0.5,
+                        duration: 0.4,
                         ease: [0.175, 0.885, 0.32, 1.275]
                       }}
-                    />
+                    >
+                      <Image
+                        src="/ab-favicon-gold.webp"
+                        alt="Above + Beyond"
+                        width={32}
+                        height={32}
+                        className="size-8 object-contain"
+                      />
+                    </motion.div>
                   ) : null}
                 </AnimatePresence>
               </div>
 
-              {/* Full logo - appears to the left when expanded */}
+              {/* Full logo - appears when expanded */}
               <AnimatePresence>
                 {isExpanded && (
                   <motion.div
@@ -170,11 +175,11 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
                     className="absolute left-6 top-1/2 -translate-y-1/2"
                   >
                     <Image
-                      src="/BeyondAI (6) (1).svg"
-                      alt="Above + Beyond AI"
-                      width={120}
-                      height={40}
-                      className="h-10 w-auto logo-sidebar"
+                      src="/ab-logo-gold.webp"
+                      alt="Above + Beyond"
+                      width={140}
+                      height={48}
+                      className="h-10 w-auto object-contain"
                     />
                   </motion.div>
                 )}

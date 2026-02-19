@@ -23,8 +23,7 @@ import {
   ArrowsOut,
 } from "@phosphor-icons/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faLightbulb } from "@fortawesome/free-solid-svg-icons";
-import { faTrophy } from "@fortawesome/free-solid-svg-icons";
+import { faLightbulb, faTrophy } from "@fortawesome/free-solid-svg-icons";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGoogleAuth } from "@/components/google-auth-provider-clean";
 import { useRouter } from "next/navigation";
@@ -162,10 +161,10 @@ const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: "digest", label: "AI Digest", icon: MagicWand },
 ];
 
-const PERIODS: { key: CallPeriod; label: string; shortLabel: string; width: number }[] = [
-  { key: "today", label: "Today", shortLabel: "today", width: 80 },
-  { key: "week", label: "This Week", shortLabel: "this week", width: 100 },
-  { key: "month", label: "This Month", shortLabel: "this month", width: 110 },
+const PERIODS: { key: CallPeriod; label: string; shortLabel: string }[] = [
+  { key: "today", label: "Today", shortLabel: "today" },
+  { key: "week", label: "This Week", shortLabel: "this week" },
+  { key: "month", label: "This Month", shortLabel: "this month" },
 ];
 
 const POLL_INTERVAL_MS = 60_000;
@@ -211,20 +210,7 @@ function periodLabel(period: CallPeriod): string {
   return PERIODS.find((p) => p.key === period)?.shortLabel || "today";
 }
 
-function getPillX(period: CallPeriod): number {
-  let x = 0;
-  for (const p of PERIODS) {
-    if (p.key === period) return x;
-    x += p.width;
-  }
-  return 0;
-}
-
-function getPillWidth(period: CallPeriod): number {
-  return PERIODS.find((p) => p.key === period)?.width || 80;
-}
-
-// ── Activity Bar Chart ──
+// ── Activity Bar Chart (full-width, taller) ──
 
 function ActivityChart({ data }: { data: HourlyData }) {
   const hours = Object.keys(data)
@@ -236,34 +222,38 @@ function ActivityChart({ data }: { data: HourlyData }) {
   );
 
   return (
-    <div className="flex items-end gap-1.5 h-32 px-1">
+    <div className="flex items-end gap-1 h-44 px-1">
       {hours.map((hour) => {
         const inbound = data[hour]?.inbound || 0;
         const outbound = data[hour]?.outbound || 0;
         const total = inbound + outbound;
+        const barH = 160; // max bar height in px
 
         return (
-          <div key={hour} className="flex-1 flex flex-col items-center gap-1 group relative">
+          <div key={hour} className="flex-1 flex flex-col items-center gap-1.5 group relative">
             <div className="w-full flex flex-col items-stretch">
               <motion.div
                 initial={{ height: 0 }}
-                animate={{ height: `${(outbound / maxVal) * 100}px` }}
-                transition={{ duration: 0.5, delay: hour * 0.03 }}
-                className="bg-primary/40 rounded-t-sm min-h-0"
+                animate={{ height: `${(outbound / maxVal) * barH}px` }}
+                transition={{ duration: 0.6, delay: hour * 0.025, ease: [0.25, 0.46, 0.45, 0.94] }}
+                className="bg-foreground/25 rounded-t-sm min-h-0"
                 style={{ minHeight: outbound > 0 ? 2 : 0 }}
               />
               <motion.div
                 initial={{ height: 0 }}
-                animate={{ height: `${(inbound / maxVal) * 100}px` }}
-                transition={{ duration: 0.5, delay: hour * 0.03 + 0.1 }}
-                className="bg-primary/15 rounded-t-sm min-h-0"
+                animate={{ height: `${(inbound / maxVal) * barH}px` }}
+                transition={{ duration: 0.6, delay: hour * 0.025 + 0.08, ease: [0.25, 0.46, 0.45, 0.94] }}
+                className="bg-foreground/10 rounded-b-sm min-h-0"
                 style={{ minHeight: inbound > 0 ? 2 : 0 }}
               />
             </div>
-            <span className="text-[10px] text-muted-foreground/50 tabular-nums">{hour}</span>
+            <span className="text-[10px] text-muted-foreground/40 tabular-nums font-medium">
+              {hour.toString().padStart(2, "0")}
+            </span>
             {total > 0 && (
-              <div className="absolute bottom-full mb-2 px-2 py-1 bg-card border border-border rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 whitespace-nowrap">
-                {outbound} out · {inbound} in
+              <div className="absolute bottom-full mb-2 px-2.5 py-1.5 bg-card border border-border rounded-lg text-xs shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 whitespace-nowrap">
+                <span className="font-semibold">{total}</span>
+                <span className="text-muted-foreground ml-1">({outbound} out · {inbound} in)</span>
               </div>
             )}
           </div>
@@ -287,17 +277,14 @@ function RepRow({
   large?: boolean;
 }) {
   const barWidth = maxCalls > 0 ? (rep.total_calls / maxCalls) * 100 : 0;
-  const isTop3 = index < 3;
   const rankSize = large ? "size-12 text-lg" : "size-8 text-sm";
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: -16 }}
+      initial={{ opacity: 0, x: -12 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.04 }}
-      className={`flex items-center gap-4 ${large ? "p-5" : "p-3"} rounded-xl transition-colors ${
-        isTop3 && !large ? "hover:bg-foreground/[0.03]" : large ? "" : "hover:bg-foreground/[0.03]"
-      }`}
+      className={`flex items-center gap-4 ${large ? "p-5" : "p-3"} rounded-xl transition-colors hover:bg-foreground/[0.03]`}
     >
       <div
         className={`${rankSize} rounded-full flex items-center justify-center font-bold shrink-0 ${
@@ -317,12 +304,12 @@ function RepRow({
           <p className={`font-semibold truncate ${large ? "text-base" : "text-sm"}`}>{rep.name}</p>
           <span className={`font-bold tabular-nums ${large ? "text-lg" : "text-sm"}`}>{rep.total_calls}</span>
         </div>
-        <div className="w-full bg-foreground/[0.04] rounded-full h-1.5 overflow-hidden">
+        <div className="w-full bg-foreground/[0.06] rounded-full h-1.5 overflow-hidden">
           <motion.div
             initial={{ width: 0 }}
             animate={{ width: `${barWidth}%` }}
             transition={{ duration: 0.6, delay: index * 0.04 }}
-            className="h-full rounded-full bg-primary/30"
+            className="h-full rounded-full bg-foreground/20"
           />
         </div>
         <div className="flex items-center gap-3 mt-1">
@@ -343,12 +330,12 @@ function RepRow({
 function CallRow({ call, onClick, large = false }: { call: RecentCall; onClick: () => void; large?: boolean }) {
   return (
     <motion.button
-      initial={{ opacity: 0, y: 8 }}
+      initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       onClick={onClick}
       className={`w-full flex items-center gap-3 ${large ? "p-4" : "p-3"} rounded-xl hover:bg-foreground/[0.04] transition-colors text-left group`}
     >
-      <div className={`${large ? "size-11" : "size-9"} rounded-full flex items-center justify-center shrink-0 bg-foreground/[0.04] text-muted-foreground`}>
+      <div className={`${large ? "size-11" : "size-9"} rounded-full flex items-center justify-center shrink-0 bg-foreground/[0.05] text-muted-foreground`}>
         {call.direction === "inbound" ? (
           <PhoneIncoming className={large ? "size-5" : "size-4"} />
         ) : (
@@ -359,7 +346,7 @@ function CallRow({ call, onClick, large = false }: { call: RecentCall; onClick: 
         <div className="flex items-center gap-2">
           <p className={`font-medium truncate ${large ? "text-base" : "text-sm"}`}>{call.contact_name}</p>
           {call.has_recording && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 shrink-0">
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 shrink-0 font-medium">
               AI
             </span>
           )}
@@ -418,9 +405,9 @@ function FullscreenModal({
             {view === "reps" ? (
               <FontAwesomeIcon icon={faTrophy} className="h-8 w-8 text-yellow-500" />
             ) : (
-              <Phone className="size-8 text-primary" weight="bold" />
+              <Phone className="size-8 text-foreground" weight="bold" />
             )}
-            <h1 className="text-3xl font-bold tracking-tight text-balance">
+            <h1 className="text-3xl font-bold tracking-tight">
               {view === "reps" ? "Calls by Rep" : "Recent Calls"}
             </h1>
             <span className="text-xl text-muted-foreground">{periodLabel(period)}</span>
@@ -601,11 +588,11 @@ function AnalysisPanel({
           <h3 className="text-sm font-semibold text-muted-foreground mb-2">Talk-to-Listen Ratio</h3>
           <div className="flex items-center gap-1 h-3 rounded-full overflow-hidden">
             <div
-              className="bg-primary/40 h-full rounded-l-full"
+              className="bg-foreground/30 h-full rounded-l-full"
               style={{ width: `${analysis.talk_to_listen_ratio.agent_pct}%` }}
             />
             <div
-              className="bg-primary/15 h-full rounded-r-full"
+              className="bg-foreground/10 h-full rounded-r-full"
               style={{ width: `${analysis.talk_to_listen_ratio.contact_pct}%` }}
             />
           </div>
@@ -665,13 +652,82 @@ function DigestSection({
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay }}
-      className="rounded-2xl bg-foreground/[0.04] border border-foreground/[0.06] overflow-hidden"
+      className="rounded-2xl bg-card border border-border/50 overflow-hidden"
     >
-      <div className="px-5 py-4 border-b border-foreground/[0.06] flex items-center gap-3">
+      <div className="px-5 py-4 border-b border-border/50 flex items-center gap-3">
         <Icon className="size-[18px] text-muted-foreground" />
         <h3 className="text-base font-semibold">{title}</h3>
       </div>
       <div className="p-5">{children}</div>
+    </motion.div>
+  );
+}
+
+// ── Metric Card ──
+
+function MetricCard({
+  label,
+  value,
+  suffix,
+  isText,
+  highlight,
+  highlightColor,
+  loading,
+  delay = 0,
+}: {
+  label: string;
+  value: number;
+  suffix?: string;
+  isText?: string;
+  highlight?: string;
+  highlightColor?: "green" | "red";
+  loading: boolean;
+  delay?: number;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay }}
+      className="rounded-xl bg-card border border-border/50 p-4"
+    >
+      {loading ? (
+        <div>
+          <div className="animate-pulse bg-muted/40 h-9 w-16 rounded-lg mb-2" />
+          <div className="animate-pulse bg-muted/30 h-3 w-14 rounded" />
+        </div>
+      ) : (
+        <div>
+          <div className="text-3xl font-bold tabular-nums tracking-tight">
+            {isText ? (
+              isText
+            ) : (
+              <>
+                <NumberFlow
+                  value={value}
+                  transformTiming={{ duration: 500, easing: "ease-out" }}
+                  spinTiming={{ duration: 400, easing: "ease-out" }}
+                />
+                {suffix && <span className="text-xl text-muted-foreground/60 ml-0.5">{suffix}</span>}
+              </>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground uppercase tracking-wider mt-1.5 font-medium">{label}</p>
+          {highlight && (
+            <p
+              className={`text-sm font-semibold mt-0.5 ${
+                highlightColor === "green"
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : highlightColor === "red"
+                    ? "text-red-500 dark:text-red-400"
+                    : "text-muted-foreground"
+              }`}
+            >
+              {highlight}
+            </p>
+          )}
+        </div>
+      )}
     </motion.div>
   );
 }
@@ -707,14 +763,21 @@ export default function CallsPage() {
     if (!loading && !user) router.push("/auth/signin");
   }, [user, loading, router]);
 
-  // Close fullscreen on Escape
+  // Close overlays on Escape
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setFullscreenView(null);
+      if (e.key === "Escape") {
+        if (selectedCallId) {
+          setSelectedCallId(null);
+          setCallAnalysis(null);
+        } else {
+          setFullscreenView(null);
+        }
+      }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, []);
+  }, [selectedCallId]);
 
   // ── Fetch call data ──
 
@@ -820,6 +883,9 @@ export default function CallsPage() {
   const hourlyData = callData?.hourlyDistribution || {};
   const maxRepCalls = repStats.length > 0 ? repStats[0].total_calls : 0;
 
+  const answerRate = stats && stats.total_calls > 0 ? ((stats.answered_calls / stats.total_calls) * 100).toFixed(1) : "0";
+  const missRate = stats && stats.total_calls > 0 ? ((stats.missed_calls / stats.total_calls) * 100).toFixed(1) : "0";
+
   if (loading) {
     return (
       <div className="min-h-dvh flex items-center justify-center">
@@ -854,7 +920,7 @@ export default function CallsPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-40 bg-background/60"
+              className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm"
               onClick={() => {
                 setSelectedCallId(null);
                 setCallAnalysis(null);
@@ -890,92 +956,46 @@ export default function CallsPage() {
       </AnimatePresence>
 
       <div className="min-h-dvh bg-gradient-to-br from-background to-muted/20 p-6 lg:p-8 pl-24">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-7xl mx-auto space-y-5">
 
-          {/* ── Period Selector (centered, spring-animated) ── */}
+          {/* ═══ Section 1: Command Bar Header ═══ */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-            className="flex justify-center mb-8 mt-4"
+            transition={{ duration: 0.4 }}
+            className="bg-card/80 backdrop-blur-sm border border-border/50 rounded-2xl px-6 py-4 flex items-center justify-between gap-4"
           >
-            <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-full p-2 shadow-lg relative">
-              <div className="flex relative">
-                <motion.div
-                  className="absolute bg-primary rounded-full shadow-lg"
-                  initial={false}
-                  animate={{ x: getPillX(period), width: getPillWidth(period) }}
-                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                  style={{ height: "40px", top: "0px" }}
-                />
-                {PERIODS.map((p) => (
-                  <button
-                    key={p.key}
-                    onClick={() => setPeriod(p.key)}
-                    className={`relative z-10 py-2.5 text-sm font-medium transition-colors duration-200 text-center ${
-                      period === p.key
-                        ? "text-primary-foreground"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                    style={{ width: `${p.width}px` }}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
+            {/* Left: Title */}
+            <div className="flex items-center gap-3">
+              <Phone className="size-6 text-foreground" weight="bold" />
+              <h1 className="text-2xl font-bold tracking-tight">Calls</h1>
             </div>
-          </motion.div>
 
-          {/* ── Hero: Total Calls ── */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.7, delay: 0.2 }}
-            className="text-center mb-8"
-          >
-            <div className="relative">
-              <div className="font-black tracking-tighter leading-none number-flow-container" style={{ fontSize: "clamp(4rem, 10vw, 8rem)" }}>
-                {initialLoading ? (
-                  <div className="animate-pulse bg-muted/50 h-28 w-64 mx-auto rounded-xl" />
-                ) : (
-                  <NumberFlow
-                    value={stats?.total_calls || 0}
-                    transformTiming={{ duration: 600, easing: "ease-out" }}
-                    spinTiming={{ duration: 500, easing: "ease-out" }}
-                    opacityTiming={{ duration: 300, easing: "ease-out" }}
-                    willChange={false}
-                  />
-                )}
-              </div>
-              <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-background to-transparent pointer-events-none" />
+            {/* Center: Period Selector (inline segmented) */}
+            <div className="bg-muted/50 rounded-lg p-1 flex relative">
+              {PERIODS.map((p) => (
+                <button
+                  key={p.key}
+                  onClick={() => setPeriod(p.key)}
+                  className={`relative z-10 px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
+                    period === p.key
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
             </div>
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={`subtitle-${period}`}
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.3 }}
-                className="text-xl text-muted-foreground mt-1 relative z-10"
-              >
-                {initialLoading ? (
-                  <div className="animate-pulse bg-muted/50 h-6 w-64 mx-auto rounded" />
-                ) : (
-                  <>
-                    {stats?.outbound_calls || 0} outbound · {stats?.inbound_calls || 0} inbound {periodLabel(period)}
-                  </>
-                )}
-              </motion.div>
-            </AnimatePresence>
 
-            {/* Live indicator + refresh */}
-            <div className="flex items-center justify-center gap-3 mt-3">
+            {/* Right: Live indicator + refresh */}
+            <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5">
                 <span className="relative flex size-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
                   <span className="relative inline-flex rounded-full size-2 bg-green-500" />
                 </span>
-                <span className="text-xs text-muted-foreground">Live</span>
+                <span className="text-xs text-muted-foreground font-medium">Live</span>
               </div>
               {lastUpdated && (
                 <span className="text-xs text-muted-foreground/50 tabular-nums">
@@ -985,77 +1005,29 @@ export default function CallsPage() {
               <button
                 onClick={() => fetchCallData(true)}
                 disabled={isRefreshing}
-                className="text-muted-foreground/40 hover:text-foreground transition-colors"
+                className="p-1.5 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted/50 transition-colors"
                 aria-label="Refresh data"
               >
-                <ArrowsClockwise className={`size-3 ${isRefreshing ? "animate-spin" : ""}`} />
+                <ArrowsClockwise className={`size-4 ${isRefreshing ? "animate-spin" : ""}`} />
               </button>
             </div>
           </motion.div>
 
-          {/* ── Stats Row ── */}
-          {!initialLoading && stats && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.35 }}
-              className="flex items-center justify-center gap-8 mb-8"
-            >
-              <div className="text-center">
-                <div className="text-2xl font-bold tabular-nums">
-                  <NumberFlow value={stats.answered_calls} transformTiming={{ duration: 400, easing: "ease-out" }} spinTiming={{ duration: 300, easing: "ease-out" }} />
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5">Answered</p>
-              </div>
-              <div className="h-8 w-px bg-border/50" />
-              <div className="text-center">
-                <div className="text-2xl font-bold tabular-nums">
-                  <NumberFlow value={stats.missed_calls} transformTiming={{ duration: 400, easing: "ease-out" }} spinTiming={{ duration: 300, easing: "ease-out" }} />
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5">Missed</p>
-              </div>
-              <div className="h-8 w-px bg-border/50" />
-              <div className="text-center">
-                <div className="text-2xl font-bold tabular-nums">
-                  {formatDurationShort(Math.round(stats.avg_duration))}
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5">Avg Duration</p>
-              </div>
-              <div className="h-8 w-px bg-border/50" />
-              <div className="text-center">
-                <div className="text-2xl font-bold tabular-nums">
-                  {formatDuration(stats.total_talk_time)}
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5">Total Talk Time</p>
-              </div>
-            </motion.div>
-          )}
-          {initialLoading && (
-            <div className="flex items-center justify-center gap-8 mb-8">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="text-center">
-                  <div className="animate-pulse bg-muted/50 h-8 w-16 mx-auto rounded mb-1" />
-                  <div className="animate-pulse bg-muted/30 h-3 w-12 mx-auto rounded" />
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* ── Tab Bar ── */}
+          {/* ═══ Tab Bar ═══ */}
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
-            className="flex justify-center mb-6"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.1 }}
+            className="flex"
           >
-            <div className="flex bg-foreground/[0.04] rounded-xl p-1 border border-foreground/[0.06]">
+            <div className="flex bg-muted/30 rounded-lg p-1 border border-border/30">
               {TABS.map((tab) => (
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
                     activeTab === tab.key
-                      ? "bg-foreground/[0.08] text-foreground"
+                      ? "bg-background text-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
@@ -1071,54 +1043,97 @@ export default function CallsPage() {
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-300 text-sm max-w-5xl mx-auto"
+              className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-300 text-sm"
             >
               {error}
-              <button
-                onClick={() => fetchCallData()}
-                className="ml-2 underline hover:opacity-80"
-              >
+              <button onClick={() => fetchCallData()} className="ml-2 underline hover:opacity-80">
                 Try again
               </button>
             </motion.div>
           )}
 
           {/* ═══════════════ OVERVIEW TAB ═══════════════ */}
-          {activeTab === "overview" && (
-            <div className="space-y-6 max-w-6xl mx-auto">
-              {/* Charts Row */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Call Activity Chart */}
+          <AnimatePresence mode="wait">
+            {activeTab === "overview" && (
+              <motion.div
+                key="overview"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-5"
+              >
+                {/* ═══ Section 2: Metric Cards ═══ */}
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                  <MetricCard
+                    label="Total Calls"
+                    value={stats?.total_calls || 0}
+                    loading={initialLoading}
+                    delay={0.15}
+                  />
+                  <MetricCard
+                    label="Answered"
+                    value={stats?.answered_calls || 0}
+                    highlight={stats && stats.total_calls > 0 ? `${answerRate}% rate` : undefined}
+                    highlightColor="green"
+                    loading={initialLoading}
+                    delay={0.2}
+                  />
+                  <MetricCard
+                    label="Missed"
+                    value={stats?.missed_calls || 0}
+                    highlight={stats && stats.missed_calls > 0 ? `${missRate}% rate` : undefined}
+                    highlightColor="red"
+                    loading={initialLoading}
+                    delay={0.25}
+                  />
+                  <MetricCard
+                    label="Avg Duration"
+                    value={0}
+                    isText={formatDurationShort(Math.round(stats?.avg_duration || 0))}
+                    loading={initialLoading}
+                    delay={0.3}
+                  />
+                  <MetricCard
+                    label="Talk Time"
+                    value={0}
+                    isText={formatDuration(stats?.total_talk_time || 0)}
+                    loading={initialLoading}
+                    delay={0.35}
+                  />
+                </div>
+
+                {/* ═══ Section 3: Activity Chart (full width) ═══ */}
                 <motion.div
-                  initial={{ opacity: 0, y: 16 }}
+                  initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.25 }}
-                  className="lg:col-span-2 rounded-2xl bg-foreground/[0.04] border border-foreground/[0.06] overflow-hidden"
+                  transition={{ delay: 0.3 }}
+                  className="rounded-2xl bg-card border border-border/50 overflow-hidden"
                 >
-                  <div className="px-5 py-4 border-b border-foreground/[0.06] flex items-center justify-between">
+                  <div className="px-5 py-4 border-b border-border/50 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <Pulse className="size-[18px] text-primary" />
+                      <Pulse className="size-[18px] text-muted-foreground" />
                       <h2 className="text-base font-semibold">Call Activity</h2>
                     </div>
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1.5">
-                        <span className="size-2 rounded-sm bg-primary/40" />
+                        <span className="size-2.5 rounded-sm bg-foreground/25" />
                         Outbound
                       </span>
                       <span className="flex items-center gap-1.5">
-                        <span className="size-2 rounded-sm bg-primary/15" />
+                        <span className="size-2.5 rounded-sm bg-foreground/10" />
                         Inbound
                       </span>
                     </div>
                   </div>
                   <div className="p-5">
                     {initialLoading ? (
-                      <div className="h-32 flex items-end gap-1.5 px-1">
-                        {Array.from({ length: 11 }).map((_, i) => (
-                          <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                      <div className="h-44 flex items-end gap-1 px-1">
+                        {Array.from({ length: 12 }).map((_, i) => (
+                          <div key={i} className="flex-1 flex flex-col items-center gap-1.5">
                             <div
                               className="w-full animate-pulse bg-muted/30 rounded-t-sm"
-                              style={{ height: `${20 + Math.random() * 60}px` }}
+                              style={{ height: `${30 + Math.random() * 100}px` }}
                             />
                             <div className="animate-pulse bg-muted/20 h-2 w-4 rounded" />
                           </div>
@@ -1130,478 +1145,415 @@ export default function CallsPage() {
                   </div>
                 </motion.div>
 
-                {/* Talk Time Summary */}
-                <motion.div
-                  initial={{ opacity: 0, y: 16 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3 }}
-                  className="rounded-2xl bg-foreground/[0.04] border border-foreground/[0.06] p-5"
-                >
-                  <div className="flex items-center gap-3 mb-5">
-                    <Clock className="size-[18px] text-muted-foreground" />
-                    <h2 className="text-base font-semibold">Talk Time</h2>
-                  </div>
-
-                  {initialLoading ? (
-                    <div className="space-y-4">
-                      {[1, 2, 3, 4].map((i) => (
-                        <div key={i}>
-                          <div className="flex items-center justify-between">
-                            <div className="animate-pulse bg-muted/30 h-4 w-24 rounded" />
-                            <div className="animate-pulse bg-muted/30 h-5 w-16 rounded" />
-                          </div>
-                          {i < 4 && <div className="h-px bg-foreground/[0.06] mt-4" />}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Total Talk Time</span>
-                        <span className="text-lg font-bold tabular-nums">
-                          {formatDuration(stats?.total_talk_time || 0)}
-                        </span>
-                      </div>
-                      <div className="h-px bg-foreground/[0.06]" />
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Avg per Call</span>
-                        <span className="text-lg font-bold tabular-nums">
-                          {formatDuration(Math.round(stats?.avg_talk_time || 0))}
-                        </span>
-                      </div>
-                      <div className="h-px bg-foreground/[0.06]" />
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Answered</span>
-                        <span className="text-lg font-bold tabular-nums">
-                          {stats?.answered_calls || 0}
-                        </span>
-                      </div>
-                      <div className="h-px bg-foreground/[0.06]" />
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Missed</span>
-                        <span className="text-lg font-bold tabular-nums">
-                          {stats?.missed_calls || 0}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </motion.div>
-              </div>
-
-              {/* Rep Stats + Recent Calls */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Rep Leaderboard */}
-                <motion.div
-                  initial={{ opacity: 0, y: 16 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.35 }}
-                  className="rounded-2xl bg-foreground/[0.04] border border-foreground/[0.06] overflow-hidden"
-                >
-                  <div className="flex items-center justify-between px-5 py-4 border-b border-foreground/[0.06]">
-                    <div className="flex items-center gap-3">
-                      <FontAwesomeIcon icon={faTrophy} className="h-[18px] w-[18px] text-yellow-500" />
-                      <h2 className="text-base font-semibold">Calls by Rep</h2>
-                      <span className="text-sm text-muted-foreground">{periodLabel(period)}</span>
-                    </div>
-                    <button
-                      onClick={() => setFullscreenView("reps")}
-                      className="p-2 rounded-lg hover:bg-foreground/10 transition-colors text-muted-foreground hover:text-foreground"
-                      aria-label="View rep leaderboard fullscreen"
-                    >
-                      <ArrowsOut className="size-[18px]" />
-                    </button>
-                  </div>
-                  <div className="p-3 max-h-[420px] overflow-y-auto scrollbar-hide">
-                    {initialLoading ? (
-                      <div className="space-y-3 p-2">
-                        {[1, 2, 3, 4].map((i) => (
-                          <div key={i} className="flex items-center gap-3 p-3 rounded-xl">
-                            <div className="animate-pulse bg-muted size-8 rounded-full" />
-                            <div className="flex-1">
-                              <div className="animate-pulse bg-muted h-3 w-24 rounded mb-2" />
-                              <div className="animate-pulse bg-muted h-1.5 w-full rounded" />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : repStats.length === 0 ? (
-                      <div className="text-center py-12 text-muted-foreground">
-                        <Users className="size-10 mx-auto mb-3 opacity-30" />
-                        <p className="text-sm">No call data yet</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-0.5">
-                        {repStats.map((rep, i) => (
-                          <RepRow key={rep.user_id} rep={rep} index={i} maxCalls={maxRepCalls} />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-
-                {/* Recent Calls Feed */}
-                <motion.div
-                  initial={{ opacity: 0, y: 16 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.4 }}
-                  className="rounded-2xl bg-foreground/[0.04] border border-foreground/[0.06] overflow-hidden"
-                >
-                  <div className="flex items-center justify-between px-5 py-4 border-b border-foreground/[0.06]">
-                    <div className="flex items-center gap-3">
-                      <Phone className="size-[18px] text-muted-foreground" />
-                      <h2 className="text-base font-semibold">Recent Calls</h2>
-                      <span className="text-xs text-muted-foreground/50">
-                        Click to AI analyse
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => setFullscreenView("calls")}
-                      className="p-2 rounded-lg hover:bg-foreground/10 transition-colors text-muted-foreground hover:text-foreground"
-                      aria-label="View recent calls fullscreen"
-                    >
-                      <ArrowsOut className="size-[18px]" />
-                    </button>
-                  </div>
-                  <div className="p-2 max-h-[420px] overflow-y-auto scrollbar-hide">
-                    {initialLoading ? (
-                      <div className="space-y-2 p-2">
-                        {[1, 2, 3, 4, 5].map((i) => (
-                          <div key={i} className="flex items-center gap-3 p-3 rounded-xl">
-                            <div className="animate-pulse bg-muted size-9 rounded-full" />
-                            <div className="flex-1">
-                              <div className="animate-pulse bg-muted h-3 w-28 rounded mb-2" />
-                              <div className="animate-pulse bg-muted h-2.5 w-20 rounded" />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : recentCalls.length === 0 ? (
-                      <div className="text-center py-12 text-muted-foreground">
-                        <Phone className="size-10 mx-auto mb-3 opacity-30" />
-                        <p className="text-sm">No calls yet</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-0.5">
-                        {recentCalls.map((call) => (
-                          <CallRow
-                            key={call.id}
-                            call={call}
-                            onClick={() => {
-                              if (call.has_recording) {
-                                analyseCallById(call.id);
-                              }
-                            }}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-              </div>
-            </div>
-          )}
-
-          {/* ═══════════════ INTELLIGENCE TAB ═══════════════ */}
-          {activeTab === "intelligence" && (
-            <div className="space-y-6 max-w-6xl mx-auto">
-              {/* Header */}
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex items-center justify-between"
-              >
-                <div>
-                  <div className="flex items-center gap-3">
-                    <h2 className="text-xl font-bold tracking-tight">AI Call Analysis</h2>
-                    <span className="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium tabular-nums">
-                      {callData?.meaningfulCallCount || 0} calls
-                    </span>
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Click any call to transcribe and analyse with Whisper + Claude
-                  </p>
-                </div>
-              </motion.div>
-
-              {/* Call list for analysis */}
-              {initialLoading ? (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {[1, 2, 3, 4, 5, 6].map((i) => (
-                    <div key={i} className="flex items-center gap-4 p-4 rounded-2xl bg-foreground/[0.04] border border-foreground/[0.06]">
-                      <div className="animate-pulse bg-muted size-11 rounded-xl" />
-                      <div className="flex-1">
-                        <div className="animate-pulse bg-muted h-4 w-32 rounded mb-2" />
-                        <div className="animate-pulse bg-muted h-3 w-48 rounded" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {analysableCalls.map((call, index) => (
-                    <motion.button
-                      key={call.id}
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.03 }}
-                      onClick={() => analyseCallById(call.id)}
-                      className="flex items-center gap-4 p-4 rounded-2xl bg-foreground/[0.04] border border-foreground/[0.06] hover:bg-foreground/[0.06] hover:border-primary/30 transition-colors text-left group"
-                    >
-                      <div className="size-11 rounded-xl flex items-center justify-center shrink-0 bg-foreground/[0.04] text-muted-foreground">
-                        {call.direction === "inbound" ? (
-                          <PhoneIncoming className="size-5" />
-                        ) : (
-                          <PhoneOutgoing className="size-5" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold truncate">{call.contact_name}</p>
-                        <p className="text-xs text-muted-foreground truncate tabular-nums">
-                          {call.agent_name} · {formatDuration(call.duration)} · {formatTime(call.started_at)}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-xs px-2 py-1 rounded-lg bg-primary/10 text-primary border border-primary/20 opacity-0 group-hover:opacity-100 transition-opacity">
-                          Analyse
-                        </span>
-                        <CaretRight className="size-4 text-muted-foreground/30 group-hover:text-foreground transition-colors" />
-                      </div>
-                    </motion.button>
-                  ))}
-                </div>
-              )}
-
-              {analysableCalls.length === 0 && !initialLoading && (
-                <div className="text-center py-16 text-muted-foreground">
-                  <Brain className="size-12 mx-auto mb-4 opacity-20" />
-                  <p className="text-lg font-semibold mb-1">No analysable calls yet</p>
-                  <p className="text-sm">
-                    Calls longer than 3 minutes will appear here for AI analysis
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ═══════════════ AI DIGEST TAB ═══════════════ */}
-          {activeTab === "digest" && (
-            <div className="space-y-6 max-w-6xl mx-auto">
-              {/* Header */}
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex items-center justify-between"
-              >
-                <div>
-                  <div className="flex items-center gap-3">
-                    <h2 className="text-xl font-bold tracking-tight">AI Sales Digest</h2>
-                    {digest && (
-                      <span className="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium tabular-nums">
-                        {digest.total_calls_analysed} calls
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {digest
-                      ? `Generated ${new Date(digest.generated_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`
-                      : "Analyse all meaningful calls and generate team-wide insights"}
-                  </p>
-                </div>
-                <button
-                  onClick={() => generateDigest(true)}
-                  disabled={digestLoading}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm font-medium disabled:opacity-50 shadow-lg"
-                >
-                  {digestLoading ? (
-                    <SpinnerGap className="size-4 animate-spin" />
-                  ) : (
-                    <ArrowsClockwise className="size-4" />
-                  )}
-                  {digestLoading ? "Generating..." : "Generate"}
-                </button>
-              </motion.div>
-
-              {digestLoading && !digest ? (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="text-center py-20"
-                >
-                  <MagicWand className="size-12 text-primary mx-auto mb-4 animate-pulse" />
-                  <p className="text-lg font-semibold mb-2">Generating AI Digest</p>
-                  <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                    Analysing call transcripts, detecting patterns, and generating team-wide insights. This may take 30-60 seconds...
-                  </p>
-                </motion.div>
-              ) : digest ? (
-                <div className="space-y-6">
-                  {/* Team Summary */}
+                {/* ═══ Section 4: Rep Leaderboard + Recent Calls ═══ */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                  {/* Rep Leaderboard */}
                   <motion.div
-                    initial={{ opacity: 0, y: 16 }}
+                    initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="rounded-2xl bg-foreground/[0.04] border border-foreground/[0.06] p-6"
+                    transition={{ delay: 0.35 }}
+                    className="rounded-2xl bg-card border border-border/50 overflow-hidden"
                   >
-                    <p className="text-base leading-relaxed italic text-foreground/80">{digest.team_summary}</p>
+                    <div className="flex items-center justify-between px-5 py-4 border-b border-border/50">
+                      <div className="flex items-center gap-3">
+                        <FontAwesomeIcon icon={faTrophy} className="h-[18px] w-[18px] text-yellow-500" />
+                        <h2 className="text-base font-semibold">Calls by Rep</h2>
+                        <span className="text-xs text-muted-foreground">{periodLabel(period)}</span>
+                      </div>
+                      <button
+                        onClick={() => setFullscreenView("reps")}
+                        className="p-2 rounded-lg hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
+                        aria-label="View rep leaderboard fullscreen"
+                      >
+                        <ArrowsOut className="size-[18px]" />
+                      </button>
+                    </div>
+                    <div className="p-3 max-h-[440px] overflow-y-auto scrollbar-hide">
+                      {initialLoading ? (
+                        <div className="space-y-2 p-1">
+                          {[1, 2, 3, 4].map((i) => (
+                            <div key={i} className="flex items-center gap-3 p-3 rounded-xl">
+                              <div className="animate-pulse bg-muted/40 size-8 rounded-full" />
+                              <div className="flex-1">
+                                <div className="animate-pulse bg-muted/40 h-3 w-24 rounded mb-2" />
+                                <div className="animate-pulse bg-muted/30 h-1.5 w-full rounded" />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : repStats.length === 0 ? (
+                        <div className="text-center py-12 text-muted-foreground">
+                          <Users className="size-10 mx-auto mb-3 opacity-30" />
+                          <p className="text-sm">No call data yet</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-0.5">
+                          {repStats.map((rep, i) => (
+                            <RepRow key={rep.user_id} rep={rep} index={i} maxCalls={maxRepCalls} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </motion.div>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {digest.top_objections.length > 0 && (
-                      <DigestSection title="Objection Radar" icon={Warning} delay={0.1}>
-                        <div className="space-y-4">
-                          {digest.top_objections.map((obj, i) => (
-                            <div key={i}>
-                              <div className="flex items-center justify-between mb-1">
-                                <p className="text-sm font-semibold">{obj.objection}</p>
-                                <span className="text-xs px-2 py-0.5 rounded-full bg-foreground/[0.06] text-muted-foreground tabular-nums">
-                                  {obj.frequency}x
-                                </span>
-                              </div>
-                              <p className="text-xs text-muted-foreground leading-relaxed">
-                                💡 {obj.suggested_response}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      </DigestSection>
-                    )}
-
-                    {digest.winning_pitches.length > 0 && (
-                      <DigestSection title="What&apos;s Working" icon={Trophy} delay={0.15}>
-                        <div className="space-y-3">
-                          {digest.winning_pitches.map((pitch, i) => (
-                            <div
-                              key={i}
-                              className="p-3 rounded-lg bg-foreground/[0.02] border border-foreground/[0.06]"
-                            >
-                              <p className="text-sm">{pitch.description}</p>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                {pitch.rep} — {pitch.context}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      </DigestSection>
-                    )}
-
-                    {digest.event_demand.length > 0 && (
-                      <DigestSection title="Event Demand" icon={TrendUp} delay={0.2}>
-                        <div className="space-y-3">
-                          {digest.event_demand.map((event, i) => (
-                            <div key={i} className="flex items-center justify-between">
-                              <div>
-                                <p className="text-sm font-semibold">{event.event}</p>
-                                <p className="text-xs text-muted-foreground">{event.sentiment}</p>
-                              </div>
-                              <span className="text-sm font-bold text-foreground tabular-nums">
-                                {event.mentions} mentions
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </DigestSection>
-                    )}
-
-                    {digest.competitor_intelligence.length > 0 && (
-                      <DigestSection title="Competitor Intel" icon={Target} delay={0.25}>
-                        <div className="space-y-3">
-                          {digest.competitor_intelligence.map((comp, i) => (
-                            <div key={i}>
-                              <div className="flex items-center justify-between mb-0.5">
-                                <p className="text-sm font-semibold">{comp.competitor}</p>
-                                <span className="text-xs text-muted-foreground tabular-nums">
-                                  {comp.mentions}x mentioned
-                                </span>
-                              </div>
-                              <p className="text-xs text-muted-foreground">{comp.context}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </DigestSection>
-                    )}
-
-                    {digest.coaching_highlights.length > 0 && (
-                      <DigestSection title="Coaching Insights" icon={Lightning} delay={0.3}>
-                        <div className="space-y-3">
-                          {digest.coaching_highlights.map((highlight, i) => (
-                            <div
-                              key={i}
-                              className="p-3 rounded-lg border bg-foreground/[0.02] border-foreground/[0.06]"
-                            >
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="text-xs font-bold uppercase">
-                                  {highlight.rep}
-                                </span>
-                                <span className="text-[10px] px-1.5 py-0.5 rounded border uppercase bg-foreground/[0.06] text-muted-foreground border-foreground/[0.08]">
-                                  {highlight.type}
-                                </span>
-                              </div>
-                              <p className="text-xs text-muted-foreground">
-                                {highlight.description}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      </DigestSection>
-                    )}
-
-                    {digest.key_deals.length > 0 && (
-                      <DigestSection title="Key Deals" icon={Target} delay={0.35}>
-                        <div className="space-y-3">
-                          {digest.key_deals.map((deal, i) => (
-                            <div
-                              key={i}
-                              className="p-3 rounded-lg bg-foreground/[0.03] border border-foreground/[0.06]"
-                            >
-                              <div className="flex items-center justify-between mb-1">
-                                <p className="text-sm font-semibold">{deal.contact}</p>
-                                <span className="text-xs text-muted-foreground">{deal.rep}</span>
-                              </div>
-                              <p className="text-xs text-muted-foreground mb-1">
-                                Status: {deal.status}
-                              </p>
-                              <p className="text-xs text-foreground">→ {deal.next_steps}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </DigestSection>
-                    )}
-
-                    {digest.follow_up_gaps.length > 0 && (
-                      <DigestSection title="Follow-up Gaps" icon={Warning} delay={0.4}>
-                        <div className="space-y-2">
-                          {digest.follow_up_gaps.map((gap, i) => (
-                            <div
-                              key={i}
-                              className="flex items-start gap-3 text-sm p-3 rounded-lg bg-foreground/[0.02] border border-foreground/[0.06]"
-                            >
-                              <span className="text-xs font-bold text-foreground shrink-0">
-                                {gap.rep}
-                              </span>
-                              <p className="text-xs text-muted-foreground">{gap.description}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </DigestSection>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-16 text-muted-foreground">
-                  <MagicWand className="size-12 mx-auto mb-4 opacity-20" />
-                  <p className="text-lg font-semibold mb-1">No digest generated yet</p>
-                  <p className="text-sm mb-4">
-                    Click Generate to create an AI digest of {periodLabel(period)}&apos;s calls
-                  </p>
-                  <button
-                    onClick={() => generateDigest()}
-                    className="px-6 py-3 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm font-medium shadow-lg"
+                  {/* Recent Calls */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4 }}
+                    className="rounded-2xl bg-card border border-border/50 overflow-hidden"
                   >
-                    Generate Digest
-                  </button>
+                    <div className="flex items-center justify-between px-5 py-4 border-b border-border/50">
+                      <div className="flex items-center gap-3">
+                        <Phone className="size-[18px] text-muted-foreground" />
+                        <h2 className="text-base font-semibold">Recent Calls</h2>
+                        <span className="text-[10px] text-muted-foreground/40 uppercase tracking-wider">
+                          Click to analyse
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => setFullscreenView("calls")}
+                        className="p-2 rounded-lg hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
+                        aria-label="View recent calls fullscreen"
+                      >
+                        <ArrowsOut className="size-[18px]" />
+                      </button>
+                    </div>
+                    <div className="p-2 max-h-[440px] overflow-y-auto scrollbar-hide">
+                      {initialLoading ? (
+                        <div className="space-y-1 p-1">
+                          {[1, 2, 3, 4, 5].map((i) => (
+                            <div key={i} className="flex items-center gap-3 p-3 rounded-xl">
+                              <div className="animate-pulse bg-muted/40 size-9 rounded-full" />
+                              <div className="flex-1">
+                                <div className="animate-pulse bg-muted/40 h-3 w-28 rounded mb-2" />
+                                <div className="animate-pulse bg-muted/30 h-2.5 w-20 rounded" />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : recentCalls.length === 0 ? (
+                        <div className="text-center py-12 text-muted-foreground">
+                          <Phone className="size-10 mx-auto mb-3 opacity-30" />
+                          <p className="text-sm">No calls yet</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-0.5">
+                          {recentCalls.map((call) => (
+                            <CallRow
+                              key={call.id}
+                              call={call}
+                              onClick={() => {
+                                if (call.has_recording) {
+                                  analyseCallById(call.id);
+                                }
+                              }}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
                 </div>
-              )}
-            </div>
-          )}
+              </motion.div>
+            )}
+
+            {/* ═══════════════ INTELLIGENCE TAB ═══════════════ */}
+            {activeTab === "intelligence" && (
+              <motion.div
+                key="intelligence"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-5"
+              >
+                {/* Header */}
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center justify-between"
+                >
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <h2 className="text-xl font-bold tracking-tight">AI Call Analysis</h2>
+                      <span className="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium tabular-nums">
+                        {callData?.meaningfulCallCount || 0} calls
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Click any call to transcribe and analyse with Whisper + Claude
+                    </p>
+                  </div>
+                </motion.div>
+
+                {/* Call list for analysis */}
+                {initialLoading ? (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {[1, 2, 3, 4, 5, 6].map((i) => (
+                      <div key={i} className="flex items-center gap-4 p-4 rounded-2xl bg-card border border-border/50">
+                        <div className="animate-pulse bg-muted/40 size-11 rounded-xl" />
+                        <div className="flex-1">
+                          <div className="animate-pulse bg-muted/40 h-4 w-32 rounded mb-2" />
+                          <div className="animate-pulse bg-muted/30 h-3 w-48 rounded" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {analysableCalls.map((call, index) => (
+                      <motion.button
+                        key={call.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.03 }}
+                        onClick={() => analyseCallById(call.id)}
+                        className="flex items-center gap-4 p-4 rounded-2xl bg-card border border-border/50 hover:bg-muted/30 hover:border-foreground/15 transition-all text-left group"
+                      >
+                        <div className="size-11 rounded-xl flex items-center justify-center shrink-0 bg-muted/40 text-muted-foreground">
+                          {call.direction === "inbound" ? (
+                            <PhoneIncoming className="size-5" />
+                          ) : (
+                            <PhoneOutgoing className="size-5" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold truncate">{call.contact_name}</p>
+                          <p className="text-xs text-muted-foreground truncate tabular-nums">
+                            {call.agent_name} · {formatDuration(call.duration)} · {formatTime(call.started_at)}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-xs px-2 py-1 rounded-lg bg-primary/10 text-primary border border-primary/20 opacity-0 group-hover:opacity-100 transition-opacity">
+                            Analyse
+                          </span>
+                          <CaretRight className="size-4 text-muted-foreground/30 group-hover:text-foreground transition-colors" />
+                        </div>
+                      </motion.button>
+                    ))}
+                  </div>
+                )}
+
+                {analysableCalls.length === 0 && !initialLoading && (
+                  <div className="text-center py-16 text-muted-foreground">
+                    <Brain className="size-12 mx-auto mb-4 opacity-20" />
+                    <p className="text-lg font-semibold mb-1">No analysable calls yet</p>
+                    <p className="text-sm">
+                      Calls longer than 3 minutes will appear here for AI analysis
+                    </p>
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {/* ═══════════════ AI DIGEST TAB ═══════════════ */}
+            {activeTab === "digest" && (
+              <motion.div
+                key="digest"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-5"
+              >
+                {/* Header */}
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center justify-between"
+                >
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <h2 className="text-xl font-bold tracking-tight">AI Sales Digest</h2>
+                      {digest && (
+                        <span className="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium tabular-nums">
+                          {digest.total_calls_analysed} calls
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {digest
+                        ? `Generated ${new Date(digest.generated_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`
+                        : "Analyse all meaningful calls and generate team-wide insights"}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => generateDigest(true)}
+                    disabled={digestLoading}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm font-medium disabled:opacity-50 shadow-lg"
+                  >
+                    {digestLoading ? (
+                      <SpinnerGap className="size-4 animate-spin" />
+                    ) : (
+                      <ArrowsClockwise className="size-4" />
+                    )}
+                    {digestLoading ? "Generating..." : "Generate"}
+                  </button>
+                </motion.div>
+
+                {digestLoading && !digest ? (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="text-center py-20"
+                  >
+                    <MagicWand className="size-12 text-primary mx-auto mb-4 animate-pulse" />
+                    <p className="text-lg font-semibold mb-2">Generating AI Digest</p>
+                    <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                      Analysing call transcripts, detecting patterns, and generating team-wide insights. This may take 30-60 seconds...
+                    </p>
+                  </motion.div>
+                ) : digest ? (
+                  <div className="space-y-5">
+                    {/* Team Summary */}
+                    <motion.div
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="rounded-2xl bg-card border border-border/50 p-6"
+                    >
+                      <p className="text-base leading-relaxed italic text-foreground/80">{digest.team_summary}</p>
+                    </motion.div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                      {digest.top_objections.length > 0 && (
+                        <DigestSection title="Objection Radar" icon={Warning} delay={0.1}>
+                          <div className="space-y-4">
+                            {digest.top_objections.map((obj, i) => (
+                              <div key={i}>
+                                <div className="flex items-center justify-between mb-1">
+                                  <p className="text-sm font-semibold">{obj.objection}</p>
+                                  <span className="text-xs px-2 py-0.5 rounded-full bg-foreground/[0.06] text-muted-foreground tabular-nums">
+                                    {obj.frequency}x
+                                  </span>
+                                </div>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                  💡 {obj.suggested_response}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        </DigestSection>
+                      )}
+
+                      {digest.winning_pitches.length > 0 && (
+                        <DigestSection title="What&apos;s Working" icon={Trophy} delay={0.15}>
+                          <div className="space-y-3">
+                            {digest.winning_pitches.map((pitch, i) => (
+                              <div key={i} className="p-3 rounded-lg bg-foreground/[0.02] border border-foreground/[0.06]">
+                                <p className="text-sm">{pitch.description}</p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {pitch.rep} — {pitch.context}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        </DigestSection>
+                      )}
+
+                      {digest.event_demand.length > 0 && (
+                        <DigestSection title="Event Demand" icon={TrendUp} delay={0.2}>
+                          <div className="space-y-3">
+                            {digest.event_demand.map((event, i) => (
+                              <div key={i} className="flex items-center justify-between">
+                                <div>
+                                  <p className="text-sm font-semibold">{event.event}</p>
+                                  <p className="text-xs text-muted-foreground">{event.sentiment}</p>
+                                </div>
+                                <span className="text-sm font-bold text-foreground tabular-nums">
+                                  {event.mentions} mentions
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </DigestSection>
+                      )}
+
+                      {digest.competitor_intelligence.length > 0 && (
+                        <DigestSection title="Competitor Intel" icon={Target} delay={0.25}>
+                          <div className="space-y-3">
+                            {digest.competitor_intelligence.map((comp, i) => (
+                              <div key={i}>
+                                <div className="flex items-center justify-between mb-0.5">
+                                  <p className="text-sm font-semibold">{comp.competitor}</p>
+                                  <span className="text-xs text-muted-foreground tabular-nums">
+                                    {comp.mentions}x mentioned
+                                  </span>
+                                </div>
+                                <p className="text-xs text-muted-foreground">{comp.context}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </DigestSection>
+                      )}
+
+                      {digest.coaching_highlights.length > 0 && (
+                        <DigestSection title="Coaching Insights" icon={Lightning} delay={0.3}>
+                          <div className="space-y-3">
+                            {digest.coaching_highlights.map((highlight, i) => (
+                              <div key={i} className="p-3 rounded-lg border bg-foreground/[0.02] border-foreground/[0.06]">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-xs font-bold uppercase">{highlight.rep}</span>
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded border uppercase bg-foreground/[0.06] text-muted-foreground border-foreground/[0.08]">
+                                    {highlight.type}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-muted-foreground">{highlight.description}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </DigestSection>
+                      )}
+
+                      {digest.key_deals.length > 0 && (
+                        <DigestSection title="Key Deals" icon={Target} delay={0.35}>
+                          <div className="space-y-3">
+                            {digest.key_deals.map((deal, i) => (
+                              <div key={i} className="p-3 rounded-lg bg-foreground/[0.03] border border-foreground/[0.06]">
+                                <div className="flex items-center justify-between mb-1">
+                                  <p className="text-sm font-semibold">{deal.contact}</p>
+                                  <span className="text-xs text-muted-foreground">{deal.rep}</span>
+                                </div>
+                                <p className="text-xs text-muted-foreground mb-1">Status: {deal.status}</p>
+                                <p className="text-xs text-foreground">→ {deal.next_steps}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </DigestSection>
+                      )}
+
+                      {digest.follow_up_gaps.length > 0 && (
+                        <DigestSection title="Follow-up Gaps" icon={Warning} delay={0.4}>
+                          <div className="space-y-2">
+                            {digest.follow_up_gaps.map((gap, i) => (
+                              <div key={i} className="flex items-start gap-3 text-sm p-3 rounded-lg bg-foreground/[0.02] border border-foreground/[0.06]">
+                                <span className="text-xs font-bold text-foreground shrink-0">{gap.rep}</span>
+                                <p className="text-xs text-muted-foreground">{gap.description}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </DigestSection>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-16 text-muted-foreground">
+                    <MagicWand className="size-12 mx-auto mb-4 opacity-20" />
+                    <p className="text-lg font-semibold mb-1">No digest generated yet</p>
+                    <p className="text-sm mb-4">
+                      Click Generate to create an AI digest of {periodLabel(period)}&apos;s calls
+                    </p>
+                    <button
+                      onClick={() => generateDigest()}
+                      className="px-6 py-3 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm font-medium shadow-lg"
+                    >
+                      Generate Digest
+                    </button>
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </DashboardLayout>
