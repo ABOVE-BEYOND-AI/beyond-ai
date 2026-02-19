@@ -900,6 +900,7 @@ export default function CallsPage() {
   if (!user) return null;
 
   return (
+    <>
       {/* Fullscreen overlay */}
       <FullscreenModal
         view={fullscreenView}
@@ -1565,5 +1566,6 @@ export default function CallsPage() {
           </AnimatePresence>
         </div>
       </div>
+    </>
   );
 }

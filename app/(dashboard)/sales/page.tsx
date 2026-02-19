@@ -390,6 +390,7 @@ export default function SalesPage() {
   if (!user) return null;
 
   return (
+    <>
       {/* Fullscreen overlay */}
       <FullscreenModal
         view={fullscreenView}
@@ -666,5 +667,6 @@ export default function SalesPage() {
           )}
         </div>
       </div>
+    </>
   );
 }
