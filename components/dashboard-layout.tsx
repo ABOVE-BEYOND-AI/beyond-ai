@@ -13,10 +13,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
     <div className="relative h-dvh bg-background">
       {/* Main content - full width, no padding (children handle their own padding) */}
-      <main className="h-full overflow-hidden">
-        <div className="h-full">
-          {children}
-        </div>
+      <main className="h-full overflow-y-auto">
+        {children}
       </main>
       
       {/* Sidebar overlay */}

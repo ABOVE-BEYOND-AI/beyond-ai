@@ -210,7 +210,7 @@ function periodLabel(period: CallPeriod): string {
   return PERIODS.find((p) => p.key === period)?.shortLabel || "today";
 }
 
-// ── Activity Bar Chart (full-width, taller) ──
+// ── Activity Bar Chart (full-width, taller, colored) ──
 
 function ActivityChart({ data }: { data: HourlyData }) {
   const hours = Object.keys(data)
@@ -227,23 +227,25 @@ function ActivityChart({ data }: { data: HourlyData }) {
         const inbound = data[hour]?.inbound || 0;
         const outbound = data[hour]?.outbound || 0;
         const total = inbound + outbound;
-        const barH = 160; // max bar height in px
+        const barH = 160;
 
         return (
           <div key={hour} className="flex-1 flex flex-col items-center gap-1.5 group relative">
             <div className="w-full flex flex-col items-stretch">
+              {/* Outbound: blue */}
               <motion.div
                 initial={{ height: 0 }}
                 animate={{ height: `${(outbound / maxVal) * barH}px` }}
                 transition={{ duration: 0.6, delay: hour * 0.025, ease: [0.25, 0.46, 0.45, 0.94] }}
-                className="bg-foreground/25 rounded-t-sm min-h-0"
+                className="bg-blue-500/60 dark:bg-blue-400/50 rounded-t-sm min-h-0"
                 style={{ minHeight: outbound > 0 ? 2 : 0 }}
               />
+              {/* Inbound: violet */}
               <motion.div
                 initial={{ height: 0 }}
                 animate={{ height: `${(inbound / maxVal) * barH}px` }}
                 transition={{ duration: 0.6, delay: hour * 0.025 + 0.08, ease: [0.25, 0.46, 0.45, 0.94] }}
-                className="bg-foreground/10 rounded-b-sm min-h-0"
+                className="bg-violet-500/40 dark:bg-violet-400/35 rounded-b-sm min-h-0"
                 style={{ minHeight: inbound > 0 ? 2 : 0 }}
               />
             </div>
@@ -972,14 +974,14 @@ export default function CallsPage() {
             </div>
 
             {/* Center: Period Selector (inline segmented) */}
-            <div className="bg-muted/50 rounded-lg p-1 flex relative">
+            <div className="bg-muted/60 rounded-xl p-1 flex relative border border-border/40">
               {PERIODS.map((p) => (
                 <button
                   key={p.key}
                   onClick={() => setPeriod(p.key)}
-                  className={`relative z-10 px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
+                  className={`relative z-10 px-5 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
                     period === p.key
-                      ? "bg-background text-foreground shadow-sm"
+                      ? "bg-background text-foreground shadow-md border border-border/50"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
@@ -1020,14 +1022,14 @@ export default function CallsPage() {
             transition={{ delay: 0.1 }}
             className="flex"
           >
-            <div className="flex bg-muted/30 rounded-lg p-1 border border-border/30">
+            <div className="flex bg-muted/60 rounded-xl p-1 border border-border/40">
               {TABS.map((tab) => (
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
                     activeTab === tab.key
-                      ? "bg-background text-foreground shadow-sm"
+                      ? "bg-background text-foreground shadow-md border border-border/50"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
@@ -1117,11 +1119,11 @@ export default function CallsPage() {
                     </div>
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1.5">
-                        <span className="size-2.5 rounded-sm bg-foreground/25" />
+                        <span className="size-2.5 rounded-sm bg-blue-500/60 dark:bg-blue-400/50" />
                         Outbound
                       </span>
                       <span className="flex items-center gap-1.5">
-                        <span className="size-2.5 rounded-sm bg-foreground/10" />
+                        <span className="size-2.5 rounded-sm bg-violet-500/40 dark:bg-violet-400/35" />
                         Inbound
                       </span>
                     </div>
@@ -1129,15 +1131,25 @@ export default function CallsPage() {
                   <div className="p-5">
                     {initialLoading ? (
                       <div className="h-44 flex items-end gap-1 px-1">
-                        {Array.from({ length: 12 }).map((_, i) => (
-                          <div key={i} className="flex-1 flex flex-col items-center gap-1.5">
-                            <div
-                              className="w-full animate-pulse bg-muted/30 rounded-t-sm"
-                              style={{ height: `${30 + Math.random() * 100}px` }}
-                            />
-                            <div className="animate-pulse bg-muted/20 h-2 w-4 rounded" />
-                          </div>
-                        ))}
+                        {Array.from({ length: 12 }).map((_, i) => {
+                          const h1 = 20 + Math.floor(Math.random() * 70);
+                          const h2 = 10 + Math.floor(Math.random() * 50);
+                          return (
+                            <div key={i} className="flex-1 flex flex-col items-center gap-1.5">
+                              <div className="w-full flex flex-col items-stretch">
+                                <div
+                                  className="w-full animate-pulse bg-blue-500/15 rounded-t-sm"
+                                  style={{ height: `${h1}px` }}
+                                />
+                                <div
+                                  className="w-full animate-pulse bg-violet-500/10 rounded-b-sm"
+                                  style={{ height: `${h2}px` }}
+                                />
+                              </div>
+                              <div className="animate-pulse bg-muted/20 h-2 w-4 rounded" />
+                            </div>
+                          );
+                        })}
                       </div>
                     ) : (
                       <ActivityChart data={hourlyData} />
