@@ -92,8 +92,8 @@ async function query<T>(soql: string): Promise<SalesforceQueryResponse<T>> {
       return query<T>(soql)
     }
 
-    console.error('Salesforce query failed:', response.status, errorBody)
-    throw new Error(`Salesforce query failed: ${response.status}`)
+    console.error('Salesforce query failed:', response.status, errorBody, 'SOQL:', soql.substring(0, 200))
+    throw new Error(`Salesforce query failed: ${response.status} - ${errorBody}`)
   }
 
   return response.json()
@@ -330,17 +330,14 @@ const LEAD_SELECT_FIELDS = `
 
 const PIPELINE_SELECT_FIELDS = `
   Id, Name, StageName, Amount, CloseDate,
-  Gross_Amount__c, Service_Charge__c, Processing_Fee__c, Tax_Amount__c,
+  Gross_Amount__c, Service_Charge__c, Processing_Fee__c,
   AccountId, Account.Name,
-  Opportunity_Contact__c, Opportunity_Contact__r.Name,
   Event__c, Event__r.Name, Event__r.Category__c, Event__r.Start_Date__c,
-  Package_Sold__c, Package_Sold__r.Name,
   Total_Number_of_Guests__c,
-  Percentage_Paid__c, Payment_Progress__c,
-  Total_Amount_Paid__c, Total_Balance__c, Total_Payments_Due__c,
-  Commission_Amount__c, NextStep, Special_Requirements__c,
-  Is_New_Business__c, LeadSource, Sign_Request_Complete__c,
-  Loss_Reason__c,
+  Percentage_Paid__c,
+  Total_Amount_Paid__c, Total_Balance__c,
+  NextStep, LeadSource,
+  Is_New_Business__c,
   OwnerId, Owner.Name, Owner.Email,
   CreatedDate, LastModifiedDate, LastActivityDate
 `.trim()
@@ -373,10 +370,7 @@ const EVENT_SELECT_FIELDS = `
 const CONTACT_SELECT_FIELDS = `
   Id, Name, FirstName, LastName, Email, Phone, MobilePhone,
   AccountId, Account.Name, Account.Type, Account.Industry,
-  Title, LeadSource, LinkedIn__c, Facebook__c, Twitter__c,
-  Total_Spend_to_Date__c, Total_Won_Opportunities__c,
-  Tags__c, Interests__c, Recent_Note__c, Score__c,
-  Work_Email__c, Secondary_Email__c,
+  Title, LeadSource,
   OwnerId, Owner.Name,
   CreatedDate, LastActivityDate
 `.trim()
@@ -505,8 +499,27 @@ export async function getOpenOpportunities(filters?: PipelineFilters): Promise<S
     LIMIT 500
   `.trim()
 
-  const result = await query<SalesforceOpportunityFull>(soql)
-  return result.records
+  try {
+    const result = await query<SalesforceOpportunityFull>(soql)
+    return result.records
+  } catch (err) {
+    // Fallback: retry with only core Opportunity fields that are guaranteed to exist
+    console.warn('Pipeline query failed, retrying with core fields only:', err)
+    const fallbackSoql = `
+      SELECT Id, Name, StageName, Amount, CloseDate,
+        Gross_Amount__c, Service_Charge__c, Processing_Fee__c,
+        AccountId, Account.Name,
+        OwnerId, Owner.Name, Owner.Email,
+        LeadSource, NextStep,
+        CreatedDate, LastModifiedDate, LastActivityDate
+      FROM Opportunity
+      WHERE ${whereClause}
+      ORDER BY LastModifiedDate DESC
+      LIMIT 500
+    `.trim()
+    const result = await query<SalesforceOpportunityFull>(fallbackSoql)
+    return result.records
+  }
 }
 
 export async function updateOpportunityStage(id: string, stage: string): Promise<void> {
@@ -551,24 +564,38 @@ export async function getContacts(filters?: ClientFilters): Promise<SalesforceCo
 
   if (filters?.search) {
     const s = filters.search.replace(/'/g, "\\'")
-    whereClause += ` AND (Name LIKE '%${s}%' OR Email LIKE '%${s}%' OR Account.Name LIKE '%${s}%')`
+    whereClause += ` AND (Name LIKE '%${s}%' OR Email LIKE '%${s}%')`
   }
   if (filters?.ownerId) {
     whereClause += ` AND OwnerId = '${filters.ownerId}'`
-  }
-  if (filters?.minSpend) {
-    whereClause += ` AND Total_Spend_to_Date__c >= ${filters.minSpend}`
   }
 
   const soql = `
     SELECT ${CONTACT_SELECT_FIELDS}
     FROM Contact
     WHERE ${whereClause}
-    ORDER BY Total_Spend_to_Date__c DESC NULLS LAST
+    ORDER BY LastActivityDate DESC NULLS LAST
     LIMIT 200
   `.trim()
 
-  const result = await query<SalesforceContact>(soql)
+  let result: { records: SalesforceContact[] }
+  try {
+    result = await query<SalesforceContact>(soql)
+  } catch (err) {
+    // Fallback: retry with only standard Contact fields
+    console.warn('Contacts query failed, retrying with standard fields only:', err)
+    const fallbackSoql = `
+      SELECT Id, Name, FirstName, LastName, Email, Phone, MobilePhone,
+        AccountId, Account.Name, Title,
+        OwnerId, Owner.Name,
+        CreatedDate, LastActivityDate
+      FROM Contact
+      WHERE ${whereClause}
+      ORDER BY LastActivityDate DESC NULLS LAST
+      LIMIT 200
+    `.trim()
+    result = await query<SalesforceContact>(fallbackSoql)
+  }
   return result.records
 }
 

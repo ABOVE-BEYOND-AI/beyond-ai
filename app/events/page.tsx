@@ -458,7 +458,7 @@ export default function EventsPage() {
 
   return (
     <DashboardLayout>
-      <div className="h-dvh overflow-y-auto bg-gradient-to-br from-background to-muted/20 p-6 lg:p-8 pl-24">
+      <div className="h-dvh overflow-y-auto bg-gradient-to-br from-background to-muted/20 p-6 pl-24 lg:p-8 lg:pl-24">
         <div className="max-w-7xl mx-auto pb-24 border border-border/50 rounded-2xl p-4">
           <div className="mb-6">
             <div className="grid grid-cols-3 items-center gap-3">

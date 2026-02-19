@@ -962,7 +962,7 @@ export default function LeadsPage() {
 
   return (
     <DashboardLayout>
-      <div className="min-h-dvh bg-gradient-to-br from-background to-muted/20 p-6 lg:p-8 pl-24">
+      <div className="min-h-dvh bg-gradient-to-br from-background to-muted/20 p-6 pl-24 lg:p-8 lg:pl-24">
         <div className="max-w-[1600px] mx-auto">
           {/* ── Header ── */}
           <motion.div
