@@ -7,71 +7,34 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   House,
-  MagicWand,
+  UsersThree,
   CurrencyGbp,
+  Kanban,
   Phone,
+  PaperPlaneTilt,
   CalendarBlank,
-  ShieldCheck,
-  Envelope,
   UserCircle,
+  ChartLineUp,
+  GearSix,
   List,
   X,
   SignOut,
-  GearSix,
 } from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGoogleAuth } from "@/components/google-auth-provider-clean";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 const navigation = [
-  {
-    name: "Dashboard",
-    href: "/",
-    icon: House,
-    active: true,
-  },
-  {
-    name: "Itinerary Creator",
-    href: "/itinerary",
-    icon: MagicWand,
-    active: true,
-  },
-  {
-    name: "Sales",
-    href: "/sales",
-    icon: CurrencyGbp,
-    active: true,
-  },
-  {
-    name: "Calls",
-    href: "/calls",
-    icon: Phone,
-    active: true,
-  },
-  {
-    name: "Upcoming Events",
-    href: "/events",
-    icon: CalendarBlank,
-    active: true,
-  },
-  {
-    name: "Upgrades",
-    href: "#",
-    icon: ShieldCheck,
-    active: false,
-  },
-  {
-    name: "Contact",
-    href: "#",
-    icon: Envelope,
-    active: false,
-  },
-  {
-    name: "Profile",
-    href: "#",
-    icon: UserCircle,
-    active: false,
-  },
+  { name: "Dashboard", href: "/", icon: House, active: true },
+  { name: "Leads", href: "/leads", icon: UsersThree, active: true },
+  { name: "Sales", href: "/sales", icon: CurrencyGbp, active: true },
+  { name: "Pipeline", href: "/pipeline", icon: Kanban, active: true },
+  { name: "Calls", href: "/calls", icon: Phone, active: true },
+  { name: "Outreach", href: "/outreach", icon: PaperPlaneTilt, active: true },
+  { name: "Events", href: "/events", icon: CalendarBlank, active: true },
+  { name: "Clients", href: "/clients", icon: UserCircle, active: true },
+  { name: "Analytics", href: "/analytics", icon: ChartLineUp, active: true },
+  { name: "Settings", href: "#", icon: GearSix, active: false },
 ];
 
 
