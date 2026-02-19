@@ -1,6 +1,5 @@
 "use client";
 
-import { DashboardLayout } from "@/components/dashboard-layout";
 import { useGoogleAuth } from "@/components/google-auth-provider-clean";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -259,7 +258,6 @@ export default function OutreachPage() {
   if (!user) return null;
 
   return (
-    <DashboardLayout>
       <div className="min-h-screen bg-gradient-to-br from-background to-muted/20 p-6 pl-24 lg:p-8 lg:pl-24">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
@@ -520,6 +518,5 @@ export default function OutreachPage() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
   );
 }

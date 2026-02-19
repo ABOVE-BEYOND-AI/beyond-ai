@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { DashboardLayout } from "@/components/dashboard-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -457,7 +456,6 @@ export default function EventsPage() {
   // Removed unused eventsByDay computation
 
   return (
-    <DashboardLayout>
       <div className="h-dvh overflow-y-auto bg-gradient-to-br from-background to-muted/20 p-6 pl-24 lg:p-8 lg:pl-24">
         <div className="max-w-7xl mx-auto pb-24 border border-border/50 rounded-2xl p-4">
           <div className="mb-6">
@@ -676,7 +674,6 @@ export default function EventsPage() {
           )}
         </div>
       </div>
-    </DashboardLayout>
   );
 }
 

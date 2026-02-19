@@ -1,6 +1,5 @@
 "use client";
 
-import { DashboardLayout } from "@/components/dashboard-layout";
 import { useGoogleAuth } from "@/components/google-auth-provider-clean";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback, useRef } from "react";
@@ -522,7 +521,6 @@ export default function PipelinePage() {
   if (!user) return null;
 
   return (
-    <DashboardLayout>
       <div className="min-h-dvh bg-background p-6 pl-24 lg:p-8 lg:pl-32">
         <div className="max-w-[1600px] mx-auto">
           {/* ── Header ── */}
@@ -822,6 +820,5 @@ export default function PipelinePage() {
           )}
         </div>
       </div>
-    </DashboardLayout>
   );
 }

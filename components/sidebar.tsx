@@ -6,35 +6,95 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
-  Home,
-  Users,
-  PoundSterling,
-  Kanban,
-  Phone,
-  Send,
-  Calendar,
-  CircleUser,
-  TrendingUp,
-  Settings,
   Menu,
   X,
   LogOut,
+  Settings,
+  CircleUser,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGoogleAuth } from "@/components/google-auth-provider-clean";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 
+const CustomIcons = {
+  Dashboard: (props: any) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <rect x="3" y="3" width="7" height="9" rx="1.5" />
+      <rect x="14" y="3" width="7" height="5" rx="1.5" />
+      <rect x="14" y="12" width="7" height="9" rx="1.5" />
+      <rect x="3" y="16" width="7" height="5" rx="1.5" />
+    </svg>
+  ),
+  Leads: (props: any) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  ),
+  Sales: (props: any) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M18 7c0-1.1-.9-2-2-2h-3a3 3 0 0 0-3 3v8a3 3 0 0 1-3 3h12" />
+      <path d="M6 13h8" />
+    </svg>
+  ),
+  Pipeline: (props: any) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <path d="M8 4v16" />
+      <path d="M16 4v16" />
+    </svg>
+  ),
+  Calls: (props: any) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+    </svg>
+  ),
+  Outreach: (props: any) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <line x1="22" y1="2" x2="11" y2="13" />
+      <polygon points="22 2 15 22 11 13 2 9 22 2" />
+    </svg>
+  ),
+  Events: (props: any) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+    </svg>
+  ),
+  Clients: (props: any) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  ),
+  Analytics: (props: any) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+    </svg>
+  ),
+  Settings: (props: any) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  )
+};
+
 const navigation = [
-  { name: "Dashboard", href: "/", icon: Home, active: true },
-  { name: "Leads", href: "/leads", icon: Users, active: true },
-  { name: "Sales", href: "/sales", icon: PoundSterling, active: true },
-  { name: "Pipeline", href: "/pipeline", icon: Kanban, active: true },
-  { name: "Calls", href: "/calls", icon: Phone, active: true },
-  { name: "Outreach", href: "/outreach", icon: Send, active: true },
-  { name: "Events", href: "/events", icon: Calendar, active: true },
-  { name: "Clients", href: "/clients", icon: CircleUser, active: true },
-  { name: "Analytics", href: "/analytics", icon: TrendingUp, active: true },
-  { name: "Settings", href: "#", icon: Settings, active: false },
+  { name: "Dashboard", href: "/", icon: CustomIcons.Dashboard, active: true },
+  { name: "Leads", href: "/leads", icon: CustomIcons.Leads, active: true },
+  { name: "Sales", href: "/sales", icon: CustomIcons.Sales, active: true },
+  { name: "Pipeline", href: "/pipeline", icon: CustomIcons.Pipeline, active: true },
+  { name: "Calls", href: "/calls", icon: CustomIcons.Calls, active: true },
+  { name: "Outreach", href: "/outreach", icon: CustomIcons.Outreach, active: true },
+  { name: "Events", href: "/events", icon: CustomIcons.Events, active: true },
+  { name: "Clients", href: "/clients", icon: CustomIcons.Clients, active: true },
+  { name: "Analytics", href: "/analytics", icon: CustomIcons.Analytics, active: true },
+  { name: "Settings", href: "#", icon: CustomIcons.Settings, active: false },
 ];
 
 
@@ -102,7 +162,7 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
           <div className="h-16 border-b border-border relative overflow-hidden">
             <Link href="/" className="absolute inset-0 flex items-center" onClick={() => setIsOpen(false)}>
               {/* Favicon - shown when collapsed */}
-              <div className="absolute left-6 top-1/2 -translate-y-1/2">
+              <div className="absolute left-5 top-1/2 -translate-y-1/2">
                 <AnimatePresence mode="wait">
                   {!isExpanded ? (
                     <motion.div
@@ -118,9 +178,9 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
                       <Image
                         src="/ab-favicon-gold.webp"
                         alt="Above + Beyond"
-                        width={32}
-                        height={32}
-                        className="size-8 object-contain"
+                        width={40}
+                        height={40}
+                        className="size-10 object-contain drop-shadow-md"
                       />
                     </motion.div>
                   ) : null}
@@ -135,14 +195,14 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.3 }}
-                    className="absolute left-6 top-1/2 -translate-y-1/2"
+                    className="absolute left-5 top-1/2 -translate-y-1/2"
                   >
                     <Image
                       src="/ab-logo-gold.webp"
                       alt="Above + Beyond"
-                      width={140}
-                      height={48}
-                      className="h-10 w-auto object-contain"
+                      width={150}
+                      height={52}
+                      className="h-[44px] w-auto object-contain drop-shadow-md"
                     />
                   </motion.div>
                 )}
@@ -151,18 +211,18 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 py-6 space-y-0.5">
+          <nav className="flex-1 py-6 space-y-1">
             {navigation.map((item) => {
               const isActive = item.href === pathname || (item.href === "/itinerary" && pathname === "/itinerary");
               return (
-                  <Link
+                <Link
                   key={item.name}
                   href={item.href}
                   className={cn(
-                    "flex items-center rounded-lg transition-all duration-200 group h-9 relative mx-3 my-1",
+                    "flex items-center rounded-xl transition-all duration-300 group h-11 relative mx-[18px] my-0.5",
                     isActive
-                      ? "text-foreground bg-primary/5 font-semibold shadow-[0_1px_3px_rgba(0,0,0,0.02)] ring-1 ring-primary/5"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50 font-medium",
+                      ? "bg-transparent"
+                      : "hover:bg-black/[0.03] dark:hover:bg-white/[0.02]",
                     !item.active && "opacity-50 cursor-not-allowed"
                   )}
                   onClick={(e) => {
@@ -173,11 +233,29 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
                   }}
                   title={!isExpanded ? item.name : undefined}
                 >
-                  {/* Icon - fixed at 24px from left edge */}
-                  <div className="absolute left-6 -translate-x-1/2 flex items-center justify-center h-full">
+                  {isActive && (
+                    <motion.div
+                      layoutId="active-nav-row"
+                      className="absolute inset-0 bg-black/[0.04] dark:bg-black/60 rounded-xl border border-black/[0.05] dark:border-white/[0.05] shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[inset_0_1px_3px_rgba(0,0,0,0.8)]"
+                      transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                    />
+                  )}
+
+                  {/* Icon - perfectly padded 5px inside the 44px height container */}
+                  <div className="absolute left-[5px] top-1/2 -translate-y-1/2 flex items-center justify-center size-[34px] transition-transform duration-300 group-hover:scale-105">
+                    {isActive && (
+                      <motion.div
+                        layoutId="active-icon-bg"
+                        className="absolute inset-0 bg-white rounded-[10px] shadow-[0_2px_4px_rgba(0,0,0,0.08),_0_1px_2px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.8),_0_2px_4px_rgba(0,0,0,0.8)] ring-1 ring-black/[0.08] dark:ring-white/20"
+                        transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                      />
+                    )}
                     <item.icon
-                      className="size-5"
-                      strokeWidth={isActive ? 2 : 1.5}
+                      className={cn(
+                        "relative z-10 size-[20px] transition-colors duration-300",
+                        isActive ? "text-black drop-shadow-[0_1px_1px_rgba(255,255,255,1)]" : "text-muted-foreground group-hover:text-foreground"
+                      )}
+                      strokeWidth={isActive ? 2.5 : 1.5}
                     />
                   </div>
 
@@ -192,15 +270,22 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
                           duration: 0.3,
                           delay: 0.1
                         }}
-                        className="flex items-center justify-between w-full pl-14 pr-4"
+                        className="flex items-center justify-between w-full pl-[48px] pr-4 relative z-10"
                       >
-                        <span className="text-[13px] tracking-tight whitespace-nowrap">{item.name}</span>
+                        <span 
+                          className={cn(
+                            "text-[14.5px] tracking-tight whitespace-nowrap transition-colors duration-300",
+                            isActive ? "font-semibold text-foreground" : "font-medium text-muted-foreground group-hover:text-foreground"
+                          )}
+                        >
+                          {item.name}
+                        </span>
                         {!item.active && (
                           <motion.span
                             initial={{ opacity: 0, scale: 0.8 }}
                             animate={{ opacity: 1, scale: 1 }}
                             transition={{ delay: 0.2, duration: 0.2 }}
-                            className="text-2xs bg-muted px-2 py-1 rounded"
+                            className="text-[10px] uppercase tracking-wider font-bold bg-muted/80 text-muted-foreground px-2 py-0.5 rounded-md"
                           >
                             Soon
                           </motion.span>
@@ -222,41 +307,37 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
           </nav>
 
           {/* Theme Toggle + User Profile Section */}
-          <div className="border-t border-border/50">
-            {/* Theme toggle row */}
-            <div className="px-4 py-3 flex items-center">
-              {isExpanded ? (
-                <ThemeToggle showLabel />
-              ) : (
-                <div className="w-full flex justify-center">
-                  <ThemeToggle showLabel={false} />
-                </div>
-              )}
+          <div className="border-t border-border/50 relative h-14 flex items-center">
+            <div className="absolute left-[10px]">
+              <ThemeToggle showLabel={false} />
             </div>
           </div>
 
-          <div className="border-t border-border relative group">
+          <div className="border-t border-border relative h-[64px] flex items-center group">
             {loading ? (
               // Loading state
-              <div className="p-4 flex items-center">
-                <div className="size-8 bg-muted rounded-full animate-pulse flex-shrink-0"></div>
-                {isExpanded && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="ml-3 flex-1"
-                  >
-                    <div className="h-3 bg-muted rounded animate-pulse mb-1"></div>
-                    <div className="h-2 bg-muted rounded animate-pulse w-20"></div>
-                  </motion.div>
-                )}
-              </div>
+              <>
+                <div className="absolute left-[24px] size-8 bg-muted rounded-full animate-pulse flex-shrink-0"></div>
+                <AnimatePresence>
+                  {isExpanded && (
+                    <motion.div
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -10 }}
+                      className="absolute left-[64px] right-4"
+                    >
+                      <div className="h-3 bg-muted rounded animate-pulse mb-1"></div>
+                      <div className="h-2 bg-muted rounded animate-pulse w-20"></div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </>
             ) : user ? (
               // Authenticated user
-              <div className="p-4">
-                <div className="flex items-center">
-                  {/* Profile Picture */}
-                  <div className="relative flex-shrink-0">
+              <>
+                {/* Profile Picture */}
+                <div className="absolute left-[24px] flex-shrink-0">
+                  <div className="relative">
                     {user.picture ? (
                       <Image
                         src={user.picture}
@@ -275,52 +356,50 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
                     {/* Online indicator */}
                     <div className="absolute -bottom-0.5 -right-0.5 size-3 bg-green-500 rounded-full border-2 border-card"></div>
                   </div>
-
-                  {/* User info and actions - shown when expanded */}
-                  <AnimatePresence>
-                    {isExpanded && (
-                      <motion.div
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -10 }}
-                        transition={{ duration: 0.3 }}
-                        className="ml-3 flex-1 min-w-0"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-foreground truncate">
-                              {user.name || user.email?.split('@')[0]}
-                            </p>
-                            <p className="text-xs text-muted-foreground truncate">
-                              {user.email}
-                            </p>
-                          </div>
-
-                          {/* Action buttons */}
-                          <div className="flex items-center gap-1 ml-2">
-                            <button
-                              className="p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-muted/50"
-                              aria-label="Settings"
-                            >
-                              <Settings className="size-4" strokeWidth={1.5} />
-                            </button>
-                            <button
-                              onClick={signOut}
-                              className="p-1.5 text-muted-foreground hover:text-red-500 transition-colors rounded-md hover:bg-red-500/10"
-                              aria-label="Sign out"
-                            >
-                              <LogOut className="size-4" strokeWidth={1.5} />
-                            </button>
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
                 </div>
+
+                {/* User info and actions - shown when expanded */}
+                <AnimatePresence>
+                  {isExpanded && (
+                    <motion.div
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -10 }}
+                      transition={{ duration: 0.3 }}
+                      className="absolute left-[64px] right-4 flex items-center justify-between"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {user.name || user.email?.split('@')[0]}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground truncate">
+                          {user.email}
+                        </p>
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        <button
+                          className="p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-muted/50"
+                          aria-label="Settings"
+                        >
+                          <Settings className="size-4" strokeWidth={1.5} />
+                        </button>
+                        <button
+                          onClick={signOut}
+                          className="p-1.5 text-muted-foreground hover:text-red-500 transition-colors rounded-md hover:bg-red-500/10"
+                          aria-label="Sign out"
+                        >
+                          <LogOut className="size-4" strokeWidth={1.5} />
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 {/* Tooltip for collapsed state */}
                 {!isExpanded && (
-                  <div className="absolute left-full ml-2 bottom-4 px-3 py-2 bg-card border border-border rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
+                  <div className="absolute left-[80px] ml-2 px-3 py-2 bg-card border border-border rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
                     <div className="flex items-center gap-2">
                       <div className="size-2 bg-green-500 rounded-full"></div>
                       <span className="text-sm font-medium">
@@ -330,45 +409,43 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
                     <p className="text-xs text-muted-foreground">{user.email}</p>
                   </div>
                 )}
-              </div>
+              </>
             ) : (
               // Not authenticated
-              <div className="p-4">
-                <div className="flex items-center">
-                  {/* Anonymous user icon */}
-                  <div className="size-8 bg-muted rounded-full flex items-center justify-center flex-shrink-0">
-                    <CircleUser className="size-4 text-muted-foreground" strokeWidth={1.5} />
-                  </div>
-
-                  {/* Sign in prompt - shown when expanded */}
-                  <AnimatePresence>
-                    {isExpanded && (
-                      <motion.div
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -10 }}
-                        transition={{ duration: 0.3 }}
-                        className="ml-3 flex-1"
-                      >
-                        <button
-                          onClick={signIn}
-                          className="w-full text-left"
-                        >
-                          <p className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-                            Sign in
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Access your itineraries
-                          </p>
-                        </button>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+              <>
+                {/* Anonymous user icon */}
+                <div className="absolute left-[24px] size-8 bg-muted rounded-full flex items-center justify-center flex-shrink-0">
+                  <CircleUser className="size-4 text-muted-foreground" strokeWidth={1.5} />
                 </div>
+
+                {/* Sign in prompt - shown when expanded */}
+                <AnimatePresence>
+                  {isExpanded && (
+                    <motion.div
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -10 }}
+                      transition={{ duration: 0.3 }}
+                      className="absolute left-[76px] right-4"
+                    >
+                      <button
+                        onClick={signIn}
+                        className="w-full text-left"
+                      >
+                        <p className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                          Sign in
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Access your itineraries
+                        </p>
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 {/* Tooltip for collapsed state */}
                 {!isExpanded && (
-                  <div className="absolute left-full ml-2 bottom-4 px-3 py-2 bg-card border border-border rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
+                  <div className="absolute left-[80px] ml-2 px-3 py-2 bg-card border border-border rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
                     <div className="flex items-center gap-2">
                       <div className="size-2 bg-muted rounded-full"></div>
                       <span className="text-sm font-medium">Not signed in</span>
@@ -376,7 +453,7 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
                     <p className="text-xs text-muted-foreground">Click to sign in</p>
                   </div>
                 )}
-              </div>
+              </>
             )}
           </div>
         </div>

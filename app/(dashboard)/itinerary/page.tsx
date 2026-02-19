@@ -4,7 +4,6 @@ export const dynamic = 'force-dynamic'
 
 import React, { useState, useMemo } from "react";
 import Image from "next/image";
-import { DashboardLayout } from "@/components/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -667,7 +666,6 @@ function ItineraryPageContent() {
 
   if (showResults) {
   return (
-    <DashboardLayout>
       <div className="min-h-screen flex flex-col p-8 pt-12 pl-32">
         <div className="w-full max-w-7xl mx-auto space-y-8">
           
@@ -1003,14 +1001,12 @@ function ItineraryPageContent() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
   );
 }
 
           
 
   return (
-    <DashboardLayout>
       <div 
         className="h-screen relative overflow-hidden"
         style={{
@@ -1229,7 +1225,6 @@ function ItineraryPageContent() {
           </div>
             </div>
       </div>
-    </DashboardLayout>
   );
 }
 

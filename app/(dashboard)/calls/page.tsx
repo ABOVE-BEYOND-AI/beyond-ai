@@ -1,6 +1,5 @@
 "use client";
 
-import { DashboardLayout } from "@/components/dashboard-layout";
 import {
   Phone,
   PhoneIncoming,
@@ -901,7 +900,6 @@ export default function CallsPage() {
   if (!user) return null;
 
   return (
-    <DashboardLayout>
       {/* Fullscreen overlay */}
       <FullscreenModal
         view={fullscreenView}
@@ -1567,6 +1565,5 @@ export default function CallsPage() {
           </AnimatePresence>
         </div>
       </div>
-    </DashboardLayout>
   );
 }

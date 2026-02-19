@@ -1,6 +1,5 @@
 "use client";
 
-import { DashboardLayout } from "@/components/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Globe, Sparkles, Zap, ShieldCheck } from "lucide-react";
@@ -76,7 +75,6 @@ export default function DashboardPage() {
   }
 
   return (
-    <DashboardLayout>
       <div className="p-8 lg:p-16 pl-24 lg:pl-32 max-w-[1400px] mx-auto">
         {/* Hero Section */}
         <motion.div
@@ -172,6 +170,5 @@ export default function DashboardPage() {
           ))}
         </motion.div>
       </div>
-    </DashboardLayout>
   );
 }

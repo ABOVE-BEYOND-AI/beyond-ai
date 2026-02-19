@@ -4,7 +4,6 @@ export const dynamic = 'force-dynamic'
 
 import React, { useEffect, useState, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { DashboardLayout } from '@/components/dashboard-layout'
 import { ProtectedRoute } from '@/components/protected-route'
 import { useGoogleAuth } from '@/components/google-auth-provider-clean'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -176,7 +175,6 @@ function ItineraryViewPageContent() {
 
   if (error || !itinerary) {
     return (
-      <DashboardLayout>
         <div className="p-6 lg:p-12 pl-32">
           <div className="text-center py-12">
             <h1 className="text-2xl font-bold mb-4">Itinerary Not Found</h1>
@@ -187,12 +185,10 @@ function ItineraryViewPageContent() {
             </Button>
           </div>
         </div>
-      </DashboardLayout>
     )
   }
 
   return (
-    <DashboardLayout>
       <div className="p-6 lg:p-12 pl-32">
         {/* Header */}
         <motion.div
@@ -367,7 +363,6 @@ function ItineraryViewPageContent() {
           </motion.div>
         )}
       </div>
-    </DashboardLayout>
   )
 }
 

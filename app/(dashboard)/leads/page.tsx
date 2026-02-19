@@ -1,6 +1,5 @@
 "use client";
 
-import { DashboardLayout } from "@/components/dashboard-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   MagnifyingGlass,
@@ -962,7 +961,6 @@ export default function LeadsPage() {
   if (!user) return null;
 
   return (
-    <DashboardLayout>
       <div className="min-h-dvh bg-background p-6 pl-24 lg:p-8 lg:pl-32">
         <div className="max-w-[1600px] mx-auto">
           {/* ── Header ── */}
@@ -1409,6 +1407,5 @@ export default function LeadsPage() {
           />
         )}
       </AnimatePresence>
-    </DashboardLayout>
   );
 }

@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import { DashboardLayout } from '@/components/dashboard-layout'
 import { ProtectedRoute } from '@/components/protected-route'
 import { useGoogleAuth } from '@/components/google-auth-provider-clean'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -93,7 +92,6 @@ function ItinerariesPageContent() {
   }
 
   return (
-    <DashboardLayout>
       <div className="p-6 lg:p-12 pl-32">
         {/* Header */}
         <motion.div
@@ -260,7 +258,6 @@ function ItinerariesPageContent() {
           </motion.div>
         )}
       </div>
-    </DashboardLayout>
   )
 }
 
