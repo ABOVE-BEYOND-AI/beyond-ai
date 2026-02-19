@@ -1,11 +1,29 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  CalendarBlank,
+  MapPin,
+  CurrencyGbp,
+  Warning,
+  Package,
+  Bed,
+  AirplaneTakeoff,
+  AirplaneLanding,
+  Car,
+  ForkKnife,
+  Martini,
+  Confetti,
+  Ticket,
+  UserCircle,
+} from "@phosphor-icons/react";
+import type { SalesforceEvent } from "@/lib/salesforce-types";
+import { formatCurrency, daysUntil, EVENT_CATEGORY_COLORS } from "@/lib/constants";
 
 interface EventItem {
   id: string;
@@ -18,13 +36,255 @@ interface EventItem {
   imageUrl?: string;
 }
 
+// ── Ticket Inventory Types ──
+
+const TICKET_TYPES = [
+  { label: "Event", icon: Ticket, requiredField: "Event_Tickets_Required__c", bookedField: "Event_Tickets_Booked__c", remainingField: "Event_Tickets_Remaining__c" },
+  { label: "Hospitality", icon: Package, requiredField: "Hospitality_Tickets_Required__c", bookedField: "Hospitality_Tickets_Booked__c", remainingField: "Hospitality_Tickets_Remaining__c" },
+  { label: "Hotel", icon: Bed, requiredField: "Hotel_Tickets_Required__c", bookedField: "Hotel_Tickets_Booked__c", remainingField: "Hotel_Tickets_Remaining__c" },
+  { label: "Dinner", icon: ForkKnife, requiredField: "Dinner_Tickets_Required__c", bookedField: "Dinner_Tickets_Booked__c", remainingField: "Dinner_Tickets_Remaining__c" },
+  { label: "Drinks", icon: Martini, requiredField: "Drinks_Tickets_Required__c", bookedField: "Drinks_Tickets_Booked__c", remainingField: "Drinks_Tickets_Remaining__c" },
+  { label: "Party", icon: Confetti, requiredField: "Party_Tickets_Required__c", bookedField: "Party_Tickets_Booked__c", remainingField: "Party_Tickets_Remaining__c" },
+  { label: "Flights In", icon: AirplaneLanding, requiredField: "Inbound_Flight_Tickets_Required__c", bookedField: "Inbound_Flight_Tickets_Booked__c", remainingField: "Inbound_Flights_Tickets_Remaining__c" },
+  { label: "Flights Out", icon: AirplaneTakeoff, requiredField: "Outbound_Flight_Tickets_Required__c", bookedField: "Outbound_Flight_Tickets_Booked__c", remainingField: "Outbound_Flights_Tickets_Remaining__c" },
+  { label: "Transfers In", icon: Car, requiredField: "Inbound_Transfer_Tickets_Required__c", bookedField: "Inbound_Transfer_Tickets_Booked__c", remainingField: "Inbound_Transfer_Tickets_Remaining__c" },
+  { label: "Transfers Out", icon: Car, requiredField: "Outbound_Transfer_Tickets_Required__c", bookedField: "Outbound_Transfer_Tickets_Booked__c", remainingField: "Outbound_Transfer_Tickets_Remaining__c" },
+] as const;
+
+function TicketBar({ label, icon: Icon, required, booked }: { label: string; icon: React.ComponentType<{ className?: string }>; required: number; booked: number }) {
+  if (required === 0) return null;
+  const pct = Math.min(100, Math.round((booked / required) * 100));
+  const color = pct >= 90 ? "bg-red-500" : pct >= 70 ? "bg-amber-500" : "bg-emerald-500";
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <Icon className="size-3.5 text-muted-foreground shrink-0" />
+      <span className="w-20 truncate text-muted-foreground">{label}</span>
+      <div className="flex-1 h-2 bg-muted/30 rounded-full overflow-hidden">
+        <div className={`h-full ${color} rounded-full transition-all duration-500`} style={{ width: `${pct}%` }} />
+      </div>
+      <span className="w-14 text-right tabular-nums text-muted-foreground">
+        {booked}/{required}
+      </span>
+      {pct >= 80 && (
+        <Warning className="size-3.5 text-amber-400 shrink-0" weight="fill" />
+      )}
+    </div>
+  );
+}
+
+function InventoryCard({ event, index }: { event: SalesforceEvent; index: number }) {
+  const catKey = (event.Category__c || "").toLowerCase().replace(/\s+/g, "-");
+  const catStyle = EVENT_CATEGORY_COLORS[catKey] || EVENT_CATEGORY_COLORS[event.Category__c || ""] || { bg: "bg-muted/15", text: "text-muted-foreground" };
+  const daysLeft = event.Start_Date__c ? daysUntil(event.Start_Date__c) : null;
+  const revenueTarget = event.Revenue_Target__c || 0;
+  const revenueActual = event.Sum_of_Closed_Won_Gross__c || 0;
+  const revenuePct = revenueTarget > 0 ? Math.min(100, Math.round((revenueActual / revenueTarget) * 100)) : 0;
+  const margin = event.Margin_Percentage__c;
+  const totalBooked = event.Total_Tickets_Booked__c || 0;
+  const totalRequired = event.Total_Tickets_Required__c || 0;
+  const completionPct = event.Percentage_Reservations_Completion__c || 0;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay: index * 0.04 }}
+    >
+      <Card className="overflow-hidden hover:shadow-lg transition-shadow">
+        <CardContent className="p-5">
+          {/* Header */}
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${catStyle.bg} ${catStyle.text}`}>
+                  {event.Category__c || "Event"}
+                </span>
+                <h3 className="text-sm font-semibold truncate">{event.Name}</h3>
+              </div>
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                {event.Location__r?.Name && (
+                  <span className="flex items-center gap-1">
+                    <MapPin className="size-3" />
+                    {event.Location__r.Name}
+                  </span>
+                )}
+                {event.Start_Date__c && (
+                  <span className="flex items-center gap-1">
+                    <CalendarBlank className="size-3" />
+                    {new Date(event.Start_Date__c).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                  </span>
+                )}
+              </div>
+            </div>
+            {daysLeft !== null && (
+              <div className={`shrink-0 text-center px-2.5 py-1 rounded-lg text-xs font-bold ${
+                daysLeft <= 0 ? "bg-muted/30 text-muted-foreground" : daysLeft <= 7 ? "bg-red-500/15 text-red-400" : daysLeft <= 30 ? "bg-amber-500/15 text-amber-400" : "bg-emerald-500/15 text-emerald-400"
+              }`}>
+                {daysLeft <= 0 ? "Passed" : `${daysLeft}d`}
+              </div>
+            )}
+          </div>
+
+          {/* Revenue + Margin row */}
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <div className="rounded-lg bg-muted/10 p-3">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <CurrencyGbp className="size-3.5 text-emerald-400" />
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Revenue</span>
+              </div>
+              <div className="text-sm font-bold tabular-nums">{formatCurrency(revenueActual)}</div>
+              {revenueTarget > 0 && (
+                <>
+                  <div className="text-[10px] text-muted-foreground/60 mt-0.5">
+                    of {formatCurrency(revenueTarget)} target
+                  </div>
+                  <div className="h-1.5 bg-muted/30 rounded-full overflow-hidden mt-2">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${revenuePct >= 100 ? "bg-emerald-500" : revenuePct >= 50 ? "bg-blue-500" : "bg-amber-500"}`}
+                      style={{ width: `${revenuePct}%` }}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="rounded-lg bg-muted/10 p-3">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1.5">Margin</div>
+              <div className={`text-sm font-bold tabular-nums ${
+                margin != null && margin >= 30 ? "text-emerald-400" : margin != null && margin >= 15 ? "text-amber-400" : "text-red-400"
+              }`}>
+                {margin != null ? `${margin.toFixed(1)}%` : "—"}
+              </div>
+              {event.Total_Margin_Value__c != null && (
+                <div className="text-[10px] text-muted-foreground/60 mt-0.5">
+                  {formatCurrency(event.Total_Margin_Value__c)}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Ticket inventory */}
+          <div className="mb-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+                Ticket Inventory
+              </span>
+              <span className="text-[10px] text-muted-foreground tabular-nums">
+                {totalBooked}/{totalRequired} ({Math.round(completionPct)}%)
+              </span>
+            </div>
+            <div className="space-y-1.5">
+              {TICKET_TYPES.map((tt) => {
+                const required = (event[tt.requiredField as keyof SalesforceEvent] as number | null) || 0;
+                const booked = (event[tt.bookedField as keyof SalesforceEvent] as number | null) || 0;
+                return (
+                  <TicketBar
+                    key={tt.label}
+                    label={tt.label}
+                    icon={tt.icon}
+                    required={required}
+                    booked={booked}
+                  />
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Staff assignments */}
+          {(event.A_B_On_Site_1__c || event.A_B_On_Site_2__c) && (
+            <div className="flex items-center gap-2 pt-3 border-t border-border/30">
+              <UserCircle className="size-3.5 text-muted-foreground" />
+              <span className="text-[10px] text-muted-foreground">
+                {[event.A_B_On_Site_1__c, event.A_B_On_Site_2__c].filter(Boolean).join(", ")}
+              </span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+}
+
+function InventoryView({ events, loading }: { events: SalesforceEvent[]; loading: boolean }) {
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="rounded-xl border border-border/30 bg-card/30 p-5 animate-pulse">
+            <div className="h-5 w-48 bg-muted/50 rounded mb-3" />
+            <div className="h-3 w-32 bg-muted/30 rounded mb-4" />
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="h-20 bg-muted/20 rounded-lg" />
+              <div className="h-20 bg-muted/20 rounded-lg" />
+            </div>
+            <div className="space-y-2">
+              <div className="h-3 bg-muted/20 rounded" />
+              <div className="h-3 bg-muted/20 rounded" />
+              <div className="h-3 bg-muted/20 rounded" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (events.length === 0) {
+    return <p className="text-muted-foreground text-center py-12">No event inventory data available.</p>;
+  }
+
+  // Sort: upcoming events first (by start date), passed events at the end
+  const sorted = [...events].sort((a, b) => {
+    const da = a.Start_Date__c || "";
+    const db = b.Start_Date__c || "";
+    return da.localeCompare(db);
+  });
+
+  // Scarcity alerts
+  const scarcityEvents = sorted.filter((e) => {
+    const pct = e.Percentage_Reservations_Completion__c || 0;
+    return pct >= 80 && (e.Total_Tickets_Remaining__c || 0) > 0;
+  });
+
+  return (
+    <div>
+      {/* Scarcity alerts */}
+      {scarcityEvents.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4"
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <Warning className="size-4 text-amber-400" weight="fill" />
+            <span className="text-sm font-medium text-amber-400">Low Inventory Alerts</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {scarcityEvents.map((e) => (
+              <span key={e.Id} className="text-xs bg-amber-500/10 text-amber-300/80 px-2.5 py-1 rounded-full">
+                {e.Name} — {e.Total_Tickets_Remaining__c} remaining ({Math.round(e.Percentage_Reservations_Completion__c || 0)}% full)
+              </span>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        {sorted.map((event, i) => (
+          <InventoryCard key={event.Id} event={event} index={i} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function EventsPage() {
   const [items, setItems] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const selectedCategory = "all" as const;
-  const [view, setView] = useState<"grid" | "list">("grid");
+  const [view, setView] = useState<"grid" | "list" | "inventory">("grid");
+  const [inventoryEvents, setInventoryEvents] = useState<SalesforceEvent[]>([]);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
   const [month, setMonth] = useState<string>(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -93,6 +353,24 @@ export default function EventsPage() {
     })
     return () => w.cancelIdleCallback?.(id as number)
   }, [month])
+
+  // Fetch inventory data when switching to inventory view
+  const fetchInventory = useCallback(async () => {
+    setInventoryLoading(true);
+    try {
+      const res = await fetch("/api/events/inventory");
+      const data = await res.json();
+      if (data.success) setInventoryEvents(data.data);
+    } catch (e) {
+      console.error("Failed to load inventory", e);
+    } finally {
+      setInventoryLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (view === "inventory" && inventoryEvents.length === 0) fetchInventory();
+  }, [view, inventoryEvents.length, fetchInventory]);
 
   // Derive category set
   const uniqueItems = useMemo(() => {
@@ -210,11 +488,17 @@ export default function EventsPage() {
               <div className="justify-self-end flex items-center gap-2">
                 <Button variant={view === "grid" ? "default" : "outline"} onClick={() => setView("grid")}>Grid</Button>
                 <Button variant={view === "list" ? "default" : "outline"} onClick={() => setView("list")}>List</Button>
+                <Button variant={view === "inventory" ? "default" : "outline"} onClick={() => setView("inventory")}>Inventory</Button>
               </div>
             </div>
           </div>
 
-          {loading ? (
+          {view === "inventory" ? (
+            <InventoryView
+              events={inventoryEvents}
+              loading={inventoryLoading}
+            />
+          ) : loading ? (
             <p className="text-muted-foreground">Loading…</p>
           ) : error ? (
             <p className="text-destructive">{error}</p>

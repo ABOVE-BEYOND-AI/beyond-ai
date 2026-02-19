@@ -273,6 +273,527 @@ function computeLeaderboard(deals: SalesforceOpportunity[]): Array<{
  * Full dashboard payload — fetches deals for all periods in parallel,
  * then computes totals and leaderboard in-code.
  */
+// ──────────────────────────────────────────────
+// Re-export types from salesforce-types.ts
+// ──────────────────────────────────────────────
+
+export type {
+  SalesforceLead,
+  SalesforceOpportunityFull,
+  SalesforceEvent as SalesforceEventRecord,
+  SalesforceContact,
+  ABNote,
+  SalesforceTarget,
+  SalesforceCommission,
+  LeadFilters,
+  PipelineFilters,
+  ClientFilters,
+} from './salesforce-types'
+
+import type {
+  SalesforceLead,
+  SalesforceOpportunityFull,
+  SalesforceEvent as SalesforceEventRecord,
+  SalesforceContact,
+  ABNote,
+  SalesforceTarget,
+  SalesforceCommission,
+  LeadFilters,
+  PipelineFilters,
+  ClientFilters,
+} from './salesforce-types'
+
+import { LEAD_SOURCE_GROUPS } from './constants'
+
+// ──────────────────────────────────────────────
+// SOQL field lists for new queries
+// ──────────────────────────────────────────────
+
+const LEAD_SELECT_FIELDS = `
+  Id, Name, FirstName, LastName, Email, Phone, MobilePhone,
+  Company, Title, Status, LeadSource, Rating,
+  Score__c, Event_of_Interest__c, Interests__c,
+  No_of_Guests__c, Form_Comments__c, Form_Type__c,
+  Recent_Note__c, Tags__c, Unqualified_Reason__c,
+  Last_Event_Booked__c, Web_to_Lead_Created__c,
+  Web_to_Lead_Page_Information__c,
+  Formula_1__c, Football__c, Rugby__c, Tennis__c,
+  Live_Music__c, Culinary__c, Luxury_Lifestyle_Celebrity__c,
+  Unique_Experiences__c, Other__c,
+  LinkedIn__c, Facebook__c, Twitter__c,
+  CreatedDate, LastModifiedDate, LastActivityDate,
+  FirstCallDateTime, FirstEmailDateTime,
+  OwnerId, Owner.Name,
+  I_agree_to_be_emailed__c, HasOptedOutOfEmail,
+  Newsletter_Subscribed__c
+`.trim()
+
+const PIPELINE_SELECT_FIELDS = `
+  Id, Name, StageName, Amount, CloseDate,
+  Gross_Amount__c, Service_Charge__c, Processing_Fee__c, Tax_Amount__c,
+  AccountId, Account.Name,
+  Opportunity_Contact__c, Opportunity_Contact__r.Name,
+  Event__c, Event__r.Name, Event__r.Category__c, Event__r.Start_Date__c,
+  Package_Sold__c, Package_Sold__r.Name,
+  Total_Number_of_Guests__c,
+  Percentage_Paid__c, Payment_Progress__c,
+  Total_Amount_Paid__c, Total_Balance__c, Total_Payments_Due__c,
+  Commission_Amount__c, NextStep, Special_Requirements__c,
+  Is_New_Business__c, LeadSource, Sign_Request_Complete__c,
+  Loss_Reason__c,
+  OwnerId, Owner.Name, Owner.Email,
+  CreatedDate, LastModifiedDate, LastActivityDate
+`.trim()
+
+const EVENT_SELECT_FIELDS = `
+  Id, Name, Category__c, Start_Date__c, End_Date__c,
+  Start_Time__c, End_Time__c,
+  Location__c, Location__r.Name,
+  Revenue_Target__c, Sum_of_Closed_Won_Gross__c,
+  Percentage_to_Target__c, Revenue_Progress__c,
+  Margin_Percentage__c, Total_Margin_Value__c,
+  Total_Booking_Cost__c, Total_Staff_Costs__c, Total_Payments_Received__c,
+  Event_Tickets_Required__c, Event_Tickets_Booked__c, Event_Tickets_Remaining__c,
+  Hospitality_Tickets_Required__c, Hospitality_Tickets_Booked__c, Hospitality_Tickets_Remaining__c,
+  Hotel_Tickets_Required__c, Hotel_Tickets_Booked__c, Hotel_Tickets_Remaining__c,
+  Dinner_Tickets_Required__c, Dinner_Tickets_Booked__c, Dinner_Tickets_Remaining__c,
+  Drinks_Tickets_Required__c, Drinks_Tickets_Booked__c, Drinks_Tickets_Remaining__c,
+  Party_Tickets_Required__c, Party_Tickets_Booked__c, Party_Tickets_Remaining__c,
+  Inbound_Flight_Tickets_Required__c, Inbound_Flight_Tickets_Booked__c, Inbound_Flights_Tickets_Remaining__c,
+  Outbound_Flight_Tickets_Required__c, Outbound_Flight_Tickets_Booked__c, Outbound_Flights_Tickets_Remaining__c,
+  Inbound_Transfer_Tickets_Required__c, Inbound_Transfer_Tickets_Booked__c, Inbound_Transfer_Tickets_Remaining__c,
+  Outbound_Transfer_Tickets_Required__c, Outbound_Transfer_Tickets_Booked__c, Outbound_Transfer_Tickets_Remaining__c,
+  Total_Tickets_Required__c, Total_Tickets_Booked__c, Total_Tickets_Remaining__c,
+  Percentage_Reservations_Completion__c,
+  Total_Projects__c,
+  A_B_On_Site_1__c, A_B_On_Site_2__c,
+  Event_Image_1__c, Master_Package_Code__c
+`.trim()
+
+const CONTACT_SELECT_FIELDS = `
+  Id, Name, FirstName, LastName, Email, Phone, MobilePhone,
+  AccountId, Account.Name, Account.Type, Account.Industry,
+  Title, LeadSource, LinkedIn__c, Facebook__c, Twitter__c,
+  Total_Spend_to_Date__c, Total_Won_Opportunities__c,
+  Tags__c, Interests__c, Recent_Note__c, Score__c,
+  Work_Email__c, Secondary_Email__c,
+  OwnerId, Owner.Name,
+  CreatedDate, LastActivityDate
+`.trim()
+
+// ──────────────────────────────────────────────
+// LEADS
+// ──────────────────────────────────────────────
+
+export async function getLeads(filters?: LeadFilters): Promise<SalesforceLead[]> {
+  let whereClause = 'IsConverted = false'
+
+  if (filters?.status) {
+    whereClause += ` AND Status = '${filters.status}'`
+  }
+
+  if (filters?.sourceGroup && LEAD_SOURCE_GROUPS[filters.sourceGroup]) {
+    const sources = LEAD_SOURCE_GROUPS[filters.sourceGroup].map(s => `'${s}'`).join(', ')
+    whereClause += ` AND LeadSource IN (${sources})`
+  }
+
+  if (filters?.ownerId) {
+    whereClause += ` AND OwnerId = '${filters.ownerId}'`
+  }
+
+  if (filters?.search) {
+    const s = filters.search.replace(/'/g, "\\'")
+    whereClause += ` AND (Name LIKE '%${s}%' OR Company LIKE '%${s}%' OR Email LIKE '%${s}%')`
+  }
+
+  // Smart view filters
+  if (filters?.view === 'hot') {
+    whereClause += ` AND Status != 'Unqualified' AND Rating IN ('Hot', 'Warm')`
+  } else if (filters?.view === 'needCalling') {
+    whereClause += ` AND Status IN ('New', 'Working') AND FirstCallDateTime = null`
+  } else if (filters?.view === 'newThisWeek') {
+    whereClause += ` AND CreatedDate = THIS_WEEK`
+  } else if (filters?.view === 'goingCold') {
+    whereClause += ` AND Status != 'Unqualified' AND LastActivityDate < LAST_N_DAYS:14`
+  } else if (filters?.view === 'eventInterested') {
+    whereClause += ` AND Event_of_Interest__c != null`
+  } else if (filters?.view === 'unqualified') {
+    whereClause += ` AND Status = 'Unqualified'`
+  }
+
+  // Interest category filter
+  if (filters?.interest) {
+    whereClause += ` AND ${filters.interest} = true`
+  }
+
+  const soql = `
+    SELECT ${LEAD_SELECT_FIELDS}
+    FROM Lead
+    WHERE ${whereClause}
+    ORDER BY LastActivityDate DESC NULLS LAST
+    LIMIT 500
+  `.trim()
+
+  const result = await query<SalesforceLead>(soql)
+  return result.records
+}
+
+export async function updateLead(id: string, fields: Record<string, unknown>): Promise<void> {
+  await updateRecord('Lead', id, fields)
+}
+
+export async function convertLead(id: string): Promise<{ contactId: string; accountId: string; opportunityId?: string }> {
+  const { access_token, instance_url } = await authenticate()
+
+  const response = await fetch(`${instance_url}/services/data/v59.0/actions/standard/convertLead`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${access_token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      inputs: [{
+        leadId: id,
+        convertedStatus: 'Qualified',
+        createOpportunity: true,
+      }],
+    }),
+  })
+
+  if (!response.ok) {
+    const errorBody = await response.text()
+    throw new Error(`Lead conversion failed: ${response.status} - ${errorBody}`)
+  }
+
+  const data = await response.json()
+  const result = data[0]
+  return {
+    contactId: result.outputValues?.contactId || '',
+    accountId: result.outputValues?.accountId || '',
+    opportunityId: result.outputValues?.opportunityId,
+  }
+}
+
+// ──────────────────────────────────────────────
+// PIPELINE (Open Opportunities)
+// ──────────────────────────────────────────────
+
+export async function getOpenOpportunities(filters?: PipelineFilters): Promise<SalesforceOpportunityFull[]> {
+  let whereClause = filters?.includeClosed ? '1=1' : 'IsClosed = false'
+
+  if (filters?.ownerId) {
+    whereClause += ` AND OwnerId = '${filters.ownerId}'`
+  }
+  if (filters?.eventId) {
+    whereClause += ` AND Event__c = '${filters.eventId}'`
+  }
+  if (filters?.eventCategory) {
+    whereClause += ` AND Event__r.Category__c = '${filters.eventCategory}'`
+  }
+  if (filters?.minAmount) {
+    whereClause += ` AND Amount >= ${filters.minAmount}`
+  }
+  if (filters?.maxAmount) {
+    whereClause += ` AND Amount <= ${filters.maxAmount}`
+  }
+
+  const soql = `
+    SELECT ${PIPELINE_SELECT_FIELDS}
+    FROM Opportunity
+    WHERE ${whereClause}
+    ORDER BY LastModifiedDate DESC
+    LIMIT 500
+  `.trim()
+
+  const result = await query<SalesforceOpportunityFull>(soql)
+  return result.records
+}
+
+export async function updateOpportunityStage(id: string, stage: string): Promise<void> {
+  await updateRecord('Opportunity', id, { StageName: stage })
+}
+
+// ──────────────────────────────────────────────
+// EVENTS (with inventory)
+// ──────────────────────────────────────────────
+
+export async function getEventsWithInventory(): Promise<SalesforceEventRecord[]> {
+  const soql = `
+    SELECT ${EVENT_SELECT_FIELDS}
+    FROM Event__c
+    ORDER BY Start_Date__c ASC NULLS LAST
+    LIMIT 200
+  `.trim()
+
+  const result = await query<SalesforceEventRecord>(soql)
+  return result.records
+}
+
+export async function getEventOpportunities(eventId: string): Promise<SalesforceOpportunityFull[]> {
+  const soql = `
+    SELECT ${PIPELINE_SELECT_FIELDS}
+    FROM Opportunity
+    WHERE Event__c = '${eventId}'
+    ORDER BY StageName ASC
+    LIMIT 200
+  `.trim()
+
+  const result = await query<SalesforceOpportunityFull>(soql)
+  return result.records
+}
+
+// ──────────────────────────────────────────────
+// CLIENTS (Contacts)
+// ──────────────────────────────────────────────
+
+export async function getContacts(filters?: ClientFilters): Promise<SalesforceContact[]> {
+  let whereClause = 'Id != null'
+
+  if (filters?.search) {
+    const s = filters.search.replace(/'/g, "\\'")
+    whereClause += ` AND (Name LIKE '%${s}%' OR Email LIKE '%${s}%' OR Account.Name LIKE '%${s}%')`
+  }
+  if (filters?.ownerId) {
+    whereClause += ` AND OwnerId = '${filters.ownerId}'`
+  }
+  if (filters?.minSpend) {
+    whereClause += ` AND Total_Spend_to_Date__c >= ${filters.minSpend}`
+  }
+
+  const soql = `
+    SELECT ${CONTACT_SELECT_FIELDS}
+    FROM Contact
+    WHERE ${whereClause}
+    ORDER BY Total_Spend_to_Date__c DESC NULLS LAST
+    LIMIT 200
+  `.trim()
+
+  const result = await query<SalesforceContact>(soql)
+  return result.records
+}
+
+export async function getContactDetail(contactId: string): Promise<SalesforceContact> {
+  const soql = `
+    SELECT ${CONTACT_SELECT_FIELDS}
+    FROM Contact
+    WHERE Id = '${contactId}'
+    LIMIT 1
+  `.trim()
+
+  const result = await query<SalesforceContact>(soql)
+  if (result.records.length === 0) throw new Error('Contact not found')
+  return result.records[0]
+}
+
+export async function getContactOpportunities(contactId: string): Promise<SalesforceOpportunityFull[]> {
+  const soql = `
+    SELECT ${PIPELINE_SELECT_FIELDS}
+    FROM Opportunity
+    WHERE Opportunity_Contact__c = '${contactId}'
+    ORDER BY CloseDate DESC
+    LIMIT 100
+  `.trim()
+
+  const result = await query<SalesforceOpportunityFull>(soql)
+  return result.records
+}
+
+export async function getContactNotes(contactId: string): Promise<ABNote[]> {
+  // A_B_Note__c may relate to Contact via a lookup
+  const soql = `
+    SELECT Id, Name, Body__c, OwnerId, Owner.Alias, CreatedDate
+    FROM A_B_Note__c
+    WHERE Contact__c = '${contactId}'
+    ORDER BY CreatedDate DESC
+    LIMIT 50
+  `.trim()
+
+  const result = await query<ABNote>(soql)
+  return result.records
+}
+
+// ──────────────────────────────────────────────
+// ANALYTICS
+// ──────────────────────────────────────────────
+
+export interface ChannelAttribution {
+  LeadSource: string
+  totalDeals: number
+  totalRevenue: number
+  avgDealSize: number
+}
+
+export async function getChannelAttribution(): Promise<ChannelAttribution[]> {
+  // Can't use GROUP BY with formula fields, so fetch records and aggregate in-code
+  const soql = `
+    SELECT Id, Amount, Gross_Amount__c, LeadSource
+    FROM Opportunity
+    WHERE StageName IN ('Agreement Signed', 'Amended', 'Amendment Signed')
+      AND CloseDate >= THIS_YEAR
+      AND LeadSource != null
+    LIMIT 2000
+  `.trim()
+
+  const result = await query<{ Id: string; Amount: number | null; Gross_Amount__c: number | null; LeadSource: string }>(soql)
+
+  const sourceMap = new Map<string, { totalDeals: number; totalRevenue: number }>()
+  for (const r of result.records) {
+    const source = r.LeadSource || 'Unknown'
+    const existing = sourceMap.get(source) || { totalDeals: 0, totalRevenue: 0 }
+    existing.totalDeals += 1
+    existing.totalRevenue += r.Gross_Amount__c ?? r.Amount ?? 0
+    sourceMap.set(source, existing)
+  }
+
+  return Array.from(sourceMap.entries())
+    .map(([source, data]) => ({
+      LeadSource: source,
+      totalDeals: data.totalDeals,
+      totalRevenue: data.totalRevenue,
+      avgDealSize: data.totalDeals > 0 ? data.totalRevenue / data.totalDeals : 0,
+    }))
+    .sort((a, b) => b.totalRevenue - a.totalRevenue)
+}
+
+export interface RepPerformance {
+  name: string
+  email: string
+  totalDeals: number
+  totalRevenue: number
+  avgDealSize: number
+  totalGuests: number
+}
+
+export async function getRepPerformance(): Promise<RepPerformance[]> {
+  const soql = `
+    SELECT Id, Amount, Gross_Amount__c, Owner.Name, Owner.Email, Total_Number_of_Guests__c
+    FROM Opportunity
+    WHERE StageName IN ('Agreement Signed', 'Amended', 'Amendment Signed')
+      AND CloseDate >= THIS_YEAR
+    LIMIT 2000
+  `.trim()
+
+  const result = await query<{
+    Id: string; Amount: number | null; Gross_Amount__c: number | null;
+    Owner: { Name: string; Email?: string } | null;
+    Total_Number_of_Guests__c: number | null
+  }>(soql)
+
+  const repMap = new Map<string, RepPerformance>()
+  for (const r of result.records) {
+    const name = r.Owner?.Name || 'Unknown'
+    const email = r.Owner?.Email || ''
+    const key = email || name
+    const existing = repMap.get(key) || { name, email, totalDeals: 0, totalRevenue: 0, avgDealSize: 0, totalGuests: 0 }
+    existing.totalDeals += 1
+    existing.totalRevenue += r.Gross_Amount__c ?? r.Amount ?? 0
+    existing.totalGuests += r.Total_Number_of_Guests__c ?? 0
+    repMap.set(key, existing)
+  }
+
+  return Array.from(repMap.values())
+    .map(r => ({ ...r, avgDealSize: r.totalDeals > 0 ? r.totalRevenue / r.totalDeals : 0 }))
+    .sort((a, b) => b.totalRevenue - a.totalRevenue)
+}
+
+export interface EventPerformance {
+  eventName: string
+  eventCategory: string | null
+  totalDeals: number
+  totalRevenue: number
+  totalGross: number
+}
+
+export async function getEventPerformance(): Promise<EventPerformance[]> {
+  const soql = `
+    SELECT Id, Amount, Gross_Amount__c, Event__r.Name, Event__r.Category__c
+    FROM Opportunity
+    WHERE StageName IN ('Agreement Signed', 'Amended', 'Amendment Signed')
+      AND CloseDate >= THIS_YEAR
+      AND Event__c != null
+    LIMIT 2000
+  `.trim()
+
+  const result = await query<{
+    Id: string; Amount: number | null; Gross_Amount__c: number | null;
+    Event__r: { Name: string; Category__c?: string } | null
+  }>(soql)
+
+  const eventMap = new Map<string, EventPerformance>()
+  for (const r of result.records) {
+    const name = r.Event__r?.Name || 'Unknown'
+    const existing = eventMap.get(name) || { eventName: name, eventCategory: r.Event__r?.Category__c || null, totalDeals: 0, totalRevenue: 0, totalGross: 0 }
+    existing.totalDeals += 1
+    existing.totalRevenue += r.Amount ?? 0
+    existing.totalGross += r.Gross_Amount__c ?? r.Amount ?? 0
+    eventMap.set(name, existing)
+  }
+
+  return Array.from(eventMap.values()).sort((a, b) => b.totalGross - a.totalGross)
+}
+
+// ──────────────────────────────────────────────
+// TARGETS & COMMISSION
+// ──────────────────────────────────────────────
+
+export async function getMonthlyTargets(year: string, month: string): Promise<SalesforceTarget[]> {
+  const soql = `
+    SELECT Id, Name, Target_Amount__c, OwnerId, Owner.Name, Type__c, Month__c, Year__c, Days_Absent__c
+    FROM Target__c
+    WHERE Year__c = '${year}' AND Month__c = '${month}'
+    LIMIT 100
+  `.trim()
+
+  const result = await query<SalesforceTarget>(soql)
+  return result.records
+}
+
+export async function getCommissionData(year: string): Promise<SalesforceCommission[]> {
+  const soql = `
+    SELECT Id, Name, Sales_Person__c, Sales_Person__r.Name,
+      Total_Monthly_commission__c, Commission_Rate_Applicable__c,
+      Gross_Amount_Moved_to_Agreement_Signed__c,
+      KPI_Targets__c, KPI_Targets_Met__c,
+      Clawback__c, Amount_Paid_to_Salesperson__c,
+      New_Bus_Ops__c, AVG_Call_Time__c,
+      Avg_Rolling_Commission__c,
+      Month__c, Month_Name__c, Year__c
+    FROM Commissions__c
+    WHERE Year__c = '${year}'
+    ORDER BY Month__c DESC
+    LIMIT 200
+  `.trim()
+
+  const result = await query<SalesforceCommission>(soql)
+  return result.records
+}
+
+// ──────────────────────────────────────────────
+// GENERIC UPDATE (write-back)
+// ──────────────────────────────────────────────
+
+export async function updateRecord(objectType: string, id: string, fields: Record<string, unknown>): Promise<void> {
+  const { access_token, instance_url } = await authenticate()
+
+  const response = await fetch(`${instance_url}/services/data/v59.0/sobjects/${objectType}/${id}`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${access_token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(fields),
+  })
+
+  if (!response.ok && response.status !== 204) {
+    const errorBody = await response.text()
+    throw new Error(`Salesforce update failed: ${response.status} - ${errorBody}`)
+  }
+}
+
+// ──────────────────────────────────────────────
+// SALES DASHBOARD (existing)
+// ──────────────────────────────────────────────
+
 export async function getDashboardData(period: SalesPeriod = 'month') {
   // Fetch all four periods in parallel
   const [todayDeals, weekDeals, monthDeals, yearDeals] = await Promise.all([
