@@ -3,7 +3,7 @@
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Globe, MagicWand, Lightning, ShieldCheck } from "@phosphor-icons/react";
+import { ArrowRight, Globe, Sparkles, Zap, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useGoogleAuth } from "@/components/google-auth-provider-clean";
@@ -13,13 +13,13 @@ import { useEffect } from "react";
 const features = [
   {
     title: "AI-Powered Research",
-            description: "Advanced AI search with enhanced results on destinations, accommodations, and activities",
-    icon: MagicWand,
+    description: "Advanced AI search with enhanced results on destinations, accommodations, and activities",
+    icon: Sparkles,
   },
   {
     title: "Instant Generation",
     description: "Transform briefs into polished itineraries in under 30 seconds",
-    icon: Lightning,
+    icon: Zap,
   },
   {
     title: "Global Coverage",
@@ -82,23 +82,26 @@ export default function DashboardPage() {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="mb-16"
+          transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1] }}
+          className="mb-16 relative"
         >
-          <h1 className="text-3xl lg:text-5xl font-bold tracking-tight mb-3 text-foreground">
+          {/* Subtle decorative glow */}
+          <div className="absolute -top-24 -left-20 w-96 h-96 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+          
+          <h1 className="text-4xl lg:text-5xl font-bold tracking-tight mb-4 text-foreground relative z-10">
             Welcome back to Above + Beyond
           </h1>
-          <p className="text-base lg:text-lg text-muted-foreground max-w-2xl text-pretty">
+          <p className="text-base lg:text-lg text-muted-foreground max-w-2xl text-pretty leading-relaxed relative z-10">
             Transform client briefs into extraordinary travel experiences with AI-powered research.
           </p>
-          <div className="flex gap-3 mt-8">
+          <div className="flex gap-4 mt-8 relative z-10">
             <Link href="/itinerary">
-              <Button size="lg" className="group rounded-full px-6">
+              <Button size="lg" className="group h-11 rounded-full px-6 shadow-soft hover:shadow-md transition-all border border-transparent hover:border-primary/10 bg-primary hover:bg-primary/90 text-primary-foreground font-medium text-sm">
                 Create Itinerary
-                <ArrowRight className="ml-2 size-4 transition-transform group-hover:translate-x-1" />
+                <ArrowRight className="ml-2 size-4 transition-transform duration-300 ease-out group-hover:translate-x-1" strokeWidth={1.5} />
               </Button>
             </Link>
-            <Button size="lg" variant="outline" className="rounded-full px-6">
+            <Button size="lg" variant="outline" className="h-11 rounded-full px-6 shadow-sm border-border/80 bg-background/50 backdrop-blur-sm hover:bg-muted/30 font-medium text-sm transition-all duration-300">
               View Demo
             </Button>
           </div>
@@ -109,29 +112,32 @@ export default function DashboardPage() {
           variants={container}
           initial="hidden"
           animate="show"
-          className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-16"
+          className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-16"
         >
           <motion.div variants={item}>
-            <Card className="bg-card border border-border/50 shadow-sm rounded-2xl">
-              <CardContent className="p-6">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Options per brief</p>
-                <div className="text-3xl font-bold text-foreground tabular-nums">3-5</div>
+            <Card className="bg-card border-border/40 shadow-soft rounded-[20px] relative overflow-hidden transition-all hover:shadow-md">
+              <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent dark:from-white/5 pointer-events-none" />
+              <CardContent className="p-7 relative z-10">
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">Options per brief</p>
+                <div className="text-4xl font-bold text-foreground tabular-nums tracking-tight">3-5</div>
               </CardContent>
             </Card>
           </motion.div>
           <motion.div variants={item}>
-            <Card className="bg-card border border-border/50 shadow-sm rounded-2xl">
-              <CardContent className="p-6">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Avg generation</p>
-                <div className="text-3xl font-bold text-foreground tabular-nums">30s</div>
+            <Card className="bg-card border-border/40 shadow-soft rounded-[20px] relative overflow-hidden transition-all hover:shadow-md">
+              <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent dark:from-white/5 pointer-events-none" />
+              <CardContent className="p-7 relative z-10">
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">Avg generation</p>
+                <div className="text-4xl font-bold text-foreground tabular-nums tracking-tight">30s</div>
               </CardContent>
             </Card>
           </motion.div>
           <motion.div variants={item}>
-            <Card className="bg-card border border-border/50 shadow-sm rounded-2xl">
-              <CardContent className="p-6">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">PDF Output</p>
-                <div className="text-3xl font-bold text-foreground tabular-nums">100%</div>
+            <Card className="bg-card border-border/40 shadow-soft rounded-[20px] relative overflow-hidden transition-all hover:shadow-md">
+              <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent dark:from-white/5 pointer-events-none" />
+              <CardContent className="p-7 relative z-10">
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">PDF Output</p>
+                <div className="text-4xl font-bold text-foreground tabular-nums tracking-tight">100%</div>
               </CardContent>
             </Card>
           </motion.div>
@@ -142,19 +148,20 @@ export default function DashboardPage() {
           variants={container}
           initial="hidden"
           animate="show"
-          className="grid grid-cols-1 md:grid-cols-2 gap-4"
+          className="grid grid-cols-1 md:grid-cols-2 gap-5"
         >
           {features.map((feature) => (
             <motion.div key={feature.title} variants={item}>
-              <Card className="group transition-all duration-200 hover:border-foreground/20 hover:bg-muted/10 rounded-2xl bg-card border-border/50 shadow-sm">
-                <CardHeader className="p-5">
-                  <div className="flex items-start gap-4">
-                    <div className="p-2.5 rounded-lg bg-muted/50 text-foreground">
-                      <feature.icon className="size-5" weight="fill" />
+              <Card className="group transition-all duration-300 hover:border-primary/20 hover:shadow-md rounded-[20px] bg-card border-border/40 shadow-soft relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-white/40 to-transparent dark:from-white/5 pointer-events-none" />
+                <CardHeader className="p-7 relative z-10">
+                  <div className="flex items-start gap-5">
+                    <div className="p-3 rounded-2xl bg-primary/[0.03] text-primary border border-primary/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.5)] dark:shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)] group-hover:scale-105 transition-transform duration-300">
+                      <feature.icon className="size-6" strokeWidth={1.5} />
                     </div>
-                    <div>
-                      <CardTitle className="text-base font-semibold">{feature.title}</CardTitle>
-                      <CardDescription className="mt-1 text-sm text-muted-foreground leading-relaxed">
+                    <div className="pt-0.5">
+                      <CardTitle className="text-lg font-semibold tracking-tight">{feature.title}</CardTitle>
+                      <CardDescription className="mt-2 text-sm text-muted-foreground/90 leading-relaxed">
                         {feature.description}
                       </CardDescription>
                     </div>

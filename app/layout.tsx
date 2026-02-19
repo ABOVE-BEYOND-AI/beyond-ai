@@ -1,12 +1,22 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { GoogleAuthProvider } from "@/components/google-auth-provider-clean";
 
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
+const googleSans = localFont({
+  src: [
+    {
+      path: "../public/Google_Sans/GoogleSans-VariableFont_GRAD,opsz,wght.ttf",
+      style: "normal",
+    },
+    {
+      path: "../public/Google_Sans/GoogleSans-Italic-VariableFont_GRAD,opsz,wght.ttf",
+      style: "italic",
+    },
+  ],
+  variable: "--font-google-sans",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -33,7 +43,7 @@ export default function RootLayout({
       </head>
       <body
         className={cn(
-          inter.variable,
+          googleSans.variable,
           "font-sans antialiased bg-background text-foreground"
         )}
       >

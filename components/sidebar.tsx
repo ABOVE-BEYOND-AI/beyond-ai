@@ -6,35 +6,35 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
-  House,
-  UsersThree,
-  CurrencyGbp,
+  Home,
+  Users,
+  PoundSterling,
   Kanban,
   Phone,
-  PaperPlaneTilt,
-  CalendarBlank,
-  UserCircle,
-  ChartLineUp,
-  GearSix,
-  List,
+  Send,
+  Calendar,
+  CircleUser,
+  TrendingUp,
+  Settings,
+  Menu,
   X,
-  SignOut,
-} from "@phosphor-icons/react";
+  LogOut,
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGoogleAuth } from "@/components/google-auth-provider-clean";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 const navigation = [
-  { name: "Dashboard", href: "/", icon: House, active: true },
-  { name: "Leads", href: "/leads", icon: UsersThree, active: true },
-  { name: "Sales", href: "/sales", icon: CurrencyGbp, active: true },
+  { name: "Dashboard", href: "/", icon: Home, active: true },
+  { name: "Leads", href: "/leads", icon: Users, active: true },
+  { name: "Sales", href: "/sales", icon: PoundSterling, active: true },
   { name: "Pipeline", href: "/pipeline", icon: Kanban, active: true },
   { name: "Calls", href: "/calls", icon: Phone, active: true },
-  { name: "Outreach", href: "/outreach", icon: PaperPlaneTilt, active: true },
-  { name: "Events", href: "/events", icon: CalendarBlank, active: true },
-  { name: "Clients", href: "/clients", icon: UserCircle, active: true },
-  { name: "Analytics", href: "/analytics", icon: ChartLineUp, active: true },
-  { name: "Settings", href: "#", icon: GearSix, active: false },
+  { name: "Outreach", href: "/outreach", icon: Send, active: true },
+  { name: "Events", href: "/events", icon: Calendar, active: true },
+  { name: "Clients", href: "/clients", icon: CircleUser, active: true },
+  { name: "Analytics", href: "/analytics", icon: TrendingUp, active: true },
+  { name: "Settings", href: "#", icon: Settings, active: false },
 ];
 
 
@@ -64,7 +64,7 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
         className="fixed top-6 left-6 z-50 lg:hidden bg-card/80 backdrop-blur-sm p-3 rounded-lg shadow-lg"
         aria-label={isOpen ? "Close menu" : "Open menu"}
       >
-        {isOpen ? <X className="size-5" /> : <List className="size-5" />}
+        {isOpen ? <X className="size-5" strokeWidth={1.5} /> : <Menu className="size-5" strokeWidth={1.5} />}
       </button>
 
       {/* Mobile Overlay */}
@@ -97,7 +97,7 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
           ease: [0.25, 0.46, 0.45, 0.94]
         }}
       >
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full bg-card/50">
           {/* Logo */}
           <div className="h-16 border-b border-border relative overflow-hidden">
             <Link href="/" className="absolute inset-0 flex items-center" onClick={() => setIsOpen(false)}>
@@ -151,7 +151,7 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 py-4 space-y-0.5">
+          <nav className="flex-1 py-6 space-y-0.5">
             {navigation.map((item) => {
               const isActive = item.href === pathname || (item.href === "/itinerary" && pathname === "/itinerary");
               return (
@@ -159,11 +159,11 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
                   key={item.name}
                   href={item.href}
                   className={cn(
-                    "flex items-center rounded-md transition-colors duration-200 group h-10 relative mx-3 my-0.5",
+                    "flex items-center rounded-lg transition-all duration-200 group h-9 relative mx-3 my-1",
                     isActive
-                      ? "text-foreground bg-foreground/5 font-medium"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
-                    !item.active && "opacity-60 cursor-not-allowed"
+                      ? "text-foreground bg-primary/5 font-semibold shadow-[0_1px_3px_rgba(0,0,0,0.02)] ring-1 ring-primary/5"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50 font-medium",
+                    !item.active && "opacity-50 cursor-not-allowed"
                   )}
                   onClick={(e) => {
                     if (!item.active) {
@@ -177,7 +177,7 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
                   <div className="absolute left-6 -translate-x-1/2 flex items-center justify-center h-full">
                     <item.icon
                       className="size-5"
-                      weight={isActive ? "fill" : "regular"}
+                      strokeWidth={isActive ? 2 : 1.5}
                     />
                   </div>
 
@@ -194,7 +194,7 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
                         }}
                         className="flex items-center justify-between w-full pl-14 pr-4"
                       >
-                        <span className="text-sm tracking-tight whitespace-nowrap">{item.name}</span>
+                        <span className="text-[13px] tracking-tight whitespace-nowrap">{item.name}</span>
                         {!item.active && (
                           <motion.span
                             initial={{ opacity: 0, scale: 0.8 }}
@@ -302,14 +302,14 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
                               className="p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-muted/50"
                               aria-label="Settings"
                             >
-                              <GearSix className="size-4" />
+                              <Settings className="size-4" strokeWidth={1.5} />
                             </button>
                             <button
                               onClick={signOut}
                               className="p-1.5 text-muted-foreground hover:text-red-500 transition-colors rounded-md hover:bg-red-500/10"
                               aria-label="Sign out"
                             >
-                              <SignOut className="size-4" />
+                              <LogOut className="size-4" strokeWidth={1.5} />
                             </button>
                           </div>
                         </div>
@@ -337,7 +337,7 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
                 <div className="flex items-center">
                   {/* Anonymous user icon */}
                   <div className="size-8 bg-muted rounded-full flex items-center justify-center flex-shrink-0">
-                    <UserCircle className="size-4 text-muted-foreground" />
+                    <CircleUser className="size-4 text-muted-foreground" strokeWidth={1.5} />
                   </div>
 
                   {/* Sign in prompt - shown when expanded */}

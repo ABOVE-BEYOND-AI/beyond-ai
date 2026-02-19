@@ -19,66 +19,66 @@
   }
 
   :root {
-    /* Light mode - Sleek, high-efficiency SaaS */
-    --background: 0 0% 98%; /* Very light gray/white */
-    --foreground: 0 0% 9%; /* Sharp almost-black */
+    /* Light mode - Ultra refined, Shopify/Vercel inspired */
+    --background: 0 0% 99%; /* Extremely clean off-white */
+    --foreground: 0 0% 7%; /* Very deep gray, not pure black */
     
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 9%;
+    --card-foreground: 0 0% 7%;
     
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 9%;
+    --popover-foreground: 0 0% 7%;
     
-    --primary: 0 0% 9%; /* Black buttons */
+    --primary: 0 0% 9%; /* Jet black for primary actions */
     --primary-foreground: 0 0% 98%;
     
-    --secondary: 0 0% 96%;
-    --secondary-foreground: 0 0% 9%;
+    --secondary: 210 20% 96%; /* Very subtle blue-gray for secondary */
+    --secondary-foreground: 220 10% 12%;
     
-    --muted: 0 0% 93%;
-    --muted-foreground: 0 0% 45%;
+    --muted: 210 20% 96%;
+    --muted-foreground: 215 14% 42%;
     
-    --accent: 0 0% 94%;
-    --accent-foreground: 0 0% 9%;
+    --accent: 210 20% 96%;
+    --accent-foreground: 220 10% 12%;
     
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
     
-    --border: 0 0% 89%; /* Crisp light border */
-    --input: 0 0% 89%;
-    --ring: 0 0% 9%;
-    --radius: 0.5rem; /* Slightly sharper corners for efficiency */
+    --border: 214 32% 91%; /* Crisp, subtle border */
+    --input: 214 32% 91%;
+    --ring: 222 84% 5%;
+    --radius: 0.6rem; /* Perfect corner radius */
   }
 
   .dark {
-    /* Dark mode - Deep, sharp, high-contrast */
-    --background: 0 0% 4%; /* Near black */
-    --foreground: 0 0% 98%; /* Off-white */
+    /* Dark mode - Deep, sharp, sophisticated */
+    --background: 240 10% 4%; /* Deep space black */
+    --foreground: 0 0% 98%;
     
-    --card: 0 0% 6%; /* Slightly lighter than bg */
+    --card: 240 10% 6%;
     --card-foreground: 0 0% 98%;
     
-    --popover: 0 0% 6%;
+    --popover: 240 10% 6%;
     --popover-foreground: 0 0% 98%;
     
-    --primary: 0 0% 98%; /* White buttons */
-    --primary-foreground: 0 0% 4%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 240 10% 4%;
     
-    --secondary: 0 0% 12%;
+    --secondary: 240 4% 16%;
     --secondary-foreground: 0 0% 98%;
     
-    --muted: 0 0% 12%;
-    --muted-foreground: 0 0% 60%;
+    --muted: 240 4% 16%;
+    --muted-foreground: 240 5% 65%;
     
-    --accent: 0 0% 14%;
+    --accent: 240 4% 16%;
     --accent-foreground: 0 0% 98%;
     
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
     
-    --border: 0 0% 14%; /* Crisp dark border */
-    --input: 0 0% 14%;
-    --ring: 0 0% 80%;
+    --border: 240 4% 16%;
+    --input: 240 4% 16%;
+    --ring: 240 5% 85%;
   }
 }
 
@@ -89,7 +89,6 @@
   
   body {
     @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1, "ss01" 1; /* Enable standard stylistic sets for Inter */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -105,36 +104,36 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-muted-foreground/30 hover:bg-muted-foreground/50 rounded-full;
+    @apply bg-muted-foreground/20 hover:bg-muted-foreground/40 rounded-full transition-colors;
   }
 
   ::selection {
-    @apply bg-primary/20 text-primary;
+    @apply bg-primary/10 text-primary;
   }
 }
 
 @layer components {
   /* Minimal glass effect */
   .glass {
-    @apply backdrop-blur-md bg-card/80 border border-border/50 shadow-sm;
+    @apply backdrop-blur-xl bg-card/70 border border-border/40 shadow-sm;
   }
 
   /* Text gradients (used sparingly) */
   .text-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-500;
+    @apply bg-clip-text text-transparent bg-gradient-to-br from-gray-900 via-gray-700 to-gray-500;
   }
 
   .dark .text-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400;
+    @apply bg-clip-text text-transparent bg-gradient-to-br from-white via-gray-200 to-gray-400;
   }
 
-  /* Sharp shadows for floating elements */
-  .shadow-sharp {
-    box-shadow: 0 4px 24px -4px rgba(0, 0, 0, 0.08), 0 0 1px 0 rgba(0,0,0,0.1);
+  /* Refined Shadows */
+  .shadow-soft {
+    box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.02);
   }
 
-  .dark .shadow-sharp {
-    box-shadow: 0 4px 24px -4px rgba(0, 0, 0, 0.5), 0 0 1px 0 rgba(255,255,255,0.1);
+  .dark .shadow-soft {
+    box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.4), 0 1px 2px -1px rgba(0, 0, 0, 0.2);
   }
 
   /* Shimmer effect for loading states */
@@ -155,7 +154,7 @@
 
   /* Focus styles */
   .focus-ring {
-    @apply focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background;
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
   }
 }
 
