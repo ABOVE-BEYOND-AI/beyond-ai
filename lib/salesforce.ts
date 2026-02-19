@@ -1,5 +1,5 @@
 // Salesforce REST API integration using OAuth 2.0 Client Credentials flow
-// No external packages needed — uses standard fetch
+// Uses standard fetch — no external packages needed
 
 interface SalesforceTokenResponse {
   access_token: string
