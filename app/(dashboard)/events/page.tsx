@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import NumberFlow from "@number-flow/react";
 import {
   CalendarBlank,
   MapPin,
@@ -50,8 +51,6 @@ import {
 } from "@/lib/constants";
 
 // ── Website Image Library ──
-// Maps slug keys (derived from image filenames) to full URLs on the A+B website
-// These are the 268 event images from aboveandbeyond.group
 
 const IMAGE_BASE = "https://aboveandbeyond.group/wp-content/uploads/2025/12/";
 
@@ -310,7 +309,6 @@ const IMAGE_LIBRARY: Record<string, string> = {
   "dakar rally": `${IMAGE_BASE}dakar-ralley.webp`,
   "dakar": `${IMAGE_BASE}dakar-ralley.webp`,
   "new york fashion week": `${IMAGE_BASE}new-york-fashion-week.webp`,
-  // Generic category fallbacks for broader matching
   "glastonbury": `${IMAGE_BASE}Creamfields.webp`,
   "marbella golf": `${IMAGE_BASE}BMW-PGA-Championship.webp`,
   "golf trip": `${IMAGE_BASE}BMW-PGA-Championship.webp`,
@@ -318,59 +316,19 @@ const IMAGE_LIBRARY: Record<string, string> = {
   "ski trip": `${IMAGE_BASE}Milano-Cortina-2026-Winter-Olympics.webp`,
 };
 
-/**
- * Fuzzy-match a Salesforce event name to a website image URL.
- * Strategy:
- * 1. Exact match on lowercased event name
- * 2. Strip year suffixes (e.g., "2026", "2025/26") and try again
- * 3. Try matching progressively shorter substrings
- * 4. Try each word combination as a key
- * 5. Falls back to null (category gradient will be used instead)
- */
 function resolveEventImage(eventName: string): string | null {
   if (!eventName) return null;
-
-  // Normalize: lowercase, collapse whitespace, remove special chars except spaces
   const normalize = (s: string) =>
-    s
-      .toLowerCase()
-      .replace(/[''`]/g, "'")
-      .replace(/[^\w\s']/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-
+    s.toLowerCase().replace(/[''`]/g, "'").replace(/[^\w\s']/g, " ").replace(/\s+/g, " ").trim();
   const normalized = normalize(eventName);
-
-  // 1. Direct match
   if (IMAGE_LIBRARY[normalized]) return IMAGE_LIBRARY[normalized];
-
-  // 2. Strip year patterns: "2026", "2025/26", "25/26", "2025-26"
-  const noYear = normalized
-    .replace(/\b20\d{2}(\/\d{2})?\b/g, "")
-    .replace(/\b\d{2}\/\d{2}\b/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  const noYear = normalized.replace(/\b20\d{2}(\/\d{2})?\b/g, "").replace(/\b\d{2}\/\d{2}\b/g, "").replace(/\s+/g, " ").trim();
   if (noYear !== normalized && IMAGE_LIBRARY[noYear]) return IMAGE_LIBRARY[noYear];
-
-  // 3. Try partial matches — find keys that are contained in the event name
   const keys = Object.keys(IMAGE_LIBRARY);
-  // Sort by key length descending (prefer longer, more specific matches)
   const sortedKeys = [...keys].sort((a, b) => b.length - a.length);
-
-  for (const key of sortedKeys) {
-    if (key.length >= 4 && normalized.includes(key)) return IMAGE_LIBRARY[key];
-  }
-  // Also try without year
-  for (const key of sortedKeys) {
-    if (key.length >= 4 && noYear.includes(key)) return IMAGE_LIBRARY[key];
-  }
-
-  // 4. Try the event name as a substring of library keys
-  for (const key of sortedKeys) {
-    if (key.length >= 6 && key.includes(noYear)) return IMAGE_LIBRARY[key];
-  }
-
-  // 5. Word-based matching — if 2+ words from the event name appear in a key
+  for (const key of sortedKeys) { if (key.length >= 4 && normalized.includes(key)) return IMAGE_LIBRARY[key]; }
+  for (const key of sortedKeys) { if (key.length >= 4 && noYear.includes(key)) return IMAGE_LIBRARY[key]; }
+  for (const key of sortedKeys) { if (key.length >= 6 && key.includes(noYear)) return IMAGE_LIBRARY[key]; }
   const eventWords = noYear.split(" ").filter((w) => w.length >= 3);
   if (eventWords.length >= 2) {
     let bestMatch: string | null = null;
@@ -378,19 +336,14 @@ function resolveEventImage(eventName: string): string | null {
     for (const key of sortedKeys) {
       const matchingWords = eventWords.filter((w) => key.includes(w));
       const score = matchingWords.length / eventWords.length;
-      if (score > bestScore && matchingWords.length >= 2) {
-        bestScore = score;
-        bestMatch = key;
-      }
+      if (score > bestScore && matchingWords.length >= 2) { bestScore = score; bestMatch = key; }
     }
     if (bestMatch && bestScore >= 0.4) return IMAGE_LIBRARY[bestMatch];
   }
-
   return null;
 }
 
 // ── Category Visual System ──
-// Rich gradient backgrounds per category so cards look stunning even without photos
 
 const CATEGORY_VISUALS: Record<
   string,
@@ -448,31 +401,21 @@ function getCategoryVisual(category: string | null) {
   return CATEGORY_VISUALS[key] || CATEGORY_VISUALS[key.replace(/\s+/g, "-")] || { gradient: "from-zinc-900 via-zinc-800 to-zinc-700", icon: CalendarBlank, accent: "text-zinc-400" };
 }
 
-// ── Helpers ──
-
 function getCatStyle(category: string | null) {
   if (!category) return { bg: "bg-muted/15", text: "text-muted-foreground" };
   const key = category.toLowerCase().replace(/\s+/g, "-");
-  return (
-    EVENT_CATEGORY_COLORS[key] ||
-    EVENT_CATEGORY_COLORS[category.toLowerCase()] || {
-      bg: "bg-muted/15",
-      text: "text-muted-foreground",
-    }
-  );
+  return EVENT_CATEGORY_COLORS[key] || EVENT_CATEGORY_COLORS[category.toLowerCase()] || { bg: "bg-muted/15", text: "text-muted-foreground" };
 }
+
+// ── Helpers ──
 
 function formatDateRange(start: string | null, end: string | null): string {
   if (!start) return "TBD";
   const s = new Date(start);
   const e = end ? new Date(end) : null;
   const opts: Intl.DateTimeFormatOptions = { day: "numeric", month: "short" };
-  if (!e || s.toDateString() === e.toDateString()) {
-    return s.toLocaleDateString("en-GB", { ...opts, year: "numeric" });
-  }
-  if (s.getMonth() === e.getMonth() && s.getFullYear() === e.getFullYear()) {
-    return `${s.getDate()} – ${e.toLocaleDateString("en-GB", { ...opts, year: "numeric" })}`;
-  }
+  if (!e || s.toDateString() === e.toDateString()) return s.toLocaleDateString("en-GB", { ...opts, year: "numeric" });
+  if (s.getMonth() === e.getMonth() && s.getFullYear() === e.getFullYear()) return `${s.getDate()} – ${e.toLocaleDateString("en-GB", { ...opts, year: "numeric" })}`;
   return `${s.toLocaleDateString("en-GB", opts)} – ${e.toLocaleDateString("en-GB", { ...opts, year: "numeric" })}`;
 }
 
@@ -516,120 +459,144 @@ function TicketBar({ label, icon: Icon, required, booked }: { label: string; ico
   );
 }
 
-// ── Event Card (3:4 aspect, image-first, captivating) ──
+// ── Event Card — website-inspired premium design ──
 
 function EventCard({ event, onClick }: { event: SalesforceEvent; onClick: () => void }) {
-  const catStyle = getCatStyle(event.Category__c);
   const catVisual = getCategoryVisual(event.Category__c);
   const CatIcon = catVisual.icon;
   const daysLeft = event.Start_Date__c ? daysUntil(event.Start_Date__c) : null;
   const isPast = daysLeft !== null && daysLeft < 0;
-
-  // Image resolution: SF field > fuzzy match from website library
   const imageUrl = event.Event_Image_1__c || resolveEventImage(event.Name);
-  const revenueTarget = event.Revenue_Target__c || 0;
-  const revenueActual = event.Sum_of_Closed_Won_Gross__c || 0;
-  const revenuePct = revenueTarget > 0 ? Math.min(100, Math.round((revenueActual / revenueTarget) * 100)) : 0;
-
   const startDate = event.Start_Date__c ? new Date(event.Start_Date__c) : null;
 
   return (
     <div
       onClick={onClick}
-      className={`group cursor-pointer relative overflow-hidden rounded-xl transition-all duration-500 hover:shadow-2xl hover:shadow-black/20 dark:hover:shadow-black/40 hover:-translate-y-1 ${isPast ? "opacity-50 hover:opacity-70" : ""}`}
-      style={{ aspectRatio: "3/4" }}
+      className={`group cursor-pointer relative overflow-hidden transition-all duration-500 ${isPast ? "opacity-40 hover:opacity-60" : ""}`}
+      style={{
+        aspectRatio: "3/4",
+        borderRadius: "12px",
+        border: "1px solid rgba(255,255,255,0.05)",
+        boxShadow: "0 12px 30px rgba(0,0,0,0.22)",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = "rgba(255,255,255,0.16)";
+        e.currentTarget.style.boxShadow = "0 0 0 1px rgba(255,255,255,0.16), 0 14px 32px rgba(0,0,0,0.28)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = "rgba(255,255,255,0.05)";
+        e.currentTarget.style.boxShadow = "0 12px 30px rgba(0,0,0,0.22)";
+      }}
     >
-      {/* Background: image or rich category gradient */}
+      {/* Background: image or category gradient */}
       {imageUrl ? (
         <>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={`/api/image-proxy?url=${encodeURIComponent(imageUrl)}`}
             alt=""
-            className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+            className="absolute inset-0 w-full h-full object-cover transition-all duration-700 opacity-80 group-hover:opacity-100 group-hover:scale-105"
             loading="lazy"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-black/10 opacity-80 group-hover:opacity-90 transition-opacity duration-500" />
+          {/* Bottom gradient for text readability */}
+          <div
+            className="absolute inset-0 transition-opacity duration-350"
+            style={{
+              background: "linear-gradient(to top, rgba(0,0,0,0.92), transparent 60%)",
+              opacity: 0.72,
+            }}
+          />
+          <div
+            className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-350 pointer-events-none"
+            style={{
+              background: "linear-gradient(to top, rgba(0,0,0,0.92), transparent 60%)",
+              opacity: undefined,
+            }}
+          />
         </>
       ) : (
         <>
           <div className={`absolute inset-0 bg-gradient-to-br ${catVisual.gradient}`} />
-          {/* Decorative icon watermark */}
           <div className="absolute inset-0 flex items-center justify-center opacity-[0.06]">
             <CatIcon className="size-48" />
           </div>
-          {/* Subtle noise texture */}
           <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E\")" }} />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
         </>
       )}
 
-      {/* Content overlay */}
-      <div className="relative h-full flex flex-col justify-between p-4">
-        {/* Top: Category + countdown */}
+      {/* Content — full height flex */}
+      <div className="relative z-[5] h-full flex flex-col justify-between p-5">
+        {/* Top: Date + Category */}
         <div className="flex items-start justify-between">
-          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider backdrop-blur-md ${catStyle.bg} ${catStyle.text} border border-white/10`}>
-            {event.Category__c || "Event"}
-          </span>
-          {daysLeft !== null && !isPast && (
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full backdrop-blur-md ${
-              daysLeft <= 7 ? "bg-red-500/25 text-red-300" : daysLeft <= 30 ? "bg-amber-500/25 text-amber-300" : "bg-white/10 text-white/70"
-            }`}>
-              {daysLeft}d
-            </span>
-          )}
-          {isPast && (
-            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-black/40 text-white/50 backdrop-blur-md">Past</span>
-          )}
-        </div>
-
-        {/* Bottom: Event info */}
-        <div className="space-y-2">
-          {/* Date large display */}
           {startDate && (
-            <div className="flex items-end gap-2.5">
-              <div className="border-l border-white/30 pl-2.5">
-                <div className="text-2xl font-light text-white leading-none">{startDate.getDate()}</div>
-                <div className="text-[9px] uppercase tracking-[0.15em] text-white/60 font-semibold mt-0.5">
-                  {startDate.toLocaleDateString("en-GB", { month: "short" })}
-                </div>
-              </div>
-              {/* Revenue indicator */}
-              {revenueTarget > 0 && (
-                <div className="flex items-center gap-1.5 ml-auto opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                  <div className="w-12 h-1 bg-white/15 rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full ${revenuePct >= 100 ? "bg-emerald-400" : revenuePct >= 50 ? "bg-blue-400" : "bg-amber-400"}`} style={{ width: `${revenuePct}%` }} />
-                  </div>
-                  <span className="text-[9px] text-white/50 tabular-nums">{revenuePct}%</span>
-                </div>
-              )}
+            <div className="flex flex-col pl-2.5" style={{ borderLeft: "1px solid #fff" }}>
+              <span className="text-[24px] font-light text-white leading-none">{startDate.getDate()}</span>
+              <span className="text-[10px] font-extrabold tracking-[0.1em] text-white/80 mt-1 uppercase">
+                {startDate.toLocaleDateString("en-GB", { month: "short" })}
+              </span>
             </div>
           )}
+          <span
+            className="text-[9px] font-extrabold tracking-[0.1em] uppercase text-white px-2 py-1 rounded-[3px]"
+            style={{
+              border: "1px solid rgba(255,255,255,0.2)",
+              backdropFilter: "blur(4px)",
+            }}
+          >
+            {event.Category__c || "Event"}
+          </span>
+        </div>
 
+        {/* Bottom: Title + meta */}
+        <div className="transform translate-y-2.5 group-hover:translate-y-0 transition-transform duration-500">
           {/* Title */}
-          <h3 className="text-white font-semibold text-sm leading-snug line-clamp-2 group-hover:translate-y-[-2px] transition-transform duration-300">
+          <h3
+            className="text-white font-light leading-[1.1] mb-3 group-hover:-translate-y-[3px] transition-transform duration-350"
+            style={{
+              fontSize: "clamp(18px, 2vw, 26px)",
+              display: "-webkit-box",
+              WebkitBoxOrient: "vertical",
+              WebkitLineClamp: 3,
+              overflow: "hidden",
+            }}
+          >
             {event.Name}
           </h3>
 
-          {/* Meta: location + date range — revealed on hover */}
-          <div className="flex items-center gap-3 text-[11px] text-white/50 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300 delay-75">
-            {event.Location__r?.Name && (
-              <span className="flex items-center gap-1 truncate">
-                <MapPin className="size-3 shrink-0" />
-                {event.Location__r.Name}
-              </span>
-            )}
-            {event.Start_Date__c && event.End_Date__c && event.Start_Date__c !== event.End_Date__c && (
-              <span className="shrink-0">{formatDateRange(event.Start_Date__c, event.End_Date__c)}</span>
-            )}
-          </div>
-
-          {/* Arrow — hover only */}
-          <div className="flex items-center justify-end opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0 transition-all duration-300 delay-100">
-            <div className="size-7 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center border border-white/10">
-              <CaretRight className="size-3 text-white" weight="bold" />
+          {/* Meta — fade in on hover */}
+          <div
+            className="opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+            style={{ transitionDelay: "120ms" }}
+          >
+            <div className="flex items-end justify-between pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.2)" }}>
+              <div>
+                {event.Location__r?.Name && (
+                  <>
+                    <div className="text-[10px] tracking-[0.12em] text-white/40 mb-1">LOCATION</div>
+                    <div className="text-[13px] font-light text-white/90">{event.Location__r.Name}</div>
+                  </>
+                )}
+              </div>
+              {/* Arrow */}
+              <div
+                className="size-8 bg-white text-black rounded-full flex items-center justify-center transform translate-x-1.5 group-hover:translate-x-0 transition-transform duration-400"
+              >
+                <CaretRight className="size-3.5" weight="bold" />
+              </div>
             </div>
           </div>
+
+          {/* Countdown badge — always visible, compact */}
+          {daysLeft !== null && !isPast && (
+            <div className="mt-3 group-hover:hidden">
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                daysLeft <= 7 ? "bg-red-500/25 text-red-300" : daysLeft <= 30 ? "bg-amber-500/25 text-amber-300" : "bg-white/10 text-white/60"
+              }`}>
+                {daysLeft}d away
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -674,8 +641,6 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
   const totalBooked = event.Total_Tickets_Booked__c || 0;
   const totalRequired = event.Total_Tickets_Required__c || 0;
   const completionPct = event.Percentage_Reservations_Completion__c || 0;
-
-  // Resolve images: SF fields first, then fuzzy match
   const sfImages = [event.Event_Image_1__c, event.Event_Image_2__c, event.Event_Image_3__c, event.Event_Image_4__c, event.Event_Image_5__c].filter(Boolean) as string[];
   const resolvedImage = sfImages.length === 0 ? resolveEventImage(event.Name) : null;
   const images = sfImages.length > 0 ? sfImages : resolvedImage ? [resolvedImage] : [];
@@ -685,7 +650,6 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
     for (const opp of opportunities) { if (!grouped[opp.StageName]) grouped[opp.StageName] = []; grouped[opp.StageName].push(opp); }
     return grouped;
   }, [opportunities]);
-
   const totalOppRevenue = useMemo(() => opportunities.reduce((sum, o) => sum + (o.Gross_Amount__c || o.Amount || 0), 0), [opportunities]);
   const wonOpps = useMemo(() => opportunities.filter((o) => ["Agreement Signed", "Amended", "Amendment Signed"].includes(o.StageName)), [opportunities]);
 
@@ -716,17 +680,13 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
           ) : (
             <>
               <div className={`absolute inset-0 bg-gradient-to-br ${catVisual.gradient}`} />
-              <div className="absolute inset-0 flex items-center justify-center opacity-[0.05]">
-                <CatIcon className="size-64" />
-              </div>
+              <div className="absolute inset-0 flex items-center justify-center opacity-[0.05]"><CatIcon className="size-64" /></div>
               <div className="absolute inset-0 bg-gradient-to-t from-card via-card/40 to-transparent" />
             </>
           )}
-
           <button onClick={onClose} className="absolute top-4 right-4 z-10 size-9 rounded-full bg-black/40 backdrop-blur-sm border border-white/10 flex items-center justify-center text-white/80 hover:text-white hover:bg-black/60 transition-colors">
             <X className="size-4" weight="bold" />
           </button>
-
           <div className="absolute bottom-0 left-0 right-0 p-6">
             <div className="flex items-end justify-between gap-4">
               <div>
@@ -735,9 +695,9 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
                     {event.Category__c || "Event"}
                   </span>
                   {daysLeft !== null && (
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-bold ${
-                      isPast ? "bg-muted/30 text-muted-foreground" : daysLeft <= 7 ? "bg-red-500/15 text-red-400" : daysLeft <= 30 ? "bg-amber-500/15 text-amber-400" : "bg-emerald-500/15 text-emerald-400"
-                    }`}>{isPast ? "Event Passed" : `${daysLeft} days away`}</span>
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-bold ${isPast ? "bg-muted/30 text-muted-foreground" : daysLeft <= 7 ? "bg-red-500/15 text-red-400" : daysLeft <= 30 ? "bg-amber-500/15 text-amber-400" : "bg-emerald-500/15 text-emerald-400"}`}>
+                      {isPast ? "Event Passed" : `${daysLeft} days away`}
+                    </span>
                   )}
                 </div>
                 <h2 className="text-2xl font-bold text-foreground">{event.Name}</h2>
@@ -798,7 +758,6 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
                   </div>
                 ))}
               </div>
-
               <div className="grid grid-cols-3 gap-4">
                 <div className="col-span-2 rounded-xl bg-muted/10 border border-border/30 p-4">
                   <h4 className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-3">Description</h4>
@@ -816,7 +775,6 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
                   </div>
                 </div>
               </div>
-
               {!oppsLoading && opportunities.length > 0 && (
                 <div className="rounded-xl bg-muted/10 border border-border/30 p-4">
                   <h4 className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-3">Deal Pipeline</h4>
@@ -840,7 +798,6 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
                   </div>
                 </div>
               )}
-
               {images.length > 1 && (
                 <div className="rounded-xl bg-muted/10 border border-border/30 p-4">
                   <h4 className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-3">Gallery</h4>
@@ -996,7 +953,9 @@ export default function EventsPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [showPastEvents, setShowPastEvents] = useState(true);
   const [selectedEvent, setSelectedEvent] = useState<SalesforceEvent | null>(null);
+  const [currentMonth, setCurrentMonth] = useState<string>("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const monthRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const fetchEvents = useCallback(async () => {
     try {
@@ -1031,7 +990,6 @@ export default function EventsPage() {
     return result;
   }, [events, search, selectedCategory, showPastEvents]);
 
-  // Group events by month
   const eventsByMonth = useMemo(() => {
     const grouped: Record<string, SalesforceEvent[]> = {};
     for (const e of filteredEvents) {
@@ -1044,79 +1002,211 @@ export default function EventsPage() {
     return grouped;
   }, [filteredEvents]);
 
+  const sortedMonthKeys = useMemo(() => Object.keys(eventsByMonth).sort(), [eventsByMonth]);
+
+  // Scroll spy: detect which month section is visible
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      const headerHeight = 64; // sticky header
+      let activeMonth = "";
+
+      for (const key of sortedMonthKeys) {
+        const el = monthRefs.current[key];
+        if (!el) continue;
+        const rect = el.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        const relativeTop = rect.top - containerRect.top;
+
+        if (relativeTop <= headerHeight + 40) {
+          activeMonth = key;
+        }
+      }
+
+      if (activeMonth && activeMonth !== currentMonth) {
+        setCurrentMonth(activeMonth);
+      }
+    };
+
+    container.addEventListener("scroll", handleScroll, { passive: true });
+    // Initial detection
+    handleScroll();
+    return () => container.removeEventListener("scroll", handleScroll);
+  }, [sortedMonthKeys, currentMonth]);
+
+  // Set initial month when data loads
+  useEffect(() => {
+    if (sortedMonthKeys.length > 0 && !currentMonth) {
+      setCurrentMonth(sortedMonthKeys[0]);
+    }
+  }, [sortedMonthKeys, currentMonth]);
+
   const formatMonthLabel = (yyyyMM: string) => {
+    if (!yyyyMM) return "";
     const [y, m] = yyyyMM.split("-").map(Number);
     const d = new Date(Date.UTC(y, m - 1, 1));
     return d.toLocaleString("en-GB", { month: "long", year: "numeric" });
   };
 
-  const activeFilters = (selectedCategory !== "all" ? 1 : 0) + (!showPastEvents ? 1 : 0) + (search.trim() ? 1 : 0);
+  const formatMonthName = (yyyyMM: string) => {
+    if (!yyyyMM) return "Events";
+    const [y, m] = yyyyMM.split("-").map(Number);
+    const d = new Date(Date.UTC(y, m - 1, 1));
+    return d.toLocaleString("en-GB", { month: "long" });
+  };
+
+  const formatYear = (yyyyMM: string) => {
+    if (!yyyyMM) return "";
+    return yyyyMM.split("-")[0];
+  };
+
+  const [searchOpen, setSearchOpen] = useState(false);
 
   return (
     <div ref={scrollRef} className="h-dvh overflow-y-auto bg-background p-6 pl-24 lg:p-8 lg:pl-24">
       <div className="max-w-[1600px] mx-auto pb-24">
 
-        {/* Sticky header — sits within content flow, does NOT overlap sidebar */}
-        <div className="sticky top-0 z-20 pb-4 pt-0 -mt-6 lg:-mt-8">
-          <div className="bg-background/80 backdrop-blur-xl rounded-b-xl border-b border-border/30 px-4 py-3">
-            <div className="flex items-center gap-4">
-              {/* Title */}
-              <h1 className="text-xl font-bold tracking-tight shrink-0">Events</h1>
-              <span className="text-xs text-muted-foreground tabular-nums shrink-0">{filteredEvents.length} events</span>
+        {/* ── Sticky Header — Glassmorphic, compact, scroll-aware ── */}
+        <div className="sticky top-0 z-20 -mt-6 lg:-mt-8 pt-3 pb-2">
+          <div
+            className="rounded-2xl px-4 py-2.5 flex items-center gap-3"
+            style={{
+              background: "rgba(10,10,10,0.65)",
+              backdropFilter: "blur(24px) saturate(1.4)",
+              WebkitBackdropFilter: "blur(24px) saturate(1.4)",
+              border: "1px solid rgba(255,255,255,0.06)",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)",
+            }}
+          >
+            {/* Month title with NumberFlow-style animated transition */}
+            <div className="flex items-baseline gap-2.5 min-w-0 shrink-0">
+              <AnimatePresence mode="wait">
+                <motion.span
+                  key={currentMonth}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                  className="text-[15px] font-bold text-white tracking-tight"
+                >
+                  {loading ? "Events" : formatMonthName(currentMonth)}
+                </motion.span>
+              </AnimatePresence>
+              <AnimatePresence mode="wait">
+                <motion.span
+                  key={formatYear(currentMonth)}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="text-[11px] font-medium text-white/30"
+                >
+                  {formatYear(currentMonth)}
+                </motion.span>
+              </AnimatePresence>
+            </div>
 
-              <div className="flex-1" />
+            {/* Subtle divider */}
+            <div className="h-4 w-px bg-white/10 shrink-0" />
 
-              {/* Search */}
-              <div className="relative w-64">
-                <MagnifyingGlass className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-                <input
-                  type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search..."
-                  className="w-full pl-8 pr-7 py-1.5 rounded-lg bg-muted/30 border border-border/40 text-sm focus:outline-none focus:border-foreground/20 focus:ring-1 focus:ring-foreground/5 transition-colors placeholder:text-muted-foreground/40"
+            {/* EVENTS CALENDAR label */}
+            <span className="text-[9px] font-extrabold tracking-[0.2em] uppercase text-white/25 shrink-0">
+              Events Calendar
+            </span>
+
+            {/* Event count */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <div className="size-1.5 rounded-full bg-emerald-400/60" />
+              <span className="text-[11px] tabular-nums text-white/40 font-medium">
+                <NumberFlow
+                  value={filteredEvents.length}
+                  transformTiming={{ duration: 400, easing: "ease-out" }}
+                  spinTiming={{ duration: 350, easing: "ease-out" }}
+                  opacityTiming={{ duration: 200, easing: "ease-out" }}
+                  willChange={false}
                 />
-                {search && (
-                  <button onClick={() => setSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                    <X className="size-3" />
-                  </button>
+              </span>
+            </div>
+
+            <div className="flex-1" />
+
+            {/* Search — expandable */}
+            <div className="relative flex items-center">
+              <AnimatePresence>
+                {searchOpen && (
+                  <motion.div
+                    initial={{ width: 0, opacity: 0 }}
+                    animate={{ width: 200, opacity: 1 }}
+                    exit={{ width: 0, opacity: 0 }}
+                    transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                    className="overflow-hidden mr-1"
+                  >
+                    <input
+                      type="text"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Search events..."
+                      autoFocus
+                      className="w-full pl-2 pr-6 py-1 rounded-lg text-[12px] text-white placeholder:text-white/25 bg-white/5 border border-white/10 focus:outline-none focus:border-white/20"
+                    />
+                    {search && (
+                      <button onClick={() => { setSearch(""); setSearchOpen(false); }} className="absolute right-8 top-1/2 -translate-y-1/2">
+                        <X className="size-2.5 text-white/40" />
+                      </button>
+                    )}
+                  </motion.div>
                 )}
-              </div>
-
-              {/* Category */}
-              <div className="relative">
-                <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="appearance-none pl-2.5 pr-7 py-1.5 rounded-lg bg-muted/30 border border-border/40 text-sm focus:outline-none focus:border-foreground/20 cursor-pointer">
-                  <option value="all">All Categories</option>
-                  {categories.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
-                </select>
-                <CaretDown className="absolute right-2 top-1/2 -translate-y-1/2 size-3 text-muted-foreground pointer-events-none" />
-              </div>
-
-              {/* Past toggle */}
-              <button onClick={() => setShowPastEvents(!showPastEvents)}
-                className={`px-2.5 py-1.5 rounded-lg border text-xs transition-colors ${!showPastEvents ? "bg-foreground/10 border-foreground/20 text-foreground" : "bg-muted/30 border-border/40 text-muted-foreground hover:text-foreground"}`}>
-                {showPastEvents ? "Hide Past" : "Show Past"}
-              </button>
-
-              {activeFilters > 0 && (
-                <button onClick={() => { setSearch(""); setSelectedCategory("all"); setShowPastEvents(true); }}
-                  className="px-2.5 py-1.5 rounded-lg border border-red-500/30 bg-red-500/5 text-red-400 text-xs hover:bg-red-500/10 transition-colors flex items-center gap-1">
-                  <X className="size-3" /> Reset
-                </button>
-              )}
-
-              {/* Refresh */}
-              <button onClick={() => { setLoading(true); fetchEvents(); }}
-                className="text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded-lg border border-border/40 bg-muted/30">
-                <ArrowsClockwise className={`size-3.5 ${loading ? "animate-spin" : ""}`} />
+              </AnimatePresence>
+              <button
+                onClick={() => setSearchOpen(!searchOpen)}
+                className="size-7 rounded-lg flex items-center justify-center text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors"
+              >
+                <MagnifyingGlass className="size-3.5" weight="bold" />
               </button>
             </div>
+
+            {/* Category dropdown */}
+            <div className="relative">
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="appearance-none pl-2 pr-6 py-1 rounded-lg text-[11px] font-medium text-white/50 bg-white/5 border border-white/8 hover:border-white/15 focus:outline-none focus:border-white/20 cursor-pointer transition-colors"
+                style={{ maxWidth: "130px" }}
+              >
+                <option value="all">All</option>
+                {categories.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+              </select>
+              <CaretDown className="absolute right-1.5 top-1/2 -translate-y-1/2 size-2.5 text-white/30 pointer-events-none" />
+            </div>
+
+            {/* Past toggle — pill-style */}
+            <button
+              onClick={() => setShowPastEvents(!showPastEvents)}
+              className={`px-2 py-1 rounded-lg text-[11px] font-medium transition-all duration-200 ${
+                !showPastEvents
+                  ? "bg-white/10 text-white/70 border border-white/15"
+                  : "text-white/30 hover:text-white/50 border border-transparent hover:border-white/8"
+              }`}
+            >
+              {showPastEvents ? "Hide Past" : "Show Past"}
+            </button>
+
+            {/* Refresh */}
+            <button
+              onClick={() => { setLoading(true); fetchEvents(); }}
+              className="size-7 rounded-lg flex items-center justify-center text-white/30 hover:text-white/60 hover:bg-white/5 transition-colors"
+            >
+              <ArrowsClockwise className={`size-3 ${loading ? "animate-spin" : ""}`} />
+            </button>
           </div>
         </div>
 
-        {/* Events — month sections */}
-        <div className="mt-2">
+        {/* ── Events — month sections ── */}
+        <div className="mt-4">
           {loading ? (
-            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
               {Array.from({ length: 8 }).map((_, i) => (
                 <div key={i} className="rounded-xl bg-muted/20 animate-pulse" style={{ aspectRatio: "3/4" }} />
               ))}
@@ -1128,24 +1218,31 @@ export default function EventsPage() {
               <p className="text-muted-foreground/50 text-sm mt-1">Try adjusting your search or filters</p>
             </div>
           ) : (
-            <div className="space-y-12">
-              {Object.entries(eventsByMonth).sort(([a], [b]) => a.localeCompare(b)).map(([monthKey, monthEvents]) => (
-                <section key={monthKey}>
-                  {/* Month header */}
-                  <div className="flex items-baseline gap-4 mb-5">
-                    <h2 className="text-2xl font-bold tracking-tight">{formatMonthLabel(monthKey)}</h2>
-                    <span className="text-xs text-muted-foreground/50">{monthEvents.length}</span>
-                    <div className="flex-1 h-px bg-border/30 self-center" />
-                  </div>
+            <div className="space-y-14">
+              {sortedMonthKeys.map((monthKey) => {
+                const monthEvents = eventsByMonth[monthKey];
+                return (
+                  <section
+                    key={monthKey}
+                    ref={(el) => { monthRefs.current[monthKey] = el; }}
+                    data-month={monthKey}
+                  >
+                    {/* Month header — elegant inline */}
+                    <div className="flex items-baseline gap-4 mb-5">
+                      <h2 className="text-2xl font-bold tracking-tight">{formatMonthLabel(monthKey)}</h2>
+                      <span className="text-xs text-muted-foreground/40 tabular-nums">{monthEvents.length}</span>
+                      <div className="flex-1 h-px bg-border/20 self-center" />
+                    </div>
 
-                  {/* Card grid */}
-                  <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                    {monthEvents.map((event) => (
-                      <EventCard key={event.Id} event={event} onClick={() => setSelectedEvent(event)} />
-                    ))}
-                  </div>
-                </section>
-              ))}
+                    {/* Card grid */}
+                    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
+                      {monthEvents.map((event) => (
+                        <EventCard key={event.Id} event={event} onClick={() => setSelectedEvent(event)} />
+                      ))}
+                    </div>
+                  </section>
+                );
+              })}
             </div>
           )}
         </div>
