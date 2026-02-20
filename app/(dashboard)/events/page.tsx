@@ -545,14 +545,22 @@ function EventCard({ event, onClick }: { event: SalesforceEvent; onClick: () => 
         </div>
       </div>
 
-      {/* Card border glow — CSS-only, no JS handlers */}
+      {/* Card border glow — CSS-only, no JS handlers, dual-mode */}
       <style jsx>{`
         .ab-card {
-          border: 1px solid rgba(255,255,255,0.05);
-          box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+          border: 1px solid rgba(0,0,0,0.08);
+          box-shadow: 0 4px 16px rgba(0,0,0,0.06);
           transition: border-color 0.5s ease, box-shadow 0.4s ease;
         }
         .ab-card:hover {
+          border-color: rgba(0,0,0,0.15);
+          box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+        }
+        :global(.dark) .ab-card {
+          border-color: rgba(255,255,255,0.05);
+          box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+        }
+        :global(.dark) .ab-card:hover {
           border-color: rgba(255,255,255,0.14);
           box-shadow: 0 0 0 1px rgba(255,255,255,0.12), 0 12px 28px rgba(0,0,0,0.3);
         }
@@ -643,9 +651,8 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
   const wonTotal = useMemo(() => wonDeals.reduce((s, o) => s + (o.Gross_Amount__c || o.Amount || 0), 0), [wonDeals]);
   const lostTotal = useMemo(() => lostDeals.reduce((s, o) => s + (o.Gross_Amount__c || o.Amount || 0), 0), [lostDeals]);
 
-  // Embossed card style — reusable
-  const cardCls = "rounded-xl border border-white/[0.06] bg-white/[0.025]";
-  const cardShadow = { boxShadow: "0 1px 3px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.02), inset 0 1px 0 rgba(255,255,255,0.03)" };
+  // Embossed card style — reusable, works in both light and dark mode
+  const cardCls = "ev-card rounded-xl border border-black/[0.06] dark:border-white/[0.06] bg-black/[0.02] dark:bg-white/[0.025]";
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}
@@ -653,8 +660,7 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
       <motion.div
         initial={{ opacity: 0, y: 20, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.98 }}
         transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-        className="w-full max-w-5xl m-6 bg-card rounded-2xl border border-border/40 overflow-hidden flex flex-col"
-        style={{ boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03)" }}
+        className="ev-detail-modal w-full max-w-5xl m-6 bg-card rounded-2xl border border-border/40 overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}>
 
         {/* Hero — compact with stronger fade */}
@@ -677,11 +683,11 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
           </button>
           <div className="absolute bottom-0 left-0 right-0 px-6 pb-5">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-[9px] font-bold tracking-[0.12em] uppercase text-white/80 px-1.5 py-[2px] rounded-[3px] border border-white/15 backdrop-blur-sm bg-black/10">
+              <span className="text-[9px] font-bold tracking-[0.12em] uppercase text-foreground/60 dark:text-white/80 px-1.5 py-[2px] rounded-[3px] border border-border/30 dark:border-white/15 backdrop-blur-sm bg-muted/30 dark:bg-black/10">
                 {event.Category__c || "Event"}
               </span>
               {daysLeft !== null && (
-                <span className={`text-[10px] font-medium ${isPast ? "text-muted-foreground/60" : daysLeft <= 14 ? "text-amber-400/80" : "text-white/40"}`}>
+                <span className={`text-[10px] font-medium ${isPast ? "text-muted-foreground/60" : daysLeft <= 14 ? "text-amber-400/80" : "text-muted-foreground/40 dark:text-white/40"}`}>
                   {isPast ? "Passed" : `${daysLeft}d away`}
                 </span>
               )}
@@ -715,7 +721,7 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
           {activeTab === "overview" && (
             <div className="p-6 space-y-4">
               {/* Financials strip — embossed horizontal row */}
-              <div className={`flex items-stretch gap-px rounded-xl overflow-hidden ${cardCls}`} style={cardShadow}>
+              <div className={`flex items-stretch gap-px rounded-xl overflow-hidden ${cardCls}`}>
                 {[
                   { label: "Pipeline", value: totalOppRevenue, loading: oppsLoading },
                   { label: "Revenue", value: revenueActual, sub: revenueTarget > 0 ? `${revenuePct}% of target` : undefined },
@@ -723,7 +729,7 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
                   { label: "Costs", value: totalCosts },
                   { label: "Margin", value: margin != null ? null : null, custom: margin != null ? `${margin.toFixed(1)}%` : "—" },
                 ].map((item, i) => (
-                  <div key={item.label} className={`flex-1 px-4 py-3.5 ${i > 0 ? "border-l border-white/[0.04]" : ""}`}>
+                  <div key={item.label} className={`flex-1 px-4 py-3.5 ${i > 0 ? "border-l border-border/20" : ""}`}>
                     <div className="text-[10px] text-muted-foreground/50 font-medium tracking-wide uppercase mb-1">{item.label}</div>
                     <div className="text-[15px] font-bold tabular-nums tracking-tight">
                       {item.loading ? "…" : item.custom || formatCurrency(item.value || 0)}
@@ -737,7 +743,7 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
               <div className="grid grid-cols-5 gap-4">
                 {/* Left: description + team */}
                 <div className="col-span-3 space-y-4">
-                  <div className={`${cardCls} p-4`} style={cardShadow}>
+                  <div className={`${cardCls} p-4`}>
                     <h4 className="text-[11px] uppercase tracking-wider text-muted-foreground/40 font-medium mb-2.5">About</h4>
                     {event.Description__c ? <p className="text-[13px] text-muted-foreground/80 leading-relaxed">{event.Description__c}</p>
                      : event.Event_Notes__c ? <p className="text-[13px] text-muted-foreground/80 leading-relaxed">{event.Event_Notes__c}</p>
@@ -764,7 +770,7 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
                 </div>
 
                 {/* Right: ticket summary */}
-                <div className={`col-span-2 ${cardCls} p-4`} style={cardShadow}>
+                <div className={`col-span-2 ${cardCls} p-4`}>
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="text-[11px] uppercase tracking-wider text-muted-foreground/40 font-medium">Tickets</h4>
                     <span className="text-[12px] tabular-nums font-semibold">{totalBooked}<span className="text-muted-foreground/30 font-normal">/{totalRequired}</span></span>
@@ -794,7 +800,7 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
 
               {/* Deal pipeline — embossed with proper sizing */}
               {!oppsLoading && opportunities.length > 0 && (
-                <div className={`${cardCls} p-4`} style={cardShadow}>
+                <div className={`${cardCls} p-4`}>
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="text-[11px] uppercase tracking-wider text-muted-foreground/40 font-medium">Pipeline</h4>
                     <span className="text-[11px] text-muted-foreground/40 tabular-nums">{opportunities.length} deals · {formatCurrency(totalOppRevenue)}</span>
@@ -817,7 +823,7 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
                       const st = opps.reduce((s, o) => s + (o.Gross_Amount__c || o.Amount || 0), 0);
                       return (
                         <div key={stage} className="flex items-center gap-1.5 text-[11px] text-muted-foreground/50">
-                          <div className={`size-2 rounded-full ${sc?.bgColor?.replace("text-", "bg-") || "bg-muted/30"}`} style={{ backgroundColor: sc?.bgColor ? undefined : "rgba(255,255,255,0.1)" }} />
+                          <div className={`size-2 rounded-full ${sc?.bgColor?.replace("text-", "bg-") || "bg-muted/30"}`} style={{ backgroundColor: sc?.bgColor ? undefined : undefined }} />
                           <span className="font-medium">{stage}</span>
                           <span className="text-muted-foreground/30 tabular-nums">{opps.length} · {formatCurrency(st)}</span>
                         </div>
@@ -831,7 +837,7 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
 
           {activeTab === "tickets" && (
             <div className="p-6 space-y-4">
-              <div className={`${cardCls} p-5`} style={cardShadow}>
+              <div className={`${cardCls} p-5`}>
                 <div className="flex items-center justify-between mb-4">
                   <h4 className="text-sm font-medium">Ticket Inventory</h4>
                   <span className="text-sm tabular-nums font-bold">{totalBooked}/{totalRequired} <span className="text-muted-foreground/50 font-normal">({Math.round(completionPct)}%)</span></span>
@@ -865,8 +871,8 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
                       <div>
                         <div className="flex items-center gap-2.5 mb-3">
                           <div className="flex items-center gap-1.5">
-                            <CheckCircle className="size-3.5 text-emerald-400/80" weight="fill" />
-                            <span className="text-[12px] font-semibold text-emerald-400/80">Won</span>
+                            <CheckCircle className="size-3.5 text-emerald-600 dark:text-emerald-400/80" weight="fill" />
+                            <span className="text-[12px] font-semibold text-emerald-600 dark:text-emerald-400/80">Won</span>
                           </div>
                           <span className="text-[11px] text-muted-foreground/30 tabular-nums">{wonDeals.length} · {formatCurrency(wonTotal)}</span>
                         </div>
@@ -875,7 +881,7 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
                             const amount = opp.Gross_Amount__c || opp.Amount || 0;
                             const pp = paymentPct(opp.Percentage_Paid__c);
                             return (
-                              <div key={opp.Id} className={`${cardCls} p-3.5`} style={cardShadow}>
+                              <div key={opp.Id} className={`${cardCls} p-3.5`}>
                                 <div className="flex items-start justify-between gap-2 mb-1.5">
                                   <span className="text-[13px] font-semibold truncate">{clientName(opp.Name)}</span>
                                   <span className="text-[13px] font-bold tabular-nums shrink-0">{formatCurrency(amount)}</span>
@@ -889,7 +895,7 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
                               </div>
                             );
                           }) : (
-                            <div className={`${cardCls} p-4 text-center`} style={cardShadow}>
+                            <div className={`${cardCls} p-4 text-center`}>
                               <span className="text-[12px] text-muted-foreground/25">No won deals</span>
                             </div>
                           )}
@@ -900,8 +906,8 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
                       <div>
                         <div className="flex items-center gap-2.5 mb-3">
                           <div className="flex items-center gap-1.5">
-                            <X className="size-3.5 text-red-400/70" weight="bold" />
-                            <span className="text-[12px] font-semibold text-red-400/70">Lost</span>
+                            <X className="size-3.5 text-red-500 dark:text-red-400/70" weight="bold" />
+                            <span className="text-[12px] font-semibold text-red-500 dark:text-red-400/70">Lost</span>
                           </div>
                           <span className="text-[11px] text-muted-foreground/30 tabular-nums">{lostDeals.length} · {formatCurrency(lostTotal)}</span>
                         </div>
@@ -910,7 +916,7 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
                             const amount = opp.Gross_Amount__c || opp.Amount || 0;
                             const pp = paymentPct(opp.Percentage_Paid__c);
                             return (
-                              <div key={opp.Id} className={`${cardCls} p-3.5`} style={cardShadow}>
+                              <div key={opp.Id} className={`${cardCls} p-3.5`}>
                                 <div className="flex items-start justify-between gap-2 mb-1.5">
                                   <span className="text-[13px] font-semibold truncate">{clientName(opp.Name)}</span>
                                   <span className="text-[13px] font-bold tabular-nums shrink-0">{formatCurrency(amount)}</span>
@@ -924,7 +930,7 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
                               </div>
                             );
                           }) : (
-                            <div className={`${cardCls} p-4 text-center`} style={cardShadow}>
+                            <div className={`${cardCls} p-4 text-center`}>
                               <span className="text-[12px] text-muted-foreground/25">No lost deals</span>
                             </div>
                           )}
@@ -938,8 +944,8 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
                     <div>
                       <div className="flex items-center gap-2.5 mb-3">
                         <div className="flex items-center gap-1.5">
-                          <Clock className="size-3.5 text-blue-400/70" />
-                          <span className="text-[12px] font-semibold text-blue-400/70">In Progress</span>
+                          <Clock className="size-3.5 text-blue-500 dark:text-blue-400/70" />
+                          <span className="text-[12px] font-semibold text-blue-500 dark:text-blue-400/70">In Progress</span>
                         </div>
                         <span className="text-[11px] text-muted-foreground/30 tabular-nums">
                           {otherDeals.length} · {formatCurrency(otherDeals.reduce((s, o) => s + (o.Gross_Amount__c || o.Amount || 0), 0))}
@@ -951,7 +957,7 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
                           const pp = paymentPct(opp.Percentage_Paid__c);
                           const sc = OPPORTUNITY_STAGES[opp.StageName];
                           return (
-                            <div key={opp.Id} className={`${cardCls} p-3.5`} style={cardShadow}>
+                            <div key={opp.Id} className={`${cardCls} p-3.5`}>
                               <div className="flex items-start justify-between gap-2 mb-1.5">
                                 <span className="text-[13px] font-semibold truncate">{clientName(opp.Name)}</span>
                                 <span className="text-[13px] font-bold tabular-nums shrink-0">{formatCurrency(amount)}</span>
@@ -983,7 +989,7 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
               {/* 50/50 split — Revenue left, Profitability right */}
               <div className="grid grid-cols-2 gap-4 mb-4">
                 {/* Revenue */}
-                <div className={`${cardCls} p-5`} style={cardShadow}>
+                <div className={`${cardCls} p-5`}>
                   <h4 className="text-[11px] uppercase tracking-wider text-muted-foreground/40 font-medium mb-4">Revenue</h4>
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
@@ -1000,20 +1006,20 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
                         <span className="text-[13px] font-semibold tabular-nums">{formatCurrency(revenueTarget)} <span className="text-muted-foreground/30 font-normal text-[11px]">({revenuePct}%)</span></span>
                       </div>
                     )}
-                    <div className="flex items-center justify-between pt-3 border-t border-white/[0.04]">
+                    <div className="flex items-center justify-between pt-3 border-t border-border/20">
                       <span className="text-[13px] text-muted-foreground/60">Payments received</span>
-                      <span className="text-[14px] font-bold tabular-nums text-emerald-400/80">{formatCurrency(event.Total_Payments_Received__c || 0)}</span>
+                      <span className="text-[14px] font-bold tabular-nums text-emerald-600 dark:text-emerald-400/80">{formatCurrency(event.Total_Payments_Received__c || 0)}</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Profitability */}
-                <div className={`${cardCls} p-5`} style={cardShadow}>
+                <div className={`${cardCls} p-5`}>
                   <h4 className="text-[11px] uppercase tracking-wider text-muted-foreground/40 font-medium mb-4">Profitability</h4>
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-[13px] text-muted-foreground/60">Margin</span>
-                      <span className={`text-[14px] font-bold tabular-nums ${margin != null && margin >= 30 ? "text-emerald-400/80" : margin != null && margin >= 15 ? "text-amber-400/80" : ""}`}>
+                      <span className={`text-[14px] font-bold tabular-nums ${margin != null && margin >= 30 ? "text-emerald-600 dark:text-emerald-400/80" : margin != null && margin >= 15 ? "text-amber-500 dark:text-amber-400/80" : ""}`}>
                         {margin != null ? `${margin.toFixed(1)}%` : "—"}
                       </span>
                     </div>
@@ -1029,7 +1035,7 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
                         <span className="text-[13px] tabular-nums font-medium">{wonOpps.length} won <span className="text-muted-foreground/30">/ {opportunities.length} total</span></span>
                       </div>
                     )}
-                    <div className="flex items-center justify-between pt-3 border-t border-white/[0.04]">
+                    <div className="flex items-center justify-between pt-3 border-t border-border/20">
                       <span className="text-[13px] text-muted-foreground/60">Total costs</span>
                       <span className="text-[14px] font-bold tabular-nums">{formatCurrency(totalCosts)}</span>
                     </div>
@@ -1039,7 +1045,7 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
 
               {/* Costs breakdown — only if there are costs */}
               {totalCosts > 0 && (
-                <div className={`${cardCls} p-5`} style={cardShadow}>
+                <div className={`${cardCls} p-5`}>
                   <h4 className="text-[11px] uppercase tracking-wider text-muted-foreground/40 font-medium mb-4">Cost Breakdown</h4>
                   <div className="grid grid-cols-2 gap-x-8 gap-y-3">
                     {event.Total_Booking_Cost__c != null && event.Total_Booking_Cost__c > 0 && (
@@ -1060,6 +1066,21 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
             </div>
           )}
         </div>
+        {/* Embossed card + modal styling — dual mode */}
+        <style jsx>{`
+          :global(.ev-detail-modal) {
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05);
+          }
+          :global(.dark .ev-detail-modal) {
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03);
+          }
+          :global(.ev-card) {
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 0 0 1px rgba(0,0,0,0.03), inset 0 1px 0 rgba(255,255,255,0.6);
+          }
+          :global(.dark .ev-card) {
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.02), inset 0 1px 0 rgba(255,255,255,0.03);
+          }
+        `}</style>
       </motion.div>
     </motion.div>
   );
@@ -1189,16 +1210,7 @@ export default function EventsPage() {
 
         {/* ── Sticky Header — Glassmorphic bar ── */}
         <div className="sticky top-0 z-20 pb-2 flex justify-center">
-          <div
-            className="rounded-2xl px-4 py-3 flex items-center gap-3 w-full max-w-[1100px]"
-            style={{
-              background: "rgba(10,10,10,0.65)",
-              backdropFilter: "blur(24px) saturate(1.4)",
-              WebkitBackdropFilter: "blur(24px) saturate(1.4)",
-              border: "1px solid rgba(255,255,255,0.06)",
-              boxShadow: "0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)",
-            }}
-          >
+          <div className="ev-header rounded-2xl px-4 py-3 flex items-center gap-3 w-full max-w-[1100px]">
             {/* Month title — fixed width to prevent jumping */}
             <div className="flex items-baseline gap-0 shrink-0 overflow-hidden" style={{ width: "140px" }}>
               <AnimatePresence mode="wait" initial={false}>
@@ -1208,7 +1220,7 @@ export default function EventsPage() {
                   animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
                   exit={{ opacity: 0, y: -10, filter: "blur(4px)" }}
                   transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-                  className="text-[15px] font-bold text-white tracking-tight whitespace-nowrap"
+                  className="text-[15px] font-bold text-foreground tracking-tight whitespace-nowrap"
                 >
                   {loading ? "Events" : `${formatMonthName(currentMonth)} ${formatYear(currentMonth)}`}
                 </motion.span>
@@ -1216,10 +1228,10 @@ export default function EventsPage() {
             </div>
 
             {/* Divider */}
-            <div className="h-4 w-px bg-white/8 shrink-0" />
+            <div className="h-4 w-px bg-border/30 shrink-0" />
 
             {/* EVENTS CALENDAR label */}
-            <span className="text-[9px] font-extrabold tracking-[0.2em] uppercase text-white/20 shrink-0">
+            <span className="text-[9px] font-extrabold tracking-[0.2em] uppercase text-muted-foreground/30 shrink-0">
               Events Calendar
             </span>
 
@@ -1227,17 +1239,17 @@ export default function EventsPage() {
 
             {/* Search — always visible */}
             <div className="relative w-40">
-              <MagnifyingGlass className="absolute left-2 top-1/2 -translate-y-1/2 size-3 text-white/25" />
+              <MagnifyingGlass className="absolute left-2 top-1/2 -translate-y-1/2 size-3 text-muted-foreground/40" />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search..."
-                className="w-full pl-7 pr-6 py-1.5 rounded-lg text-[11px] text-white placeholder:text-white/20 bg-white/[0.04] border border-white/[0.08] outline-none ring-0 focus:outline-none focus:ring-0 focus:border-white/15 transition-colors"
+                className="ev-input w-full pl-7 pr-6 py-1.5 rounded-lg text-[11px] text-foreground placeholder:text-muted-foreground/30 outline-none ring-0 focus:outline-none focus:ring-0 transition-colors"
               />
               {search && (
                 <button onClick={() => setSearch("")} className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5">
-                  <X className="size-2.5 text-white/30 hover:text-white/60" />
+                  <X className="size-2.5 text-muted-foreground/40 hover:text-muted-foreground" />
                 </button>
               )}
             </div>
@@ -1246,10 +1258,10 @@ export default function EventsPage() {
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="appearance-none pl-2.5 pr-2.5 py-1.5 rounded-lg text-[11px] font-medium text-white/40 bg-white/[0.04] border border-white/[0.08] hover:border-white/12 outline-none ring-0 focus:outline-none focus:ring-0 focus:border-white/15 cursor-pointer transition-colors"
+              className="ev-input appearance-none pl-2.5 py-1.5 rounded-lg text-[11px] font-medium text-muted-foreground/60 outline-none ring-0 focus:outline-none focus:ring-0 cursor-pointer transition-colors"
               style={{
                 maxWidth: "120px",
-                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.25)' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
                 backgroundRepeat: "no-repeat",
                 backgroundPosition: "right 6px center",
                 paddingRight: "22px",
@@ -1262,10 +1274,8 @@ export default function EventsPage() {
             {/* Past toggle */}
             <button
               onClick={() => setShowPastEvents(!showPastEvents)}
-              className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all duration-200 ${
-                !showPastEvents
-                  ? "bg-white/10 text-white/70 border border-white/15"
-                  : "text-white/25 hover:text-white/45 border border-transparent hover:border-white/[0.06]"
+              className={`ev-toggle px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all duration-200 ${
+                !showPastEvents ? "active" : ""
               }`}
             >
               {showPastEvents ? "Hide Past" : "Show Past"}
@@ -1274,7 +1284,7 @@ export default function EventsPage() {
             {/* Refresh */}
             <button
               onClick={() => { setLoading(true); fetchEvents(); }}
-              className="size-7 rounded-lg flex items-center justify-center text-white/25 hover:text-white/50 hover:bg-white/[0.04] transition-colors"
+              className="ev-toggle size-7 rounded-lg flex items-center justify-center transition-colors"
             >
               <ArrowsClockwise className={`size-3 ${loading ? "animate-spin" : ""}`} />
             </button>
@@ -1330,6 +1340,65 @@ export default function EventsPage() {
       <AnimatePresence>
         {selectedEvent && <EventDetail event={selectedEvent} onClose={() => setSelectedEvent(null)} />}
       </AnimatePresence>
+
+      {/* Theme-aware styles for header, inputs, toggles, and embossed cards */}
+      <style jsx>{`
+        /* ── Glassmorphic Header ── */
+        .ev-header {
+          background: rgba(255, 255, 255, 0.72);
+          backdrop-filter: blur(24px) saturate(1.4);
+          -webkit-backdrop-filter: blur(24px) saturate(1.4);
+          border: 1px solid rgba(0, 0, 0, 0.06);
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+        }
+        :global(.dark) .ev-header {
+          background: rgba(10, 10, 10, 0.65);
+          border: 1px solid rgba(255, 255, 255, 0.06);
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+        }
+
+        /* ── Inputs (search, dropdown) ── */
+        .ev-input {
+          background: rgba(0, 0, 0, 0.03);
+          border: 1px solid rgba(0, 0, 0, 0.08);
+        }
+        .ev-input:focus {
+          border-color: rgba(0, 0, 0, 0.15);
+        }
+        :global(.dark) .ev-input {
+          background: rgba(255, 255, 255, 0.04);
+          border-color: rgba(255, 255, 255, 0.08);
+        }
+        :global(.dark) .ev-input:focus {
+          border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        /* ── Toggle buttons ── */
+        .ev-toggle {
+          color: rgba(0, 0, 0, 0.3);
+        }
+        .ev-toggle:hover {
+          color: rgba(0, 0, 0, 0.6);
+          background: rgba(0, 0, 0, 0.03);
+        }
+        .ev-toggle.active {
+          color: rgba(0, 0, 0, 0.7);
+          background: rgba(0, 0, 0, 0.06);
+          border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+        :global(.dark) .ev-toggle {
+          color: rgba(255, 255, 255, 0.25);
+        }
+        :global(.dark) .ev-toggle:hover {
+          color: rgba(255, 255, 255, 0.5);
+          background: rgba(255, 255, 255, 0.04);
+        }
+        :global(.dark) .ev-toggle.active {
+          color: rgba(255, 255, 255, 0.7);
+          background: rgba(255, 255, 255, 0.1);
+          border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+      `}</style>
     </div>
   );
 }
