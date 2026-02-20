@@ -563,6 +563,12 @@ function EventCard({ event, onClick }: { event: SalesforceEvent; onClick: () => 
 
 // ── Full-Screen Event Detail ──
 
+// Extract client name from opp name (e.g., "John Smith - Company LTD-003440" → "John Smith")
+function clientName(oppName: string): string {
+  const dashIdx = oppName.indexOf(" - ");
+  return dashIdx > 0 ? oppName.slice(0, dashIdx) : oppName;
+}
+
 function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () => void }) {
   const [opportunities, setOpportunities] = useState<SalesforceOpportunityFull[]>([]);
   const [oppsLoading, setOppsLoading] = useState(true);
@@ -587,7 +593,6 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
     return () => { document.body.style.overflow = ""; window.removeEventListener("keydown", handler); };
   }, [onClose]);
 
-  const catStyle = getCatStyle(event.Category__c);
   const catVisual = getCategoryVisual(event.Category__c);
   const CatIcon = catVisual.icon;
   const daysLeft = event.Start_Date__c ? daysUntil(event.Start_Date__c) : null;
@@ -602,6 +607,7 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
   const sfImages = [event.Event_Image_1__c, event.Event_Image_2__c, event.Event_Image_3__c, event.Event_Image_4__c, event.Event_Image_5__c].filter(Boolean) as string[];
   const resolvedImage = sfImages.length === 0 ? resolveEventImage(event.Name) : null;
   const images = sfImages.length > 0 ? sfImages : resolvedImage ? [resolvedImage] : [];
+  const totalCosts = (event.Total_Booking_Cost__c || 0) + (event.Total_Staff_Costs__c || 0);
 
   const oppsByStage = useMemo(() => {
     const grouped: Record<string, SalesforceOpportunityFull[]> = {};
@@ -614,158 +620,194 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
   const tabs = [
     { id: "overview" as const, label: "Overview" },
     { id: "tickets" as const, label: "Tickets" },
-    { id: "deals" as const, label: `Deals (${opportunities.length})` },
+    { id: "deals" as const, label: `Deals` },
     { id: "financials" as const, label: "Financials" },
   ];
 
+  // Payment progress helper
+  const paymentPct = (pct: number | null) => {
+    if (pct == null) return null;
+    const p = Math.round(pct);
+    if (p >= 100) return { label: "Paid", color: "text-emerald-400" };
+    if (p >= 50) return { label: `${p}%`, color: "text-foreground/70" };
+    if (p > 0) return { label: `${p}%`, color: "text-amber-400/80" };
+    return { label: "0%", color: "text-muted-foreground/50" };
+  };
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}
-      className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-stretch justify-center" onClick={onClose}>
+      className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md flex items-stretch justify-center" onClick={onClose}>
       <motion.div
-        initial={{ opacity: 0, y: 24, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 24, scale: 0.97 }}
+        initial={{ opacity: 0, y: 20, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.98 }}
         transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-        className="w-full max-w-6xl m-6 bg-card rounded-2xl border border-border/50 overflow-hidden flex flex-col shadow-2xl"
+        className="w-full max-w-5xl m-6 bg-card rounded-2xl border border-border/40 overflow-hidden flex flex-col"
+        style={{ boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03)" }}
         onClick={(e) => e.stopPropagation()}>
 
-        {/* Hero */}
-        <div className="relative h-64 shrink-0 overflow-hidden">
+        {/* Hero — compact */}
+        <div className="relative h-52 shrink-0 overflow-hidden">
           {images.length > 0 ? (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={`/api/image-proxy?url=${encodeURIComponent(images[0])}`} alt="" className="absolute inset-0 w-full h-full object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-t from-card via-card/50 to-black/20" />
+              <div className="absolute inset-0 bg-gradient-to-t from-card via-card/40 to-black/10" />
             </>
           ) : (
             <>
               <div className={`absolute inset-0 bg-gradient-to-br ${catVisual.gradient}`} />
-              <div className="absolute inset-0 flex items-center justify-center opacity-[0.05]"><CatIcon className="size-64" /></div>
-              <div className="absolute inset-0 bg-gradient-to-t from-card via-card/40 to-transparent" />
+              <div className="absolute inset-0 flex items-center justify-center opacity-[0.04]"><CatIcon className="size-56" /></div>
+              <div className="absolute inset-0 bg-gradient-to-t from-card via-card/30 to-transparent" />
             </>
           )}
-          <button onClick={onClose} className="absolute top-4 right-4 z-10 size-9 rounded-full bg-black/40 backdrop-blur-sm border border-white/10 flex items-center justify-center text-white/80 hover:text-white hover:bg-black/60 transition-colors">
-            <X className="size-4" weight="bold" />
+          <button onClick={onClose} className="absolute top-4 right-4 z-10 size-8 rounded-full bg-black/30 backdrop-blur-sm border border-white/10 flex items-center justify-center text-white/70 hover:text-white hover:bg-black/50 transition-colors">
+            <X className="size-3.5" weight="bold" />
           </button>
-          <div className="absolute bottom-0 left-0 right-0 p-6">
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider backdrop-blur-sm ${catStyle.bg} ${catStyle.text} border border-white/10`}>
-                    {event.Category__c || "Event"}
-                  </span>
-                  {daysLeft !== null && (
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-bold ${isPast ? "bg-muted/30 text-muted-foreground" : daysLeft <= 7 ? "bg-red-500/15 text-red-400" : daysLeft <= 30 ? "bg-amber-500/15 text-amber-400" : "bg-emerald-500/15 text-emerald-400"}`}>
-                      {isPast ? "Event Passed" : `${daysLeft} days away`}
-                    </span>
-                  )}
-                </div>
-                <h2 className="text-2xl font-bold text-foreground">{event.Name}</h2>
-                <div className="flex items-center gap-4 mt-1.5 text-sm text-muted-foreground">
-                  {event.Location__r?.Name && <span className="flex items-center gap-1.5"><MapPin className="size-4" />{event.Location__r.Name}</span>}
-                  <span className="flex items-center gap-1.5"><CalendarBlank className="size-4" />{formatDateRange(event.Start_Date__c, event.End_Date__c)}</span>
-                  {(event.Start_Time__c || event.End_Time__c) && (
-                    <span className="flex items-center gap-1.5"><Clock className="size-4" />{formatTime(event.Start_Time__c)}{event.End_Time__c && ` – ${formatTime(event.End_Time__c)}`}</span>
-                  )}
-                </div>
-              </div>
-              {revenueTarget > 0 && (
-                <div className="text-right shrink-0">
-                  <div className="text-lg font-bold tabular-nums text-foreground">{formatCurrency(revenueActual)}</div>
-                  <div className="text-[10px] text-muted-foreground">of {formatCurrency(revenueTarget)} ({revenuePct}%)</div>
-                </div>
+          <div className="absolute bottom-0 left-0 right-0 px-6 pb-5">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[9px] font-bold tracking-[0.12em] uppercase text-white/80 px-1.5 py-[2px] rounded-[3px] border border-white/15 backdrop-blur-sm bg-black/10">
+                {event.Category__c || "Event"}
+              </span>
+              {daysLeft !== null && (
+                <span className={`text-[10px] font-medium ${isPast ? "text-muted-foreground/60" : daysLeft <= 14 ? "text-amber-400/80" : "text-white/40"}`}>
+                  {isPast ? "Passed" : `${daysLeft}d away`}
+                </span>
               )}
+            </div>
+            <h2 className="text-xl font-bold text-foreground leading-tight">{event.Name}</h2>
+            <div className="flex items-center gap-3 mt-1.5 text-[12px] text-muted-foreground">
+              {event.Location__r?.Name && <span className="flex items-center gap-1"><MapPin className="size-3.5" />{event.Location__r.Name}</span>}
+              <span className="flex items-center gap-1"><CalendarBlank className="size-3.5" />{formatDateRange(event.Start_Date__c, event.End_Date__c)}</span>
+              {event.Owner?.Name && <span className="flex items-center gap-1"><UserCircle className="size-3.5" />{event.Owner.Name}</span>}
             </div>
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="border-b border-border/50 px-6">
-          <div className="flex items-center gap-1">
+        {/* Tabs — clean underline */}
+        <div className="border-b border-border/30 px-6">
+          <div className="flex items-center gap-0">
             {tabs.map((tab) => (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === tab.id ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground/70"}`}>
+                className={`px-4 py-2.5 text-[13px] font-medium border-b-2 -mb-px transition-colors ${activeTab === tab.id ? "border-foreground text-foreground" : "border-transparent text-muted-foreground/60 hover:text-muted-foreground"}`}>
                 {tab.label}
+                {tab.id === "deals" && !oppsLoading && opportunities.length > 0 && (
+                  <span className="ml-1.5 text-[10px] text-muted-foreground/40 tabular-nums">{opportunities.length}</span>
+                )}
               </button>
             ))}
           </div>
         </div>
 
         {/* Tab content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto">
           {activeTab === "overview" && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-5 gap-4">
+            <div className="p-6 space-y-5">
+              {/* Financials strip — clean horizontal row */}
+              <div className="flex items-stretch gap-px rounded-xl overflow-hidden border border-border/20">
                 {[
-                  { icon: ChartLineUp, iconColor: "text-emerald-400", label: "Revenue", value: formatCurrency(revenueActual), sub: revenueTarget > 0 ? `Target: ${formatCurrency(revenueTarget)}` : undefined, bar: revenueTarget > 0 ? revenuePct : undefined, barColor: revenuePct >= 100 ? "bg-emerald-500" : revenuePct >= 50 ? "bg-blue-500" : "bg-amber-500" },
-                  { icon: CurrencyGbp, iconColor: "text-blue-400", label: "Margin", value: margin != null ? `${margin.toFixed(1)}%` : "—", valueColor: margin != null && margin >= 30 ? "text-emerald-400" : margin != null && margin >= 15 ? "text-amber-400" : "text-red-400", sub: event.Total_Margin_Value__c != null ? formatCurrency(event.Total_Margin_Value__c) : undefined },
-                  { icon: Ticket, iconColor: "text-violet-400", label: "Tickets", value: `${totalBooked}/${totalRequired}`, sub: `${Math.round(completionPct)}% fulfilled` },
-                  { icon: Users, iconColor: "text-orange-400", label: "Deals", value: oppsLoading ? "…" : String(opportunities.length), sub: `${wonOpps.length} won` },
-                  { icon: CurrencyGbp, iconColor: "text-teal-400", label: "Payments", value: formatCurrency(event.Total_Payments_Received__c || 0), sub: "Collected" },
-                ].map((kpi) => (
-                  <div key={kpi.label} className="rounded-xl bg-muted/10 border border-border/30 p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <kpi.icon className={`size-4 ${kpi.iconColor}`} />
-                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{kpi.label}</span>
+                  { label: "Pipeline", value: totalOppRevenue, loading: oppsLoading },
+                  { label: "Revenue", value: revenueActual, sub: revenueTarget > 0 ? `${revenuePct}% of target` : undefined },
+                  { label: "Payments", value: event.Total_Payments_Received__c || 0 },
+                  { label: "Costs", value: totalCosts },
+                  { label: "Margin", value: margin != null ? null : null, custom: margin != null ? `${margin.toFixed(1)}%` : "—" },
+                ].map((item, i) => (
+                  <div key={item.label} className={`flex-1 px-4 py-3.5 ${i > 0 ? "border-l border-border/15" : ""} bg-muted/[0.04]`}>
+                    <div className="text-[10px] text-muted-foreground/50 font-medium tracking-wide uppercase mb-1">{item.label}</div>
+                    <div className="text-[15px] font-bold tabular-nums tracking-tight">
+                      {item.loading ? "…" : item.custom || formatCurrency(item.value || 0)}
                     </div>
-                    <div className={`text-lg font-bold tabular-nums ${kpi.valueColor || ""}`}>{kpi.value}</div>
-                    {kpi.sub && <div className="text-[10px] text-muted-foreground/60 mt-0.5">{kpi.sub}</div>}
-                    {kpi.bar != null && (
-                      <div className="h-1.5 bg-muted/30 rounded-full overflow-hidden mt-2">
-                        <div className={`h-full rounded-full transition-all ${kpi.barColor}`} style={{ width: `${kpi.bar}%` }} />
-                      </div>
-                    )}
+                    {item.sub && <div className="text-[10px] text-muted-foreground/40 mt-0.5">{item.sub}</div>}
                   </div>
                 ))}
               </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="col-span-2 rounded-xl bg-muted/10 border border-border/30 p-4">
-                  <h4 className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-3">Description</h4>
-                  {event.Description__c ? <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">{event.Description__c}</p>
-                   : event.Event_Notes__c ? <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">{event.Event_Notes__c}</p>
-                   : <p className="text-sm text-muted-foreground/50 italic">No description available</p>}
-                </div>
-                <div className="rounded-xl bg-muted/10 border border-border/30 p-4">
-                  <h4 className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-3">Team & Operations</h4>
-                  <div className="space-y-3">
-                    {event.Owner?.Name && <div><div className="text-[10px] text-muted-foreground/50 uppercase tracking-wider">Owner</div><div className="text-sm flex items-center gap-1.5 mt-0.5"><UserCircle className="size-4 text-muted-foreground" />{event.Owner.Name}</div></div>}
-                    {(event.A_B_On_Site_1__c || event.A_B_On_Site_2__c) && <div><div className="text-[10px] text-muted-foreground/50 uppercase tracking-wider">On-Site Staff</div><div className="text-sm mt-0.5">{[event.A_B_On_Site_1__c, event.A_B_On_Site_2__c].filter(Boolean).join(", ")}</div></div>}
-                    {event.Total_Projects__c != null && <div><div className="text-[10px] text-muted-foreground/50 uppercase tracking-wider">Projects</div><div className="text-sm mt-0.5">{event.Total_Projects__c}</div></div>}
-                    {event.Master_Package_Code__c && <div><div className="text-[10px] text-muted-foreground/50 uppercase tracking-wider">Package Code</div><div className="text-sm mt-0.5 font-mono text-xs">{event.Master_Package_Code__c}</div></div>}
+
+              {/* Two-column: Info + Tickets summary */}
+              <div className="grid grid-cols-5 gap-4">
+                {/* Left: description + team */}
+                <div className="col-span-3 space-y-4">
+                  <div className="rounded-xl border border-border/15 p-4 bg-muted/[0.03]">
+                    <h4 className="text-[11px] uppercase tracking-wider text-muted-foreground/40 font-medium mb-2.5">About</h4>
+                    {event.Description__c ? <p className="text-[13px] text-muted-foreground/80 leading-relaxed">{event.Description__c}</p>
+                     : event.Event_Notes__c ? <p className="text-[13px] text-muted-foreground/80 leading-relaxed">{event.Event_Notes__c}</p>
+                     : <p className="text-[13px] text-muted-foreground/30 italic">No description available</p>}
                   </div>
+                  {/* Team row */}
+                  {(event.Owner?.Name || event.A_B_On_Site_1__c || event.Total_Projects__c != null) && (
+                    <div className="flex items-center gap-4 text-[12px]">
+                      {event.Owner?.Name && (
+                        <div className="flex items-center gap-1.5 text-muted-foreground/60">
+                          <UserCircle className="size-3.5" /><span>{event.Owner.Name}</span>
+                        </div>
+                      )}
+                      {(event.A_B_On_Site_1__c || event.A_B_On_Site_2__c) && (
+                        <div className="text-muted-foreground/40">
+                          On-site: {[event.A_B_On_Site_1__c, event.A_B_On_Site_2__c].filter(Boolean).join(", ")}
+                        </div>
+                      )}
+                      {event.Total_Projects__c != null && (
+                        <div className="text-muted-foreground/40">{event.Total_Projects__c} projects</div>
+                      )}
+                    </div>
+                  )}
                 </div>
-              </div>
-              {!oppsLoading && opportunities.length > 0 && (
-                <div className="rounded-xl bg-muted/10 border border-border/30 p-4">
-                  <h4 className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-3">Deal Pipeline</h4>
-                  <div className="flex items-center gap-2">
-                    {Object.entries(oppsByStage).map(([stage, opps]) => {
-                      const sc = OPPORTUNITY_STAGES[stage];
-                      const st = opps.reduce((s, o) => s + (o.Gross_Amount__c || o.Amount || 0), 0);
-                      const wp = totalOppRevenue > 0 ? Math.max(8, (st / totalOppRevenue) * 100) : 100 / Object.keys(oppsByStage).length;
+
+                {/* Right: ticket summary */}
+                <div className="col-span-2 rounded-xl border border-border/15 p-4 bg-muted/[0.03]">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-[11px] uppercase tracking-wider text-muted-foreground/40 font-medium">Tickets</h4>
+                    <span className="text-[12px] tabular-nums font-semibold">{totalBooked}<span className="text-muted-foreground/30 font-normal">/{totalRequired}</span></span>
+                  </div>
+                  <div className="h-1.5 bg-muted/20 rounded-full overflow-hidden mb-3">
+                    <div className={`h-full rounded-full transition-all ${completionPct >= 90 ? "bg-red-400/80" : completionPct >= 50 ? "bg-amber-400/70" : "bg-emerald-400/70"}`} style={{ width: `${completionPct}%` }} />
+                  </div>
+                  <div className="space-y-1.5">
+                    {TICKET_TYPES.map((tt) => {
+                      const req = (event[tt.requiredField as keyof SalesforceEvent] as number | null) || 0;
+                      const bkd = (event[tt.bookedField as keyof SalesforceEvent] as number | null) || 0;
+                      if (req === 0) return null;
+                      const pct = Math.round((bkd / req) * 100);
                       return (
-                        <div key={stage} className="flex-1 min-w-0" style={{ flex: wp }}>
-                          <div className={`h-8 rounded-lg flex items-center justify-center px-2 ${sc?.bgColor || "bg-muted/30 text-muted-foreground"}`}>
-                            <span className="text-[10px] font-medium truncate">{stage}</span>
+                        <div key={tt.label} className="flex items-center gap-2 text-[11px]">
+                          <span className="w-16 text-muted-foreground/50 truncate">{tt.label}</span>
+                          <div className="flex-1 h-1 bg-muted/15 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full ${pct >= 90 ? "bg-red-400/60" : pct >= 50 ? "bg-amber-400/50" : "bg-emerald-400/50"}`} style={{ width: `${pct}%` }} />
                           </div>
-                          <div className="text-center mt-1">
-                            <div className="text-[10px] font-bold tabular-nums">{opps.length}</div>
-                            <div className="text-[9px] text-muted-foreground/50 tabular-nums">{formatCurrency(st)}</div>
-                          </div>
+                          <span className="w-10 text-right tabular-nums text-muted-foreground/40">{bkd}/{req}</span>
                         </div>
                       );
                     })}
                   </div>
                 </div>
-              )}
-              {images.length > 1 && (
-                <div className="rounded-xl bg-muted/10 border border-border/30 p-4">
-                  <h4 className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-3">Gallery</h4>
-                  <div className="grid grid-cols-4 gap-2">
-                    {images.map((img, i) => (
-                      <div key={i} className="aspect-video rounded-lg overflow-hidden bg-muted/20">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={`/api/image-proxy?url=${encodeURIComponent(img)}`} alt="" className="w-full h-full object-cover" />
-                      </div>
-                    ))}
+              </div>
+
+              {/* Deal pipeline — condensed */}
+              {!oppsLoading && opportunities.length > 0 && (
+                <div className="rounded-xl border border-border/15 p-4 bg-muted/[0.03]">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-[11px] uppercase tracking-wider text-muted-foreground/40 font-medium">Pipeline</h4>
+                    <span className="text-[11px] text-muted-foreground/40 tabular-nums">{opportunities.length} deals · {formatCurrency(totalOppRevenue)}</span>
+                  </div>
+                  <div className="flex items-center gap-1 h-6">
+                    {Object.entries(oppsByStage).map(([stage, opps]) => {
+                      const sc = OPPORTUNITY_STAGES[stage];
+                      const st = opps.reduce((s, o) => s + (o.Gross_Amount__c || o.Amount || 0), 0);
+                      const wp = totalOppRevenue > 0 ? Math.max(5, (st / totalOppRevenue) * 100) : 100 / Object.keys(oppsByStage).length;
+                      return (
+                        <div key={stage} className={`h-full rounded flex items-center justify-center ${sc?.bgColor || "bg-muted/20 text-muted-foreground"}`} style={{ flex: wp }} title={`${stage}: ${opps.length} · ${formatCurrency(st)}`}>
+                          <span className="text-[9px] font-medium truncate px-1">{opps.length}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="flex items-center gap-3 mt-2">
+                    {Object.entries(oppsByStage).map(([stage, opps]) => {
+                      const sc = OPPORTUNITY_STAGES[stage];
+                      return (
+                        <div key={stage} className="flex items-center gap-1.5 text-[10px] text-muted-foreground/40">
+                          <div className={`size-1.5 rounded-full ${sc?.bgColor?.replace("text-", "bg-") || "bg-muted/30"}`} style={{ backgroundColor: sc?.bgColor ? undefined : "rgba(255,255,255,0.1)" }} />
+                          {stage} ({opps.length})
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -773,14 +815,14 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
           )}
 
           {activeTab === "tickets" && (
-            <div className="space-y-4">
-              <div className="rounded-xl bg-muted/10 border border-border/30 p-5">
+            <div className="p-6 space-y-4">
+              <div className="rounded-xl border border-border/15 p-5 bg-muted/[0.03]">
                 <div className="flex items-center justify-between mb-4">
-                  <h4 className="text-sm font-medium">Overall Ticket Inventory</h4>
-                  <span className="text-sm tabular-nums font-bold">{totalBooked}/{totalRequired} <span className="text-muted-foreground font-normal">({Math.round(completionPct)}%)</span></span>
+                  <h4 className="text-sm font-medium">Ticket Inventory</h4>
+                  <span className="text-sm tabular-nums font-bold">{totalBooked}/{totalRequired} <span className="text-muted-foreground/50 font-normal">({Math.round(completionPct)}%)</span></span>
                 </div>
-                <div className="h-3 bg-muted/30 rounded-full overflow-hidden mb-6">
-                  <div className={`h-full rounded-full transition-all ${completionPct >= 90 ? "bg-red-500" : completionPct >= 70 ? "bg-amber-500" : "bg-emerald-500"}`} style={{ width: `${completionPct}%` }} />
+                <div className="h-2 bg-muted/15 rounded-full overflow-hidden mb-5">
+                  <div className={`h-full rounded-full transition-all ${completionPct >= 90 ? "bg-red-400/80" : completionPct >= 70 ? "bg-amber-400/70" : "bg-emerald-400/70"}`} style={{ width: `${completionPct}%` }} />
                 </div>
                 <div className="space-y-2.5">
                   {TICKET_TYPES.map((tt) => {
@@ -790,110 +832,136 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
                   })}
                 </div>
               </div>
-              {TICKET_TYPES.some((tt) => { const r = (event[tt.requiredField as keyof SalesforceEvent] as number | null) || 0; const b = (event[tt.bookedField as keyof SalesforceEvent] as number | null) || 0; return r > 0 && b / r >= 0.8; }) && (
-                <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
-                  <div className="flex items-center gap-2 mb-2"><Warning className="size-4 text-amber-400" weight="fill" /><span className="text-sm font-medium text-amber-400">Low Inventory Alert</span></div>
-                  <div className="flex flex-wrap gap-2">
-                    {TICKET_TYPES.filter((tt) => { const r = (event[tt.requiredField as keyof SalesforceEvent] as number | null) || 0; const b = (event[tt.bookedField as keyof SalesforceEvent] as number | null) || 0; return r > 0 && b / r >= 0.8; }).map((tt) => {
-                      const r = (event[tt.requiredField as keyof SalesforceEvent] as number | null) || 0; const b = (event[tt.bookedField as keyof SalesforceEvent] as number | null) || 0;
-                      return <span key={tt.label} className="text-xs bg-amber-500/10 text-amber-300/80 px-2.5 py-1 rounded-full">{tt.label}: {b}/{r} ({Math.round((b / r) * 100)}%)</span>;
-                    })}
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
           {activeTab === "deals" && (
-            <div className="space-y-4">
-              {oppsLoading ? <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-16 rounded-xl bg-muted/20 animate-pulse" />)}</div>
-               : opportunities.length === 0 ? <p className="text-center text-muted-foreground py-12">No deals linked to this event yet.</p>
-               : Object.entries(oppsByStage).map(([stage, opps]) => {
-                  const sc = OPPORTUNITY_STAGES[stage];
-                  return (
-                    <div key={stage}>
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${sc?.bgColor || "bg-muted/30 text-muted-foreground"}`}>{stage}</span>
-                        <span className="text-xs text-muted-foreground">{opps.length} deal{opps.length !== 1 ? "s" : ""}</span>
-                        <span className="text-xs text-muted-foreground/50 ml-auto tabular-nums">{formatCurrency(opps.reduce((s, o) => s + (o.Gross_Amount__c || o.Amount || 0), 0))}</span>
-                      </div>
-                      <div className="space-y-1.5 mb-4">
-                        {opps.map((opp) => (
-                          <div key={opp.Id} className="flex items-center gap-3 rounded-lg bg-muted/10 border border-border/20 px-4 py-2.5 text-sm">
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium truncate">{opp.Name}</div>
-                              <div className="text-xs text-muted-foreground flex items-center gap-2">
-                                {opp.Account?.Name && <span>{opp.Account.Name}</span>}
-                                {opp.Owner?.Name && <><span className="text-muted-foreground/30">•</span><span>{opp.Owner.Name}</span></>}
-                                {opp.Package_Sold__r?.Name && <><span className="text-muted-foreground/30">•</span><span className="text-violet-400/80">{opp.Package_Sold__r.Name}</span></>}
-                              </div>
-                            </div>
-                            <div className="text-right shrink-0">
-                              <div className="font-bold tabular-nums">{formatCurrency(opp.Gross_Amount__c || opp.Amount || 0)}</div>
-                              {opp.Percentage_Paid__c != null && (
-                                <div className="text-[10px] text-muted-foreground tabular-nums flex items-center gap-1 justify-end">
-                                  {opp.Percentage_Paid__c >= 100 && <CheckCircle className="size-3 text-emerald-400" />}
-                                  {Math.round(opp.Percentage_Paid__c)}% paid
+            <div className="p-6">
+              {oppsLoading ? (
+                <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-12 rounded-lg bg-muted/10 animate-pulse" />)}</div>
+              ) : opportunities.length === 0 ? (
+                <p className="text-center text-muted-foreground/50 py-16 text-sm">No deals linked to this event</p>
+              ) : (
+                <div className="space-y-5">
+                  {Object.entries(oppsByStage).map(([stage, opps]) => {
+                    const sc = OPPORTUNITY_STAGES[stage];
+                    const stageTotal = opps.reduce((s, o) => s + (o.Gross_Amount__c || o.Amount || 0), 0);
+                    return (
+                      <div key={stage}>
+                        {/* Stage header */}
+                        <div className="flex items-center gap-2.5 mb-2">
+                          <span className={`inline-flex items-center px-2 py-[3px] rounded text-[10px] font-medium ${sc?.bgColor || "bg-muted/20 text-muted-foreground"}`}>{stage}</span>
+                          <span className="text-[11px] text-muted-foreground/40 tabular-nums">{opps.length} · {formatCurrency(stageTotal)}</span>
+                        </div>
+
+                        {/* Deal table */}
+                        <div className="rounded-lg border border-border/10 overflow-hidden">
+                          {opps.map((opp, i) => {
+                            const amount = opp.Gross_Amount__c || opp.Amount || 0;
+                            const pp = paymentPct(opp.Percentage_Paid__c);
+                            return (
+                              <div key={opp.Id} className={`flex items-center gap-3 px-3.5 py-2.5 ${i > 0 ? "border-t border-border/[0.06]" : ""} hover:bg-muted/[0.03] transition-colors`}>
+                                {/* Client + account */}
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-[13px] font-medium truncate">{clientName(opp.Name)}</div>
+                                  <div className="text-[11px] text-muted-foreground/40 truncate">
+                                    {opp.Account?.Name}{opp.Owner?.Name && ` · ${opp.Owner.Name}`}
+                                  </div>
                                 </div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
+                                {/* Payment */}
+                                {pp && (
+                                  <span className={`text-[10px] font-medium tabular-nums ${pp.color}`}>{pp.label}</span>
+                                )}
+                                {/* Amount */}
+                                <div className="text-[13px] font-semibold tabular-nums text-right w-20 shrink-0">{formatCurrency(amount)}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })
-              }
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
           {activeTab === "financials" && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-4">
-                <div className="rounded-xl bg-muted/10 border border-border/30 p-5">
-                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-2">Revenue (Closed Won)</div>
-                  <div className="text-2xl font-bold tabular-nums text-emerald-400">{formatCurrency(revenueActual)}</div>
-                  {revenueTarget > 0 && <div className="text-xs text-muted-foreground mt-1">{revenuePct}% of {formatCurrency(revenueTarget)} target</div>}
-                </div>
-                <div className="rounded-xl bg-muted/10 border border-border/30 p-5">
-                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-2">Payments Received</div>
-                  <div className="text-2xl font-bold tabular-nums text-teal-400">{formatCurrency(event.Total_Payments_Received__c || 0)}</div>
-                  {revenueActual > 0 && <div className="text-xs text-muted-foreground mt-1">{Math.round(((event.Total_Payments_Received__c || 0) / revenueActual) * 100)}% collected</div>}
-                </div>
-                <div className="rounded-xl bg-muted/10 border border-border/30 p-5">
-                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-2">Margin</div>
-                  <div className={`text-2xl font-bold tabular-nums ${margin != null && margin >= 30 ? "text-emerald-400" : margin != null && margin >= 15 ? "text-amber-400" : "text-red-400"}`}>
-                    {margin != null ? `${margin.toFixed(1)}%` : "—"}
+            <div className="p-6 space-y-4">
+              {/* Revenue section */}
+              <div className="rounded-xl border border-border/15 p-5 bg-muted/[0.03]">
+                <h4 className="text-[11px] uppercase tracking-wider text-muted-foreground/40 font-medium mb-4">Revenue</h4>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[13px] text-muted-foreground/60">Pipeline value</span>
+                    <span className="text-[13px] font-semibold tabular-nums">{oppsLoading ? "…" : formatCurrency(totalOppRevenue)}</span>
                   </div>
-                  {event.Total_Margin_Value__c != null && <div className="text-xs text-muted-foreground mt-1">{formatCurrency(event.Total_Margin_Value__c)} value</div>}
+                  <div className="flex items-center justify-between">
+                    <span className="text-[13px] text-muted-foreground/60">Closed won</span>
+                    <span className="text-[13px] font-semibold tabular-nums">{formatCurrency(revenueActual)}</span>
+                  </div>
+                  {revenueTarget > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-[13px] text-muted-foreground/60">Target</span>
+                      <span className="text-[13px] font-semibold tabular-nums">{formatCurrency(revenueTarget)} <span className="text-muted-foreground/30 font-normal text-[11px]">({revenuePct}%)</span></span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between pt-2 border-t border-border/10">
+                    <span className="text-[13px] text-muted-foreground/60">Payments received</span>
+                    <span className="text-[13px] font-bold tabular-nums">{formatCurrency(event.Total_Payments_Received__c || 0)}</span>
+                  </div>
                 </div>
               </div>
-              <div className="rounded-xl bg-muted/10 border border-border/30 p-5">
-                <h4 className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-4">Cost Breakdown</h4>
-                <div className="space-y-3">
-                  {[{ label: "Booking Costs", value: event.Total_Booking_Cost__c }, { label: "Staff Costs", value: event.Total_Staff_Costs__c }]
-                    .filter((c) => c.value != null && c.value > 0)
-                    .map((cost) => (
-                      <div key={cost.label} className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">{cost.label}</span>
-                        <span className="font-semibold tabular-nums">{formatCurrency(cost.value!)}</span>
+
+              {/* Costs */}
+              {totalCosts > 0 && (
+                <div className="rounded-xl border border-border/15 p-5 bg-muted/[0.03]">
+                  <h4 className="text-[11px] uppercase tracking-wider text-muted-foreground/40 font-medium mb-4">Costs</h4>
+                  <div className="space-y-3">
+                    {event.Total_Booking_Cost__c != null && event.Total_Booking_Cost__c > 0 && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-[13px] text-muted-foreground/60">Booking costs</span>
+                        <span className="text-[13px] font-semibold tabular-nums">{formatCurrency(event.Total_Booking_Cost__c)}</span>
                       </div>
-                    ))}
-                  {(event.Total_Booking_Cost__c || 0) + (event.Total_Staff_Costs__c || 0) > 0 && (
-                    <div className="flex items-center justify-between text-sm pt-2 border-t border-border/30">
-                      <span className="font-medium">Total Costs</span>
-                      <span className="font-bold tabular-nums">{formatCurrency((event.Total_Booking_Cost__c || 0) + (event.Total_Staff_Costs__c || 0))}</span>
+                    )}
+                    {event.Total_Staff_Costs__c != null && event.Total_Staff_Costs__c > 0 && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-[13px] text-muted-foreground/60">Staff costs</span>
+                        <span className="text-[13px] font-semibold tabular-nums">{formatCurrency(event.Total_Staff_Costs__c)}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between pt-2 border-t border-border/10">
+                      <span className="text-[13px] font-medium">Total costs</span>
+                      <span className="text-[13px] font-bold tabular-nums">{formatCurrency(totalCosts)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Margin */}
+              <div className="rounded-xl border border-border/15 p-5 bg-muted/[0.03]">
+                <h4 className="text-[11px] uppercase tracking-wider text-muted-foreground/40 font-medium mb-4">Profitability</h4>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[13px] text-muted-foreground/60">Margin</span>
+                    <span className={`text-[13px] font-bold tabular-nums ${margin != null && margin >= 30 ? "text-emerald-400/80" : margin != null && margin >= 15 ? "text-amber-400/80" : ""}`}>
+                      {margin != null ? `${margin.toFixed(1)}%` : "—"}
+                    </span>
+                  </div>
+                  {event.Total_Margin_Value__c != null && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-[13px] text-muted-foreground/60">Margin value</span>
+                      <span className="text-[13px] font-semibold tabular-nums">{formatCurrency(event.Total_Margin_Value__c)}</span>
+                    </div>
+                  )}
+                  {!oppsLoading && (
+                    <div className="flex items-center justify-between pt-2 border-t border-border/10">
+                      <span className="text-[13px] text-muted-foreground/60">Deals</span>
+                      <span className="text-[13px] tabular-nums">{wonOpps.length} won <span className="text-muted-foreground/30">/ {opportunities.length} total</span></span>
                     </div>
                   )}
                 </div>
               </div>
-              {!oppsLoading && totalOppRevenue > 0 && (
-                <div className="rounded-xl bg-muted/10 border border-border/30 p-5">
-                  <h4 className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-2">Total Pipeline Value</h4>
-                  <div className="text-2xl font-bold tabular-nums">{formatCurrency(totalOppRevenue)}</div>
-                  <div className="text-xs text-muted-foreground mt-1">Across {opportunities.length} deals</div>
-                </div>
-              )}
             </div>
           )}
         </div>
