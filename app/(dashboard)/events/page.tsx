@@ -1070,7 +1070,7 @@ export default function EventsPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search..."
-                className="w-full pl-7 pr-6 py-1.5 rounded-lg text-[11px] text-white placeholder:text-white/20 bg-white/[0.04] border border-white/[0.08] focus:outline-none focus:border-white/15 transition-colors"
+                className="w-full pl-7 pr-6 py-1.5 rounded-lg text-[11px] text-white placeholder:text-white/20 bg-white/[0.04] border border-white/[0.08] outline-none ring-0 focus:outline-none focus:ring-0 focus:border-white/15 transition-colors"
               />
               {search && (
                 <button onClick={() => setSearch("")} className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5">
@@ -1083,7 +1083,7 @@ export default function EventsPage() {
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="appearance-none pl-2.5 pr-2.5 py-1.5 rounded-lg text-[11px] font-medium text-white/40 bg-white/[0.04] border border-white/[0.08] hover:border-white/12 focus:outline-none focus:border-white/15 cursor-pointer transition-colors"
+              className="appearance-none pl-2.5 pr-2.5 py-1.5 rounded-lg text-[11px] font-medium text-white/40 bg-white/[0.04] border border-white/[0.08] hover:border-white/12 outline-none ring-0 focus:outline-none focus:ring-0 focus:border-white/15 cursor-pointer transition-colors"
               style={{
                 maxWidth: "120px",
                 backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.25)' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
