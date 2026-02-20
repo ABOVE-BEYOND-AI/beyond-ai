@@ -330,14 +330,18 @@ const LEAD_SELECT_FIELDS = `
 
 const PIPELINE_SELECT_FIELDS = `
   Id, Name, StageName, Amount, CloseDate,
-  Gross_Amount__c, Service_Charge__c, Processing_Fee__c,
+  Gross_Amount__c, Service_Charge__c, Processing_Fee__c, Tax_Amount__c,
   AccountId, Account.Name,
+  Opportunity_Contact__c, Opportunity_Contact__r.Name,
   Event__c, Event__r.Name, Event__r.Category__c, Event__r.Start_Date__c,
+  Package_Sold__c, Package_Sold__r.Name,
   Total_Number_of_Guests__c,
-  Percentage_Paid__c,
-  Total_Amount_Paid__c, Total_Balance__c,
-  NextStep, LeadSource,
-  Is_New_Business__c,
+  Percentage_Paid__c, Payment_Progress__c,
+  Total_Amount_Paid__c, Total_Balance__c, Total_Payments_Due__c,
+  Commission_Amount__c,
+  NextStep, Special_Requirements__c,
+  Is_New_Business__c, LeadSource,
+  Sign_Request_Complete__c, Loss_Reason__c,
   OwnerId, Owner.Name, Owner.Email,
   CreatedDate, LastModifiedDate, LastActivityDate
 `.trim()
