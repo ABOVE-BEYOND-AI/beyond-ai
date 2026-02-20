@@ -49,6 +49,346 @@ import {
   OPPORTUNITY_STAGES,
 } from "@/lib/constants";
 
+// ── Website Image Library ──
+// Maps slug keys (derived from image filenames) to full URLs on the A+B website
+// These are the 268 event images from aboveandbeyond.group
+
+const IMAGE_BASE = "https://aboveandbeyond.group/wp-content/uploads/2025/12/";
+
+const IMAGE_LIBRARY: Record<string, string> = {
+  "1000 guineas": `${IMAGE_BASE}1000-Guineas.webp`,
+  "1st test england vs new zealand": `${IMAGE_BASE}1st-Test-England-vs-New-Zealand.webp`,
+  "2000 guineas": `${IMAGE_BASE}2000-Guineas.webp`,
+  "24 hours of le mans": `${IMAGE_BASE}24-Hours-of-Le-Mans.webp`,
+  "2nd test england vs new zealand": `${IMAGE_BASE}2nd-Test-England-vs-New-Zealand.webp`,
+  "3rd test england vs new zealand": `${IMAGE_BASE}3rd-Test-England-vs-New-Zealand.webp`,
+  "5th ashes test": `${IMAGE_BASE}5th-ashes-test.webp`,
+  "atp finals": `${IMAGE_BASE}ATP-Finals.webp`,
+  "ariana grande london concert": `${IMAGE_BASE}Ariana-Grande-London-Concert.webp`,
+  "art basel": `${IMAGE_BASE}Art-BaseL.webp`,
+  "asian games 2026": `${IMAGE_BASE}Asian-Games-2026.webp`,
+  "australian open main draw": `${IMAGE_BASE}Australian-Open-Main-Draw.webp`,
+  "australian open qualifying": `${IMAGE_BASE}Australian-Open-Qualifying.webp`,
+  "australian open": `${IMAGE_BASE}Australian-Open-Main-Draw.webp`,
+  "autumn nations series": `${IMAGE_BASE}Autumn-Nations-Series.webp`,
+  "bbc proms": `${IMAGE_BASE}BBC-Proms.webp`,
+  "bmw pga championship": `${IMAGE_BASE}BMW-PGA-Championship.webp`,
+  "bst hyde park garth brooks": `${IMAGE_BASE}BST-Hyde-Park-Garth-Brooks.webp`,
+  "bst hyde park lewis capaldi": `${IMAGE_BASE}BST-Hyde-Park-Lewis-Capaldi-Night-1.webp`,
+  "bst hyde park": `${IMAGE_BASE}BST-Hyde-Park-Garth-Brooks.webp`,
+  "barbarians v all blacks": `${IMAGE_BASE}Barbarians-v-All-Blacks-XV.webp`,
+  "barbarians all blacks": `${IMAGE_BASE}Barbarians-v-All-Blacks-XV.webp`,
+  "belmont stakes": `${IMAGE_BASE}Belmont-Stakes.webp`,
+  "berlinale": `${IMAGE_BASE}Berlinale-Berlin-Film-Festival.webp`,
+  "berlin film festival": `${IMAGE_BASE}Berlinale-Berlin-Film-Festival.webp`,
+  "boston marathon": `${IMAGE_BASE}Boston-Marathon.webp`,
+  "cannes film festival": `${IMAGE_BASE}Cannes-Film-Festival.webp`,
+  "cheltenham festival": `${IMAGE_BASE}Cheltenham-Festival.webp`,
+  "cheltenham": `${IMAGE_BASE}Cheltenham-Festival.webp`,
+  "coachella": `${IMAGE_BASE}Coachella.webp`,
+  "cowes week": `${IMAGE_BASE}Cowes-Week-Bicentenary.webp`,
+  "creamfields": `${IMAGE_BASE}Creamfields.webp`,
+  "crowdstrike 24 hours of spa": `${IMAGE_BASE}CrowdStrike-24-Hours-of-Spa.webp`,
+  "24 hours of spa": `${IMAGE_BASE}CrowdStrike-24-Hours-of-Spa.webp`,
+  "dp world tour championship": `${IMAGE_BASE}DP-World-Tour-Championship.webp`,
+  "davis cup finals": `${IMAGE_BASE}Davis-Cup-Finals.webp`,
+  "davis cup": `${IMAGE_BASE}Davis-Cup-Finals.webp`,
+  "download festival": `${IMAGE_BASE}Download-Festival.webp`,
+  "dubai world cup": `${IMAGE_BASE}Dubai-World-Cup.webp`,
+  "bafta film awards": `${IMAGE_BASE}EE-BAFTA-Film-Awards.webp`,
+  "bafta": `${IMAGE_BASE}EE-BAFTA-Film-Awards.webp`,
+  "efl cup final": `${IMAGE_BASE}EFL-Cup-Final-Carabao-Cup.webp`,
+  "carabao cup": `${IMAGE_BASE}EFL-Cup-Final-Carabao-Cup.webp`,
+  "carabao cup final": `${IMAGE_BASE}EFL-Cup-Final-Carabao-Cup.webp`,
+  "epcr challenge cup final": `${IMAGE_BASE}EPCR-Challenge-Cup-Final.webp`,
+  "challenge cup final": `${IMAGE_BASE}EPCR-Challenge-Cup-Final.webp`,
+  "eastbourne international": `${IMAGE_BASE}Eastbourne-International.webp`,
+  "england vs ireland six nations": `${IMAGE_BASE}England-vs-Ireland-Six-Nations.webp`,
+  "england vs wales six nations": `${IMAGE_BASE}England-vs-Wales-Six-Nations.webp`,
+  "epsom derby": `${IMAGE_BASE}Epsom-Derby.webp`,
+  "epsom oaks": `${IMAGE_BASE}Epsom-Oaks.webp`,
+  "euroleague basketball final four": `${IMAGE_BASE}EuroLeague-Basketball-Final-Four.webp`,
+  "european athletics championships": `${IMAGE_BASE}European-Athletics-Championships.webp`,
+  "eurovision song contest": `${IMAGE_BASE}Eurovision-Song-Contest-Grand-Final.webp`,
+  "eurovision": `${IMAGE_BASE}Eurovision-Song-Contest-Grand-Final.webp`,
+  "fa cup final": `${IMAGE_BASE}FA-CUP-FINAL.webp`,
+  "fa community shield": `${IMAGE_BASE}FA-Community-Shield.webp`,
+  "community shield": `${IMAGE_BASE}FA-Community-Shield.webp`,
+  "fa cup third round": `${IMAGE_BASE}FA-Cup-Third-Round.webp`,
+  "fifa world cup": `${IMAGE_BASE}FIFA-WORLD-CUP.webp`,
+  "world cup": `${IMAGE_BASE}FIFA-WORLD-CUP.webp`,
+  "abu dhabi grand prix": `${IMAGE_BASE}Formula-1_-Abu-Dhabi-Grand-Prix.webp`,
+  "australian grand prix": `${IMAGE_BASE}Formula-1_-Australian-Grand-Prix.webp`,
+  "austrian grand prix": `${IMAGE_BASE}Formula-1_-Austrian-Grand-Prix.webp`,
+  "azerbaijan grand prix": `${IMAGE_BASE}Formula-1_-Azerbaijan-Grand-Prix.webp`,
+  "bahrain grand prix": `${IMAGE_BASE}Formula-1_-Bahrain-Grand-Prix.webp`,
+  "belgian grand prix": `${IMAGE_BASE}Formula-1_-Belgian-Grand-Prix.webp`,
+  "british grand prix": `${IMAGE_BASE}Formula-1_-British-Grand-Prix-Sprint.webp`,
+  "canadian grand prix": `${IMAGE_BASE}Formula-1_-Canadian-Grand-Prix-Sprint.webp`,
+  "chinese grand prix": `${IMAGE_BASE}Formula-1_-Chinese-Grand-Prix.webp`,
+  "dutch grand prix": `${IMAGE_BASE}Formula-1_-Dutch-Grand-Prix-Sprint.webp`,
+  "hungarian grand prix": `${IMAGE_BASE}Formula-1_-Hungarian-Grand-Prix.webp`,
+  "italian grand prix": `${IMAGE_BASE}Formula-1_-Italian-Grand-Prix.webp`,
+  "japanese grand prix": `${IMAGE_BASE}Formula-1_-Japanese-Grand-Prix.webp`,
+  "las vegas grand prix": `${IMAGE_BASE}Formula-1_-Las-Vegas-Grand-Prix.webp`,
+  "madrid grand prix": `${IMAGE_BASE}Formula-1_-Madrid-Grand-Prix.webp`,
+  "mexican grand prix": `${IMAGE_BASE}Formula-1_-Mexican-Grand-Prix.webp`,
+  "miami grand prix": `${IMAGE_BASE}Formula-1_-Miami-Grand-Prix.webp`,
+  "qatar grand prix": `${IMAGE_BASE}Formula-1_-Qatar-Grand-Prix.webp`,
+  "sao paulo grand prix": `${IMAGE_BASE}Formula-1_-Sao-Paulo-Grand-Prix.webp`,
+  "saudi arabian gp": `${IMAGE_BASE}Formula-1_-Saudi-Arabian-GP.webp`,
+  "saudi arabian grand prix": `${IMAGE_BASE}Formula-1_-Saudi-Arabian-GP.webp`,
+  "singapore grand prix": `${IMAGE_BASE}Formula-1_-Singapore-Grand-Prix-Sprint.webp`,
+  "spanish grand prix": `${IMAGE_BASE}Formula-1_-Spanish-Grand-Prix.webp`,
+  "united states grand prix": `${IMAGE_BASE}Formula-1_-United-States-Grand-Prix.webp`,
+  "monaco grand prix": `${IMAGE_BASE}monaco-grand-prix.webp`,
+  "formula e london e prix": `${IMAGE_BASE}Formula-E-London-E-Prix.webp`,
+  "london e prix": `${IMAGE_BASE}Formula-E-London-E-Prix.webp`,
+  "france vs ireland six nations": `${IMAGE_BASE}France-vs-Ireland-Six-Nations.webp`,
+  "french open": `${IMAGE_BASE}French-Open-Roland-Garros.webp`,
+  "roland garros": `${IMAGE_BASE}French-Open-Roland-Garros.webp`,
+  "frieze london": `${IMAGE_BASE}Frieze-London-_-Frieze-Masters.webp`,
+  "frieze masters": `${IMAGE_BASE}Frieze-London-_-Frieze-Masters.webp`,
+  "gallagher premiership final": `${IMAGE_BASE}Gallagher-Premiership-Final.webp`,
+  "premiership final": `${IMAGE_BASE}Gallagher-Premiership-Final.webp`,
+  "genesis scottish open": `${IMAGE_BASE}Genesis-Scottish-Open.webp`,
+  "scottish open": `${IMAGE_BASE}Genesis-Scottish-Open.webp`,
+  "giro ditalia": `${IMAGE_BASE}Giro-dItalia.webp`,
+  "giro d'italia": `${IMAGE_BASE}Giro-dItalia.webp`,
+  "goodwood festival of speed": `${IMAGE_BASE}Goodwood-Festival-of-Speed.webp`,
+  "festival of speed": `${IMAGE_BASE}Goodwood-Festival-of-Speed.webp`,
+  "goodwood members meeting": `${IMAGE_BASE}Goodwood-Members-Meeting.webp`,
+  "goodwood revival": `${IMAGE_BASE}Goodwood-Revival.webp`,
+  "goodwood": `${IMAGE_BASE}Goodwood-Festival-of-Speed.webp`,
+  "grand national": `${IMAGE_BASE}Grand-National-LOCATION-Liverpool-UK.webp`,
+  "queens club": `${IMAGE_BASE}HSBC-Championships-Queens-Club.webp`,
+  "hsbc championships": `${IMAGE_BASE}HSBC-Championships-Queens-Club.webp`,
+  "henley royal regatta": `${IMAGE_BASE}Henley-Royal-Regatta.webp`,
+  "henley regatta": `${IMAGE_BASE}Henley-Royal-Regatta.webp`,
+  "icc mens t20 world cup": `${IMAGE_BASE}ICC-Mens-T20-World-Cup.webp`,
+  "t20 world cup": `${IMAGE_BASE}ICC-Mens-T20-World-Cup.webp`,
+  "icc womens t20 world cup": `${IMAGE_BASE}ICC-Womens-T20-World-Cup.webp`,
+  "indian wells": `${IMAGE_BASE}Indian-Wells-BNP-Paribas-Open.webp`,
+  "bnp paribas open": `${IMAGE_BASE}Indian-Wells-BNP-Paribas-Open.webp`,
+  "indianapolis 500": `${IMAGE_BASE}Indianapolis-500.webp`,
+  "indy 500": `${IMAGE_BASE}Indianapolis-500.webp`,
+  "internazionali ditalia": `${IMAGE_BASE}Internazionali-dItalia-Rome.webp`,
+  "italian open": `${IMAGE_BASE}Internazionali-dItalia-Rome.webp`,
+  "rome masters": `${IMAGE_BASE}Internazionali-dItalia-Rome.webp`,
+  "investec champions cup final": `${IMAGE_BASE}Investec-Champions-Cup-Final.webp`,
+  "champions cup final": `${IMAGE_BASE}Investec-Champions-Cup-Final.webp`,
+  "isle of man tt": `${IMAGE_BASE}Isle-of-Man-TT.webp`,
+  "isle of wight festival": `${IMAGE_BASE}Isle-of-Wight-Festival.webp`,
+  "italy vs england six nations": `${IMAGE_BASE}Italy-vs-England-Six-Nations.webp`,
+  "jingle bell ball": `${IMAGE_BASE}Jingle-Bell-Ball.webp`,
+  "kentucky derby": `${IMAGE_BASE}Kentucky-Derby.webp`,
+  "kentucky oaks": `${IMAGE_BASE}Kentucky-Oaks.webp`,
+  "king george vi chase": `${IMAGE_BASE}King-George-VI-Chase.webp`,
+  "king george vi queen elizabeth stakes": `${IMAGE_BASE}King-George-VI-Queen-Elizabeth-Stakes.webp`,
+  "king george": `${IMAGE_BASE}King-George-VI-Queen-Elizabeth-Stakes.webp`,
+  "latitude festival": `${IMAGE_BASE}Latitude-Festival.webp`,
+  "laver cup": `${IMAGE_BASE}Laver-Cup.webp`,
+  "london fashion week": `${IMAGE_BASE}London-Fashion-Week.webp`,
+  "london marathon": `${IMAGE_BASE}London-Marathon.webp`,
+  "madrid open": `${IMAGE_BASE}Madrid-Open.webp`,
+  "melbourne cup": `${IMAGE_BASE}Melbourne-Cup.webp`,
+  "met gala": `${IMAGE_BASE}Met-Gala-New-York.webp`,
+  "miami open": `${IMAGE_BASE}Miami-Open.webp`,
+  "milan fashion week": `${IMAGE_BASE}Milan-Fashion-Week.webp`,
+  "winter olympics": `${IMAGE_BASE}Milano-Cortina-2026-Winter-Olympics.webp`,
+  "milano cortina": `${IMAGE_BASE}Milano-Cortina-2026-Winter-Olympics.webp`,
+  "monaco e prix": `${IMAGE_BASE}Monaco-E-Prix-Formula-E.webp`,
+  "monaco historic grand prix": `${IMAGE_BASE}Monaco-Historic-Grand-Prix.webp`,
+  "monte carlo masters": `${IMAGE_BASE}Monte-Carlo-Masters.webp`,
+  "motogp czech gp": `${IMAGE_BASE}MotoGP-Round-10-Czech-GP.webp`,
+  "motogp british gp": `${IMAGE_BASE}MotoGP-Round-13-British-GP.webp`,
+  "motogp japanese gp": `${IMAGE_BASE}MotoGP-Round-17-Japanese-GP.webp`,
+  "motogp indonesian gp": `${IMAGE_BASE}MotoGP-Round-18-Indonesian-GP.webp`,
+  "motogp australian gp": `${IMAGE_BASE}MotoGP-Round-19-Australian-GP.webp`,
+  "motogp malaysian gp": `${IMAGE_BASE}MotoGP-Round-20-Malaysian-GP.webp`,
+  "motogp portuguese gp": `${IMAGE_BASE}MotoGP-Round-21-Portuguese-GP.webp`,
+  "motogp valencia gp": `${IMAGE_BASE}MotoGP-Round-22-Valencia-GP.webp`,
+  "motogp spanish gp": `${IMAGE_BASE}MotoGP-Round-5-Spanish-GP.webp`,
+  "motogp thailand gp": `${IMAGE_BASE}MotoGP-Thailand-GP.webp`,
+  "motogp": `${IMAGE_BASE}MotoGP-Round-13-British-GP.webp`,
+  "nba europe games berlin": `${IMAGE_BASE}NBA-Europe-Games-Berlin.webp`,
+  "nba europe games london": `${IMAGE_BASE}NBA-Europe-Games-London.webp`,
+  "nba europe games": `${IMAGE_BASE}NBA-Europe-Games-London.webp`,
+  "nba london": `${IMAGE_BASE}NBA-Europe-Games-London.webp`,
+  "nfl playoffs conference championships": `${IMAGE_BASE}NFL-Playoffs-Conference-Championships.webp`,
+  "nfl playoffs divisional round": `${IMAGE_BASE}NFL-Playoffs-Divisional-Round.webp`,
+  "nfl playoffs wild card": `${IMAGE_BASE}NFL-Playoffs-Wild-Card-Round.webp`,
+  "nfl london": `${IMAGE_BASE}nfl-london-games.webp`,
+  "nfl london games": `${IMAGE_BASE}nfl-london-games.webp`,
+  "nurburgring 24 hours": `${IMAGE_BASE}Nurburgring-24-Hours.webp`,
+  "nurburgring": `${IMAGE_BASE}Nurburgring-24-Hours.webp`,
+  "oktoberfest": `${IMAGE_BASE}Oktoberfest.webp`,
+  "olivier awards": `${IMAGE_BASE}Olivier-Awards.webp`,
+  "pdc world darts championship": `${IMAGE_BASE}PDC-World-Darts-Championship.webp`,
+  "world darts championship": `${IMAGE_BASE}PDC-World-Darts-Championship.webp`,
+  "world darts": `${IMAGE_BASE}PDC-World-Darts-Championship.webp`,
+  "pga championship": `${IMAGE_BASE}PGA-Championship.webp`,
+  "palio di siena": `${IMAGE_BASE}Palio-di-Siena-Summer.webp`,
+  "paris fashion week": `${IMAGE_BASE}Paris-Fashion-Week.webp`,
+  "paris haute couture": `${IMAGE_BASE}Paris-Haute-Couture-Week.webp`,
+  "paris mens fashion week": `${IMAGE_BASE}paris-mens-fashion-week-2026.webp`,
+  "parklife festival": `${IMAGE_BASE}Parklife-Festival.webp`,
+  "parklife": `${IMAGE_BASE}Parklife-Festival.webp`,
+  "premier league opening weekend": `${IMAGE_BASE}Premier-League-2026_27-Opening-Weekend.webp`,
+  "premier league boxing day": `${IMAGE_BASE}Premier-League-Boxing-Day-Fixtures.webp`,
+  "premier league darts final": `${IMAGE_BASE}Premier-League-Darts-Final.webp`,
+  "premier league darts": `${IMAGE_BASE}Premier-League-Darts-Final.webp`,
+  "premier league final round": `${IMAGE_BASE}Premier-League-Final-Round.webp`,
+  "premier league final day": `${IMAGE_BASE}Premier-League-Final-Round.webp`,
+  "presidents cup": `${IMAGE_BASE}Presidents-Cup.webp`,
+  "prix de larc de triomphe": `${IMAGE_BASE}Prix-de-lArc-de-Triomphe-Weekend.webp`,
+  "arc de triomphe": `${IMAGE_BASE}Prix-de-lArc-de-Triomphe-Weekend.webp`,
+  "qatar goodwood festival": `${IMAGE_BASE}Qatar-Goodwood-Festival.webp`,
+  "raye": `${IMAGE_BASE}RAYE-This-Tour-May-Contain-New-Music.webp`,
+  "reading leeds": `${IMAGE_BASE}Reading-Leeds-Festivals.webp`,
+  "reading festival": `${IMAGE_BASE}Reading-Leeds-Festivals.webp`,
+  "leeds festival": `${IMAGE_BASE}Reading-Leeds-Festivals.webp`,
+  "rolex 24 at daytona": `${IMAGE_BASE}Rolex-24-At-Daytona.webp`,
+  "daytona 24": `${IMAGE_BASE}Rolex-24-At-Daytona.webp`,
+  "royal ascot": `${IMAGE_BASE}Royal-Ascot.webp`,
+  "ascot": `${IMAGE_BASE}Royal-Ascot.webp`,
+  "sailgp": `${IMAGE_BASE}SailGP-UK-Plymouth.webp`,
+  "sailgp uk plymouth": `${IMAGE_BASE}SailGP-UK-Plymouth.webp`,
+  "six nations championship": `${IMAGE_BASE}Six-Nations-Championship.webp`,
+  "six nations": `${IMAGE_BASE}Six-Nations-Championship.webp`,
+  "six nations super saturday": `${IMAGE_BASE}Six-Nations-Super-Saturday-Finale.webp`,
+  "solheim cup": `${IMAGE_BASE}Solheim-Cup.webp`,
+  "st leger festival": `${IMAGE_BASE}St-Leger-Festival.webp`,
+  "st leger": `${IMAGE_BASE}St-Leger-Festival.webp`,
+  "sundance film festival": `${IMAGE_BASE}Sundance-film-festival.webp`,
+  "sundance": `${IMAGE_BASE}Sundance-film-festival.webp`,
+  "super bowl": `${IMAGE_BASE}Super-Bowl-LX.webp`,
+  "t20 blast finals day": `${IMAGE_BASE}T20-Blast-Finals-Day.webp`,
+  "t20 blast": `${IMAGE_BASE}T20-Blast-Finals-Day.webp`,
+  "tefaf maastricht": `${IMAGE_BASE}TEFAF-Maastricht.webp`,
+  "tefaf": `${IMAGE_BASE}TEFAF-Maastricht.webp`,
+  "trnsmt festival": `${IMAGE_BASE}TRNSMT-Festival.webp`,
+  "trnsmt": `${IMAGE_BASE}TRNSMT-Festival.webp`,
+  "take that": `${IMAGE_BASE}Take-That-The-Circus-Live-Tour.webp`,
+  "the open championship": `${IMAGE_BASE}The-154th-Open-Championship.webp`,
+  "the open": `${IMAGE_BASE}The-154th-Open-Championship.webp`,
+  "open championship": `${IMAGE_BASE}The-154th-Open-Championship.webp`,
+  "the hundred": `${IMAGE_BASE}The-Hundred.webp`,
+  "the masters": `${IMAGE_BASE}The-Masters.webp`,
+  "masters golf": `${IMAGE_BASE}The-Masters.webp`,
+  "the players championship": `${IMAGE_BASE}The-Players-Championship.webp`,
+  "players championship": `${IMAGE_BASE}The-Players-Championship.webp`,
+  "tomorrowland": `${IMAGE_BASE}Tomorrowland.webp`,
+  "tour de france": `${IMAGE_BASE}Tour-de-France.webp`,
+  "champions league final": `${IMAGE_BASE}UEFA-Champions-League-Final.webp`,
+  "uefa champions league final": `${IMAGE_BASE}UEFA-Champions-League-Final.webp`,
+  "europa conference league final": `${IMAGE_BASE}UEFA-Europa-Conference-League-Final.webp`,
+  "europa league final": `${IMAGE_BASE}UEFA-Europa-League-Final.webp`,
+  "uefa super cup": `${IMAGE_BASE}UEFA-Super-Cup.webp`,
+  "womens champions league final": `${IMAGE_BASE}UEFA-Womens-Champions-League-Final.webp`,
+  "ufc": `${IMAGE_BASE}UFC-White-House.webp`,
+  "us open": `${IMAGE_BASE}US-Open.webp`,
+  "venice film festival": `${IMAGE_BASE}Venice-Film-Festival.webp`,
+  "vuelta a espana": `${IMAGE_BASE}Vuelta-a-Espana.webp`,
+  "vuelta": `${IMAGE_BASE}Vuelta-a-Espana.webp`,
+  "wta finals": `${IMAGE_BASE}WTA-Finals.webp`,
+  "white turf st moritz": `${IMAGE_BASE}White-Turf-St.-Moritz-Race-Day-1.webp`,
+  "st moritz": `${IMAGE_BASE}White-Turf-St.-Moritz-Race-Day-1.webp`,
+  "wimbledon championships": `${IMAGE_BASE}Wimbledon-Championships.webp`,
+  "wimbledon": `${IMAGE_BASE}Wimbledon-Championships.webp`,
+  "wimbledon gentlemans final": `${IMAGE_BASE}Wimbledon-Gentlemans-Final.webp`,
+  "wimbledon final": `${IMAGE_BASE}Wimbledon-Gentlemans-Final.webp`,
+  "winter paralympics": `${IMAGE_BASE}Winter-Paralympics-2026.webp`,
+  "paralympics": `${IMAGE_BASE}Winter-Paralympics-2026.webp`,
+  "wireless festival": `${IMAGE_BASE}Wireless-Festival.webp`,
+  "wireless": `${IMAGE_BASE}Wireless-Festival.webp`,
+  "world athletics u20 championships": `${IMAGE_BASE}World-Athletics-U20-Championships.webp`,
+  "world rowing championships": `${IMAGE_BASE}World-Rowing-Championships.webp`,
+  "york ebor festival": `${IMAGE_BASE}York-Ebor-Festival.webp`,
+  "ebor festival": `${IMAGE_BASE}York-Ebor-Festival.webp`,
+  "burning man": `${IMAGE_BASE}burning-man-festival.webp`,
+  "dakar rally": `${IMAGE_BASE}dakar-ralley.webp`,
+  "dakar": `${IMAGE_BASE}dakar-ralley.webp`,
+  "new york fashion week": `${IMAGE_BASE}new-york-fashion-week.webp`,
+  // Generic category fallbacks for broader matching
+  "glastonbury": `${IMAGE_BASE}Creamfields.webp`,
+  "marbella golf": `${IMAGE_BASE}BMW-PGA-Championship.webp`,
+  "golf trip": `${IMAGE_BASE}BMW-PGA-Championship.webp`,
+  "skiing": `${IMAGE_BASE}Milano-Cortina-2026-Winter-Olympics.webp`,
+  "ski trip": `${IMAGE_BASE}Milano-Cortina-2026-Winter-Olympics.webp`,
+};
+
+/**
+ * Fuzzy-match a Salesforce event name to a website image URL.
+ * Strategy:
+ * 1. Exact match on lowercased event name
+ * 2. Strip year suffixes (e.g., "2026", "2025/26") and try again
+ * 3. Try matching progressively shorter substrings
+ * 4. Try each word combination as a key
+ * 5. Falls back to null (category gradient will be used instead)
+ */
+function resolveEventImage(eventName: string): string | null {
+  if (!eventName) return null;
+
+  // Normalize: lowercase, collapse whitespace, remove special chars except spaces
+  const normalize = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/[''`]/g, "'")
+      .replace(/[^\w\s']/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const normalized = normalize(eventName);
+
+  // 1. Direct match
+  if (IMAGE_LIBRARY[normalized]) return IMAGE_LIBRARY[normalized];
+
+  // 2. Strip year patterns: "2026", "2025/26", "25/26", "2025-26"
+  const noYear = normalized
+    .replace(/\b20\d{2}(\/\d{2})?\b/g, "")
+    .replace(/\b\d{2}\/\d{2}\b/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (noYear !== normalized && IMAGE_LIBRARY[noYear]) return IMAGE_LIBRARY[noYear];
+
+  // 3. Try partial matches — find keys that are contained in the event name
+  const keys = Object.keys(IMAGE_LIBRARY);
+  // Sort by key length descending (prefer longer, more specific matches)
+  const sortedKeys = [...keys].sort((a, b) => b.length - a.length);
+
+  for (const key of sortedKeys) {
+    if (key.length >= 4 && normalized.includes(key)) return IMAGE_LIBRARY[key];
+  }
+  // Also try without year
+  for (const key of sortedKeys) {
+    if (key.length >= 4 && noYear.includes(key)) return IMAGE_LIBRARY[key];
+  }
+
+  // 4. Try the event name as a substring of library keys
+  for (const key of sortedKeys) {
+    if (key.length >= 6 && key.includes(noYear)) return IMAGE_LIBRARY[key];
+  }
+
+  // 5. Word-based matching — if 2+ words from the event name appear in a key
+  const eventWords = noYear.split(" ").filter((w) => w.length >= 3);
+  if (eventWords.length >= 2) {
+    let bestMatch: string | null = null;
+    let bestScore = 0;
+    for (const key of sortedKeys) {
+      const matchingWords = eventWords.filter((w) => key.includes(w));
+      const score = matchingWords.length / eventWords.length;
+      if (score > bestScore && matchingWords.length >= 2) {
+        bestScore = score;
+        bestMatch = key;
+      }
+    }
+    if (bestMatch && bestScore >= 0.4) return IMAGE_LIBRARY[bestMatch];
+  }
+
+  return null;
+}
+
 // ── Category Visual System ──
 // Rich gradient backgrounds per category so cards look stunning even without photos
 
@@ -184,7 +524,9 @@ function EventCard({ event, onClick }: { event: SalesforceEvent; onClick: () => 
   const CatIcon = catVisual.icon;
   const daysLeft = event.Start_Date__c ? daysUntil(event.Start_Date__c) : null;
   const isPast = daysLeft !== null && daysLeft < 0;
-  const imageUrl = event.Event_Image_1__c;
+
+  // Image resolution: SF field > fuzzy match from website library
+  const imageUrl = event.Event_Image_1__c || resolveEventImage(event.Name);
   const revenueTarget = event.Revenue_Target__c || 0;
   const revenueActual = event.Sum_of_Closed_Won_Gross__c || 0;
   const revenuePct = revenueTarget > 0 ? Math.min(100, Math.round((revenueActual / revenueTarget) * 100)) : 0;
@@ -332,7 +674,11 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
   const totalBooked = event.Total_Tickets_Booked__c || 0;
   const totalRequired = event.Total_Tickets_Required__c || 0;
   const completionPct = event.Percentage_Reservations_Completion__c || 0;
-  const images = [event.Event_Image_1__c, event.Event_Image_2__c, event.Event_Image_3__c, event.Event_Image_4__c, event.Event_Image_5__c].filter(Boolean) as string[];
+
+  // Resolve images: SF fields first, then fuzzy match
+  const sfImages = [event.Event_Image_1__c, event.Event_Image_2__c, event.Event_Image_3__c, event.Event_Image_4__c, event.Event_Image_5__c].filter(Boolean) as string[];
+  const resolvedImage = sfImages.length === 0 ? resolveEventImage(event.Name) : null;
+  const images = sfImages.length > 0 ? sfImages : resolvedImage ? [resolvedImage] : [];
 
   const oppsByStage = useMemo(() => {
     const grouped: Record<string, SalesforceOpportunityFull[]> = {};
@@ -648,7 +994,7 @@ export default function EventsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [showPastEvents, setShowPastEvents] = useState(false);
+  const [showPastEvents, setShowPastEvents] = useState(true);
   const [selectedEvent, setSelectedEvent] = useState<SalesforceEvent | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -685,7 +1031,7 @@ export default function EventsPage() {
     return result;
   }, [events, search, selectedCategory, showPastEvents]);
 
-  // Group events by month — always
+  // Group events by month
   const eventsByMonth = useMemo(() => {
     const grouped: Record<string, SalesforceEvent[]> = {};
     for (const e of filteredEvents) {
@@ -704,69 +1050,71 @@ export default function EventsPage() {
     return d.toLocaleString("en-GB", { month: "long", year: "numeric" });
   };
 
-  const activeFilters = (selectedCategory !== "all" ? 1 : 0) + (showPastEvents ? 1 : 0) + (search.trim() ? 1 : 0);
+  const activeFilters = (selectedCategory !== "all" ? 1 : 0) + (!showPastEvents ? 1 : 0) + (search.trim() ? 1 : 0);
 
   return (
     <div ref={scrollRef} className="h-dvh overflow-y-auto bg-background p-6 pl-24 lg:p-8 lg:pl-24">
       <div className="max-w-[1600px] mx-auto pb-24">
 
-        {/* Compact sticky header */}
-        <div className="sticky top-0 z-40 -mx-6 px-6 -mt-6 pt-6 lg:-mx-8 lg:px-8 lg:-mt-8 lg:pt-8 pb-4 bg-background/80 backdrop-blur-xl border-b border-border/30">
-          <div className="flex items-center gap-4">
-            {/* Title */}
-            <h1 className="text-xl font-bold tracking-tight shrink-0">Events</h1>
-            <span className="text-xs text-muted-foreground tabular-nums shrink-0">{filteredEvents.length} events</span>
+        {/* Sticky header — sits within content flow, does NOT overlap sidebar */}
+        <div className="sticky top-0 z-20 pb-4 pt-0 -mt-6 lg:-mt-8">
+          <div className="bg-background/80 backdrop-blur-xl rounded-b-xl border-b border-border/30 px-4 py-3">
+            <div className="flex items-center gap-4">
+              {/* Title */}
+              <h1 className="text-xl font-bold tracking-tight shrink-0">Events</h1>
+              <span className="text-xs text-muted-foreground tabular-nums shrink-0">{filteredEvents.length} events</span>
 
-            <div className="flex-1" />
+              <div className="flex-1" />
 
-            {/* Search */}
-            <div className="relative w-64">
-              <MagnifyingGlass className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-              <input
-                type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search..."
-                className="w-full pl-8 pr-7 py-1.5 rounded-lg bg-muted/30 border border-border/40 text-sm focus:outline-none focus:border-foreground/20 focus:ring-1 focus:ring-foreground/5 transition-colors placeholder:text-muted-foreground/40"
-              />
-              {search && (
-                <button onClick={() => setSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                  <X className="size-3" />
+              {/* Search */}
+              <div className="relative w-64">
+                <MagnifyingGlass className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+                <input
+                  type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search..."
+                  className="w-full pl-8 pr-7 py-1.5 rounded-lg bg-muted/30 border border-border/40 text-sm focus:outline-none focus:border-foreground/20 focus:ring-1 focus:ring-foreground/5 transition-colors placeholder:text-muted-foreground/40"
+                />
+                {search && (
+                  <button onClick={() => setSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                    <X className="size-3" />
+                  </button>
+                )}
+              </div>
+
+              {/* Category */}
+              <div className="relative">
+                <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="appearance-none pl-2.5 pr-7 py-1.5 rounded-lg bg-muted/30 border border-border/40 text-sm focus:outline-none focus:border-foreground/20 cursor-pointer">
+                  <option value="all">All Categories</option>
+                  {categories.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+                </select>
+                <CaretDown className="absolute right-2 top-1/2 -translate-y-1/2 size-3 text-muted-foreground pointer-events-none" />
+              </div>
+
+              {/* Past toggle */}
+              <button onClick={() => setShowPastEvents(!showPastEvents)}
+                className={`px-2.5 py-1.5 rounded-lg border text-xs transition-colors ${!showPastEvents ? "bg-foreground/10 border-foreground/20 text-foreground" : "bg-muted/30 border-border/40 text-muted-foreground hover:text-foreground"}`}>
+                {showPastEvents ? "Hide Past" : "Show Past"}
+              </button>
+
+              {activeFilters > 0 && (
+                <button onClick={() => { setSearch(""); setSelectedCategory("all"); setShowPastEvents(true); }}
+                  className="px-2.5 py-1.5 rounded-lg border border-red-500/30 bg-red-500/5 text-red-400 text-xs hover:bg-red-500/10 transition-colors flex items-center gap-1">
+                  <X className="size-3" /> Reset
                 </button>
               )}
-            </div>
 
-            {/* Category */}
-            <div className="relative">
-              <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}
-                className="appearance-none pl-2.5 pr-7 py-1.5 rounded-lg bg-muted/30 border border-border/40 text-sm focus:outline-none focus:border-foreground/20 cursor-pointer">
-                <option value="all">All Categories</option>
-                {categories.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
-              </select>
-              <CaretDown className="absolute right-2 top-1/2 -translate-y-1/2 size-3 text-muted-foreground pointer-events-none" />
-            </div>
-
-            {/* Past toggle */}
-            <button onClick={() => setShowPastEvents(!showPastEvents)}
-              className={`px-2.5 py-1.5 rounded-lg border text-xs transition-colors ${showPastEvents ? "bg-foreground/10 border-foreground/20 text-foreground" : "bg-muted/30 border-border/40 text-muted-foreground hover:text-foreground"}`}>
-              {showPastEvents ? "Hide Past" : "Show Past"}
-            </button>
-
-            {activeFilters > 0 && (
-              <button onClick={() => { setSearch(""); setSelectedCategory("all"); setShowPastEvents(false); }}
-                className="px-2.5 py-1.5 rounded-lg border border-red-500/30 bg-red-500/5 text-red-400 text-xs hover:bg-red-500/10 transition-colors flex items-center gap-1">
-                <X className="size-3" /> Reset
+              {/* Refresh */}
+              <button onClick={() => { setLoading(true); fetchEvents(); }}
+                className="text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded-lg border border-border/40 bg-muted/30">
+                <ArrowsClockwise className={`size-3.5 ${loading ? "animate-spin" : ""}`} />
               </button>
-            )}
-
-            {/* Refresh */}
-            <button onClick={() => { setLoading(true); fetchEvents(); }}
-              className="text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded-lg border border-border/40 bg-muted/30">
-              <ArrowsClockwise className={`size-3.5 ${loading ? "animate-spin" : ""}`} />
-            </button>
+            </div>
           </div>
         </div>
 
         {/* Events — month sections */}
-        <div className="mt-6">
+        <div className="mt-2">
           {loading ? (
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {Array.from({ length: 8 }).map((_, i) => (
