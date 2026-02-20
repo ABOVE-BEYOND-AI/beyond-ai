@@ -634,6 +634,19 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
     return { label: "0%", color: "text-muted-foreground/50" };
   };
 
+  // Group deals into won vs lost for side-by-side layout
+  const wonStages = ["Agreement Signed", "Amended", "Amendment Signed"];
+  const lostStages = ["Closed Lost"];
+  const wonDeals = useMemo(() => opportunities.filter((o) => wonStages.includes(o.StageName)), [opportunities]);
+  const lostDeals = useMemo(() => opportunities.filter((o) => lostStages.includes(o.StageName)), [opportunities]);
+  const otherDeals = useMemo(() => opportunities.filter((o) => !wonStages.includes(o.StageName) && !lostStages.includes(o.StageName)), [opportunities]);
+  const wonTotal = useMemo(() => wonDeals.reduce((s, o) => s + (o.Gross_Amount__c || o.Amount || 0), 0), [wonDeals]);
+  const lostTotal = useMemo(() => lostDeals.reduce((s, o) => s + (o.Gross_Amount__c || o.Amount || 0), 0), [lostDeals]);
+
+  // Embossed card style — reusable
+  const cardCls = "rounded-xl border border-white/[0.06] bg-white/[0.025]";
+  const cardShadow = { boxShadow: "0 1px 3px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.02), inset 0 1px 0 rgba(255,255,255,0.03)" };
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}
       className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md flex items-stretch justify-center" onClick={onClose}>
@@ -644,13 +657,13 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
         style={{ boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03)" }}
         onClick={(e) => e.stopPropagation()}>
 
-        {/* Hero — compact */}
+        {/* Hero — compact with stronger fade */}
         <div className="relative h-52 shrink-0 overflow-hidden">
           {images.length > 0 ? (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={`/api/image-proxy?url=${encodeURIComponent(images[0])}`} alt="" className="absolute inset-0 w-full h-full object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-t from-card via-card/40 to-black/10" />
+              <div className="absolute inset-0 bg-gradient-to-t from-card via-card/50 to-black/20" />
             </>
           ) : (
             <>
@@ -700,9 +713,9 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
         {/* Tab content */}
         <div className="flex-1 overflow-y-auto">
           {activeTab === "overview" && (
-            <div className="p-6 space-y-5">
-              {/* Financials strip — clean horizontal row */}
-              <div className="flex items-stretch gap-px rounded-xl overflow-hidden border border-border/20">
+            <div className="p-6 space-y-4">
+              {/* Financials strip — embossed horizontal row */}
+              <div className={`flex items-stretch gap-px rounded-xl overflow-hidden ${cardCls}`} style={cardShadow}>
                 {[
                   { label: "Pipeline", value: totalOppRevenue, loading: oppsLoading },
                   { label: "Revenue", value: revenueActual, sub: revenueTarget > 0 ? `${revenuePct}% of target` : undefined },
@@ -710,7 +723,7 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
                   { label: "Costs", value: totalCosts },
                   { label: "Margin", value: margin != null ? null : null, custom: margin != null ? `${margin.toFixed(1)}%` : "—" },
                 ].map((item, i) => (
-                  <div key={item.label} className={`flex-1 px-4 py-3.5 ${i > 0 ? "border-l border-border/15" : ""} bg-muted/[0.04]`}>
+                  <div key={item.label} className={`flex-1 px-4 py-3.5 ${i > 0 ? "border-l border-white/[0.04]" : ""}`}>
                     <div className="text-[10px] text-muted-foreground/50 font-medium tracking-wide uppercase mb-1">{item.label}</div>
                     <div className="text-[15px] font-bold tabular-nums tracking-tight">
                       {item.loading ? "…" : item.custom || formatCurrency(item.value || 0)}
@@ -724,7 +737,7 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
               <div className="grid grid-cols-5 gap-4">
                 {/* Left: description + team */}
                 <div className="col-span-3 space-y-4">
-                  <div className="rounded-xl border border-border/15 p-4 bg-muted/[0.03]">
+                  <div className={`${cardCls} p-4`} style={cardShadow}>
                     <h4 className="text-[11px] uppercase tracking-wider text-muted-foreground/40 font-medium mb-2.5">About</h4>
                     {event.Description__c ? <p className="text-[13px] text-muted-foreground/80 leading-relaxed">{event.Description__c}</p>
                      : event.Event_Notes__c ? <p className="text-[13px] text-muted-foreground/80 leading-relaxed">{event.Event_Notes__c}</p>
@@ -732,7 +745,7 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
                   </div>
                   {/* Team row */}
                   {(event.Owner?.Name || event.A_B_On_Site_1__c || event.Total_Projects__c != null) && (
-                    <div className="flex items-center gap-4 text-[12px]">
+                    <div className="flex items-center gap-4 text-[12px] px-1">
                       {event.Owner?.Name && (
                         <div className="flex items-center gap-1.5 text-muted-foreground/60">
                           <UserCircle className="size-3.5" /><span>{event.Owner.Name}</span>
@@ -751,7 +764,7 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
                 </div>
 
                 {/* Right: ticket summary */}
-                <div className="col-span-2 rounded-xl border border-border/15 p-4 bg-muted/[0.03]">
+                <div className={`col-span-2 ${cardCls} p-4`} style={cardShadow}>
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="text-[11px] uppercase tracking-wider text-muted-foreground/40 font-medium">Tickets</h4>
                     <span className="text-[12px] tabular-nums font-semibold">{totalBooked}<span className="text-muted-foreground/30 font-normal">/{totalRequired}</span></span>
@@ -779,32 +792,34 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
                 </div>
               </div>
 
-              {/* Deal pipeline — condensed */}
+              {/* Deal pipeline — embossed with proper sizing */}
               {!oppsLoading && opportunities.length > 0 && (
-                <div className="rounded-xl border border-border/15 p-4 bg-muted/[0.03]">
+                <div className={`${cardCls} p-4`} style={cardShadow}>
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="text-[11px] uppercase tracking-wider text-muted-foreground/40 font-medium">Pipeline</h4>
                     <span className="text-[11px] text-muted-foreground/40 tabular-nums">{opportunities.length} deals · {formatCurrency(totalOppRevenue)}</span>
                   </div>
-                  <div className="flex items-center gap-1 h-6">
+                  <div className="flex items-center gap-1.5 h-9 mb-3">
                     {Object.entries(oppsByStage).map(([stage, opps]) => {
                       const sc = OPPORTUNITY_STAGES[stage];
                       const st = opps.reduce((s, o) => s + (o.Gross_Amount__c || o.Amount || 0), 0);
-                      const wp = totalOppRevenue > 0 ? Math.max(5, (st / totalOppRevenue) * 100) : 100 / Object.keys(oppsByStage).length;
+                      const wp = totalOppRevenue > 0 ? Math.max(8, (st / totalOppRevenue) * 100) : 100 / Object.keys(oppsByStage).length;
                       return (
-                        <div key={stage} className={`h-full rounded flex items-center justify-center ${sc?.bgColor || "bg-muted/20 text-muted-foreground"}`} style={{ flex: wp }} title={`${stage}: ${opps.length} · ${formatCurrency(st)}`}>
-                          <span className="text-[9px] font-medium truncate px-1">{opps.length}</span>
+                        <div key={stage} className={`h-full rounded-lg flex items-center justify-center ${sc?.bgColor || "bg-muted/20 text-muted-foreground"}`} style={{ flex: wp }} title={`${stage}: ${opps.length} · ${formatCurrency(st)}`}>
+                          <span className="text-[11px] font-semibold truncate px-2">{opps.length}</span>
                         </div>
                       );
                     })}
                   </div>
-                  <div className="flex items-center gap-3 mt-2">
+                  <div className="flex items-center gap-4">
                     {Object.entries(oppsByStage).map(([stage, opps]) => {
                       const sc = OPPORTUNITY_STAGES[stage];
+                      const st = opps.reduce((s, o) => s + (o.Gross_Amount__c || o.Amount || 0), 0);
                       return (
-                        <div key={stage} className="flex items-center gap-1.5 text-[10px] text-muted-foreground/40">
-                          <div className={`size-1.5 rounded-full ${sc?.bgColor?.replace("text-", "bg-") || "bg-muted/30"}`} style={{ backgroundColor: sc?.bgColor ? undefined : "rgba(255,255,255,0.1)" }} />
-                          {stage} ({opps.length})
+                        <div key={stage} className="flex items-center gap-1.5 text-[11px] text-muted-foreground/50">
+                          <div className={`size-2 rounded-full ${sc?.bgColor?.replace("text-", "bg-") || "bg-muted/30"}`} style={{ backgroundColor: sc?.bgColor ? undefined : "rgba(255,255,255,0.1)" }} />
+                          <span className="font-medium">{stage}</span>
+                          <span className="text-muted-foreground/30 tabular-nums">{opps.length} · {formatCurrency(st)}</span>
                         </div>
                       );
                     })}
@@ -816,7 +831,7 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
 
           {activeTab === "tickets" && (
             <div className="p-6 space-y-4">
-              <div className="rounded-xl border border-border/15 p-5 bg-muted/[0.03]">
+              <div className={`${cardCls} p-5`} style={cardShadow}>
                 <div className="flex items-center justify-between mb-4">
                   <h4 className="text-sm font-medium">Ticket Inventory</h4>
                   <span className="text-sm tabular-nums font-bold">{totalBooked}/{totalRequired} <span className="text-muted-foreground/50 font-normal">({Math.round(completionPct)}%)</span></span>
@@ -843,81 +858,190 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
                 <p className="text-center text-muted-foreground/50 py-16 text-sm">No deals linked to this event</p>
               ) : (
                 <div className="space-y-5">
-                  {Object.entries(oppsByStage).map(([stage, opps]) => {
-                    const sc = OPPORTUNITY_STAGES[stage];
-                    const stageTotal = opps.reduce((s, o) => s + (o.Gross_Amount__c || o.Amount || 0), 0);
-                    return (
-                      <div key={stage}>
-                        {/* Stage header */}
-                        <div className="flex items-center gap-2.5 mb-2">
-                          <span className={`inline-flex items-center px-2 py-[3px] rounded text-[10px] font-medium ${sc?.bgColor || "bg-muted/20 text-muted-foreground"}`}>{stage}</span>
-                          <span className="text-[11px] text-muted-foreground/40 tabular-nums">{opps.length} · {formatCurrency(stageTotal)}</span>
+                  {/* Won + Lost side by side */}
+                  {(wonDeals.length > 0 || lostDeals.length > 0) && (
+                    <div className="grid grid-cols-2 gap-4">
+                      {/* Won column */}
+                      <div>
+                        <div className="flex items-center gap-2.5 mb-3">
+                          <div className="flex items-center gap-1.5">
+                            <CheckCircle className="size-3.5 text-emerald-400/80" weight="fill" />
+                            <span className="text-[12px] font-semibold text-emerald-400/80">Won</span>
+                          </div>
+                          <span className="text-[11px] text-muted-foreground/30 tabular-nums">{wonDeals.length} · {formatCurrency(wonTotal)}</span>
                         </div>
-
-                        {/* Deal table */}
-                        <div className="rounded-lg border border-border/10 overflow-hidden">
-                          {opps.map((opp, i) => {
+                        <div className="space-y-2">
+                          {wonDeals.length > 0 ? wonDeals.map((opp) => {
                             const amount = opp.Gross_Amount__c || opp.Amount || 0;
                             const pp = paymentPct(opp.Percentage_Paid__c);
                             return (
-                              <div key={opp.Id} className={`flex items-center gap-3 px-3.5 py-2.5 ${i > 0 ? "border-t border-border/[0.06]" : ""} hover:bg-muted/[0.03] transition-colors`}>
-                                {/* Client + account */}
-                                <div className="flex-1 min-w-0">
-                                  <div className="text-[13px] font-medium truncate">{clientName(opp.Name)}</div>
-                                  <div className="text-[11px] text-muted-foreground/40 truncate">
-                                    {opp.Account?.Name}{opp.Owner?.Name && ` · ${opp.Owner.Name}`}
-                                  </div>
+                              <div key={opp.Id} className={`${cardCls} p-3.5`} style={cardShadow}>
+                                <div className="flex items-start justify-between gap-2 mb-1.5">
+                                  <span className="text-[13px] font-semibold truncate">{clientName(opp.Name)}</span>
+                                  <span className="text-[13px] font-bold tabular-nums shrink-0">{formatCurrency(amount)}</span>
                                 </div>
-                                {/* Payment */}
-                                {pp && (
-                                  <span className={`text-[10px] font-medium tabular-nums ${pp.color}`}>{pp.label}</span>
-                                )}
-                                {/* Amount */}
-                                <div className="text-[13px] font-semibold tabular-nums text-right w-20 shrink-0">{formatCurrency(amount)}</div>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[11px] text-muted-foreground/40 truncate">
+                                    {opp.Account?.Name}{opp.Owner?.Name && ` · ${opp.Owner.Name}`}
+                                  </span>
+                                  {pp && <span className={`text-[10px] font-medium tabular-nums ${pp.color}`}>{pp.label}</span>}
+                                </div>
                               </div>
                             );
-                          })}
+                          }) : (
+                            <div className={`${cardCls} p-4 text-center`} style={cardShadow}>
+                              <span className="text-[12px] text-muted-foreground/25">No won deals</span>
+                            </div>
+                          )}
                         </div>
                       </div>
-                    );
-                  })}
+
+                      {/* Lost column */}
+                      <div>
+                        <div className="flex items-center gap-2.5 mb-3">
+                          <div className="flex items-center gap-1.5">
+                            <X className="size-3.5 text-red-400/70" weight="bold" />
+                            <span className="text-[12px] font-semibold text-red-400/70">Lost</span>
+                          </div>
+                          <span className="text-[11px] text-muted-foreground/30 tabular-nums">{lostDeals.length} · {formatCurrency(lostTotal)}</span>
+                        </div>
+                        <div className="space-y-2">
+                          {lostDeals.length > 0 ? lostDeals.map((opp) => {
+                            const amount = opp.Gross_Amount__c || opp.Amount || 0;
+                            const pp = paymentPct(opp.Percentage_Paid__c);
+                            return (
+                              <div key={opp.Id} className={`${cardCls} p-3.5`} style={cardShadow}>
+                                <div className="flex items-start justify-between gap-2 mb-1.5">
+                                  <span className="text-[13px] font-semibold truncate">{clientName(opp.Name)}</span>
+                                  <span className="text-[13px] font-bold tabular-nums shrink-0">{formatCurrency(amount)}</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[11px] text-muted-foreground/40 truncate">
+                                    {opp.Account?.Name}{opp.Owner?.Name && ` · ${opp.Owner.Name}`}
+                                  </span>
+                                  {pp && <span className={`text-[10px] font-medium tabular-nums ${pp.color}`}>{pp.label}</span>}
+                                </div>
+                              </div>
+                            );
+                          }) : (
+                            <div className={`${cardCls} p-4 text-center`} style={cardShadow}>
+                              <span className="text-[12px] text-muted-foreground/25">No lost deals</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Other stages (in progress, etc.) — full width below */}
+                  {otherDeals.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-2.5 mb-3">
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="size-3.5 text-blue-400/70" />
+                          <span className="text-[12px] font-semibold text-blue-400/70">In Progress</span>
+                        </div>
+                        <span className="text-[11px] text-muted-foreground/30 tabular-nums">
+                          {otherDeals.length} · {formatCurrency(otherDeals.reduce((s, o) => s + (o.Gross_Amount__c || o.Amount || 0), 0))}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {otherDeals.map((opp) => {
+                          const amount = opp.Gross_Amount__c || opp.Amount || 0;
+                          const pp = paymentPct(opp.Percentage_Paid__c);
+                          const sc = OPPORTUNITY_STAGES[opp.StageName];
+                          return (
+                            <div key={opp.Id} className={`${cardCls} p-3.5`} style={cardShadow}>
+                              <div className="flex items-start justify-between gap-2 mb-1.5">
+                                <span className="text-[13px] font-semibold truncate">{clientName(opp.Name)}</span>
+                                <span className="text-[13px] font-bold tabular-nums shrink-0">{formatCurrency(amount)}</span>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] text-muted-foreground/40 truncate">
+                                  {opp.Account?.Name}{opp.Owner?.Name && ` · ${opp.Owner.Name}`}
+                                </span>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  {pp && <span className={`text-[10px] font-medium tabular-nums ${pp.color}`}>{pp.label}</span>}
+                                  <span className={`text-[9px] px-1.5 py-[1px] rounded font-medium ${sc?.bgColor || "bg-muted/20 text-muted-foreground"}`}>
+                                    {opp.StageName}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           )}
 
           {activeTab === "financials" && (
-            <div className="p-6 space-y-4">
-              {/* Revenue section */}
-              <div className="rounded-xl border border-border/15 p-5 bg-muted/[0.03]">
-                <h4 className="text-[11px] uppercase tracking-wider text-muted-foreground/40 font-medium mb-4">Revenue</h4>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[13px] text-muted-foreground/60">Pipeline value</span>
-                    <span className="text-[13px] font-semibold tabular-nums">{oppsLoading ? "…" : formatCurrency(totalOppRevenue)}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[13px] text-muted-foreground/60">Closed won</span>
-                    <span className="text-[13px] font-semibold tabular-nums">{formatCurrency(revenueActual)}</span>
-                  </div>
-                  {revenueTarget > 0 && (
+            <div className="p-6">
+              {/* 50/50 split — Revenue left, Profitability right */}
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                {/* Revenue */}
+                <div className={`${cardCls} p-5`} style={cardShadow}>
+                  <h4 className="text-[11px] uppercase tracking-wider text-muted-foreground/40 font-medium mb-4">Revenue</h4>
+                  <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-[13px] text-muted-foreground/60">Target</span>
-                      <span className="text-[13px] font-semibold tabular-nums">{formatCurrency(revenueTarget)} <span className="text-muted-foreground/30 font-normal text-[11px]">({revenuePct}%)</span></span>
+                      <span className="text-[13px] text-muted-foreground/60">Pipeline value</span>
+                      <span className="text-[14px] font-bold tabular-nums">{oppsLoading ? "…" : formatCurrency(totalOppRevenue)}</span>
                     </div>
-                  )}
-                  <div className="flex items-center justify-between pt-2 border-t border-border/10">
-                    <span className="text-[13px] text-muted-foreground/60">Payments received</span>
-                    <span className="text-[13px] font-bold tabular-nums">{formatCurrency(event.Total_Payments_Received__c || 0)}</span>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[13px] text-muted-foreground/60">Closed won</span>
+                      <span className="text-[14px] font-bold tabular-nums">{formatCurrency(revenueActual)}</span>
+                    </div>
+                    {revenueTarget > 0 && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-[13px] text-muted-foreground/60">Target</span>
+                        <span className="text-[13px] font-semibold tabular-nums">{formatCurrency(revenueTarget)} <span className="text-muted-foreground/30 font-normal text-[11px]">({revenuePct}%)</span></span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between pt-3 border-t border-white/[0.04]">
+                      <span className="text-[13px] text-muted-foreground/60">Payments received</span>
+                      <span className="text-[14px] font-bold tabular-nums text-emerald-400/80">{formatCurrency(event.Total_Payments_Received__c || 0)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Profitability */}
+                <div className={`${cardCls} p-5`} style={cardShadow}>
+                  <h4 className="text-[11px] uppercase tracking-wider text-muted-foreground/40 font-medium mb-4">Profitability</h4>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[13px] text-muted-foreground/60">Margin</span>
+                      <span className={`text-[14px] font-bold tabular-nums ${margin != null && margin >= 30 ? "text-emerald-400/80" : margin != null && margin >= 15 ? "text-amber-400/80" : ""}`}>
+                        {margin != null ? `${margin.toFixed(1)}%` : "—"}
+                      </span>
+                    </div>
+                    {event.Total_Margin_Value__c != null && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-[13px] text-muted-foreground/60">Margin value</span>
+                        <span className="text-[14px] font-bold tabular-nums">{formatCurrency(event.Total_Margin_Value__c)}</span>
+                      </div>
+                    )}
+                    {!oppsLoading && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-[13px] text-muted-foreground/60">Deals</span>
+                        <span className="text-[13px] tabular-nums font-medium">{wonOpps.length} won <span className="text-muted-foreground/30">/ {opportunities.length} total</span></span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between pt-3 border-t border-white/[0.04]">
+                      <span className="text-[13px] text-muted-foreground/60">Total costs</span>
+                      <span className="text-[14px] font-bold tabular-nums">{formatCurrency(totalCosts)}</span>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Costs */}
+              {/* Costs breakdown — only if there are costs */}
               {totalCosts > 0 && (
-                <div className="rounded-xl border border-border/15 p-5 bg-muted/[0.03]">
-                  <h4 className="text-[11px] uppercase tracking-wider text-muted-foreground/40 font-medium mb-4">Costs</h4>
-                  <div className="space-y-3">
+                <div className={`${cardCls} p-5`} style={cardShadow}>
+                  <h4 className="text-[11px] uppercase tracking-wider text-muted-foreground/40 font-medium mb-4">Cost Breakdown</h4>
+                  <div className="grid grid-cols-2 gap-x-8 gap-y-3">
                     {event.Total_Booking_Cost__c != null && event.Total_Booking_Cost__c > 0 && (
                       <div className="flex items-center justify-between">
                         <span className="text-[13px] text-muted-foreground/60">Booking costs</span>
@@ -930,38 +1054,9 @@ function EventDetail({ event, onClose }: { event: SalesforceEvent; onClose: () =
                         <span className="text-[13px] font-semibold tabular-nums">{formatCurrency(event.Total_Staff_Costs__c)}</span>
                       </div>
                     )}
-                    <div className="flex items-center justify-between pt-2 border-t border-border/10">
-                      <span className="text-[13px] font-medium">Total costs</span>
-                      <span className="text-[13px] font-bold tabular-nums">{formatCurrency(totalCosts)}</span>
-                    </div>
                   </div>
                 </div>
               )}
-
-              {/* Margin */}
-              <div className="rounded-xl border border-border/15 p-5 bg-muted/[0.03]">
-                <h4 className="text-[11px] uppercase tracking-wider text-muted-foreground/40 font-medium mb-4">Profitability</h4>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[13px] text-muted-foreground/60">Margin</span>
-                    <span className={`text-[13px] font-bold tabular-nums ${margin != null && margin >= 30 ? "text-emerald-400/80" : margin != null && margin >= 15 ? "text-amber-400/80" : ""}`}>
-                      {margin != null ? `${margin.toFixed(1)}%` : "—"}
-                    </span>
-                  </div>
-                  {event.Total_Margin_Value__c != null && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-[13px] text-muted-foreground/60">Margin value</span>
-                      <span className="text-[13px] font-semibold tabular-nums">{formatCurrency(event.Total_Margin_Value__c)}</span>
-                    </div>
-                  )}
-                  {!oppsLoading && (
-                    <div className="flex items-center justify-between pt-2 border-t border-border/10">
-                      <span className="text-[13px] text-muted-foreground/60">Deals</span>
-                      <span className="text-[13px] tabular-nums">{wonOpps.length} won <span className="text-muted-foreground/30">/ {opportunities.length} total</span></span>
-                    </div>
-                  )}
-                </div>
-              </div>
             </div>
           )}
         </div>
