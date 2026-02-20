@@ -1,10 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   CalendarBlank,
   MapPin,
@@ -20,46 +17,161 @@ import {
   Confetti,
   Ticket,
   UserCircle,
+  MagnifyingGlass,
+  X,
+  ArrowLeft,
+  ArrowRight,
+  CaretRight,
+  Users,
+  ChartLineUp,
+  Clock,
+  ArrowsClockwise,
+  CheckCircle,
+  CaretDown,
+  Funnel,
 } from "@phosphor-icons/react";
-import type { SalesforceEvent } from "@/lib/salesforce-types";
-import { formatCurrency, daysUntil, EVENT_CATEGORY_COLORS } from "@/lib/constants";
+import type {
+  SalesforceEvent,
+  SalesforceOpportunityFull,
+} from "@/lib/salesforce-types";
+import {
+  formatCurrency,
+  daysUntil,
+  EVENT_CATEGORY_COLORS,
+  OPPORTUNITY_STAGES,
+} from "@/lib/constants";
 
-interface EventItem {
-  id: string;
-  name: string;
-  startDate: string;
-  endDate: string;
-  location: string;
-  description: string;
-  category: string;
-  imageUrl?: string;
+// ── Helpers ──
+
+function getCatStyle(category: string | null) {
+  if (!category) return { bg: "bg-muted/15", text: "text-muted-foreground" };
+  const key = category.toLowerCase().replace(/\s+/g, "-");
+  return (
+    EVENT_CATEGORY_COLORS[key] ||
+    EVENT_CATEGORY_COLORS[category.toLowerCase()] || {
+      bg: "bg-muted/15",
+      text: "text-muted-foreground",
+    }
+  );
 }
 
-// ── Ticket Inventory Types ──
+function formatDateRange(start: string | null, end: string | null): string {
+  if (!start) return "TBD";
+  const s = new Date(start);
+  const e = end ? new Date(end) : null;
+  const opts: Intl.DateTimeFormatOptions = {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  };
+  if (!e || s.toDateString() === e.toDateString()) {
+    return s.toLocaleDateString("en-GB", opts);
+  }
+  // Same month
+  if (s.getMonth() === e.getMonth() && s.getFullYear() === e.getFullYear()) {
+    return `${s.getDate()} – ${e.toLocaleDateString("en-GB", opts)}`;
+  }
+  return `${s.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} – ${e.toLocaleDateString("en-GB", opts)}`;
+}
+
+function formatTime(time: string | null): string {
+  if (!time) return "";
+  // Salesforce time format: "HH:mm:ss.000Z"
+  const parts = time.split(":");
+  return `${parts[0]}:${parts[1]}`;
+}
+
+// ── Ticket Types ──
 
 const TICKET_TYPES = [
-  { label: "Event", icon: Ticket, requiredField: "Event_Tickets_Required__c", bookedField: "Event_Tickets_Booked__c", remainingField: "Event_Tickets_Remaining__c" },
-  { label: "Hospitality", icon: Package, requiredField: "Hospitality_Tickets_Required__c", bookedField: "Hospitality_Tickets_Booked__c", remainingField: "Hospitality_Tickets_Remaining__c" },
-  { label: "Hotel", icon: Bed, requiredField: "Hotel_Tickets_Required__c", bookedField: "Hotel_Tickets_Booked__c", remainingField: "Hotel_Tickets_Remaining__c" },
-  { label: "Dinner", icon: ForkKnife, requiredField: "Dinner_Tickets_Required__c", bookedField: "Dinner_Tickets_Booked__c", remainingField: "Dinner_Tickets_Remaining__c" },
-  { label: "Drinks", icon: Martini, requiredField: "Drinks_Tickets_Required__c", bookedField: "Drinks_Tickets_Booked__c", remainingField: "Drinks_Tickets_Remaining__c" },
-  { label: "Party", icon: Confetti, requiredField: "Party_Tickets_Required__c", bookedField: "Party_Tickets_Booked__c", remainingField: "Party_Tickets_Remaining__c" },
-  { label: "Flights In", icon: AirplaneLanding, requiredField: "Inbound_Flight_Tickets_Required__c", bookedField: "Inbound_Flight_Tickets_Booked__c", remainingField: "Inbound_Flights_Tickets_Remaining__c" },
-  { label: "Flights Out", icon: AirplaneTakeoff, requiredField: "Outbound_Flight_Tickets_Required__c", bookedField: "Outbound_Flight_Tickets_Booked__c", remainingField: "Outbound_Flights_Tickets_Remaining__c" },
-  { label: "Transfers In", icon: Car, requiredField: "Inbound_Transfer_Tickets_Required__c", bookedField: "Inbound_Transfer_Tickets_Booked__c", remainingField: "Inbound_Transfer_Tickets_Remaining__c" },
-  { label: "Transfers Out", icon: Car, requiredField: "Outbound_Transfer_Tickets_Required__c", bookedField: "Outbound_Transfer_Tickets_Booked__c", remainingField: "Outbound_Transfer_Tickets_Remaining__c" },
+  {
+    label: "Event",
+    icon: Ticket,
+    requiredField: "Event_Tickets_Required__c",
+    bookedField: "Event_Tickets_Booked__c",
+  },
+  {
+    label: "Hospitality",
+    icon: Package,
+    requiredField: "Hospitality_Tickets_Required__c",
+    bookedField: "Hospitality_Tickets_Booked__c",
+  },
+  {
+    label: "Hotel",
+    icon: Bed,
+    requiredField: "Hotel_Tickets_Required__c",
+    bookedField: "Hotel_Tickets_Booked__c",
+  },
+  {
+    label: "Dinner",
+    icon: ForkKnife,
+    requiredField: "Dinner_Tickets_Required__c",
+    bookedField: "Dinner_Tickets_Booked__c",
+  },
+  {
+    label: "Drinks",
+    icon: Martini,
+    requiredField: "Drinks_Tickets_Required__c",
+    bookedField: "Drinks_Tickets_Booked__c",
+  },
+  {
+    label: "Party",
+    icon: Confetti,
+    requiredField: "Party_Tickets_Required__c",
+    bookedField: "Party_Tickets_Booked__c",
+  },
+  {
+    label: "Flights In",
+    icon: AirplaneLanding,
+    requiredField: "Inbound_Flight_Tickets_Required__c",
+    bookedField: "Inbound_Flight_Tickets_Booked__c",
+  },
+  {
+    label: "Flights Out",
+    icon: AirplaneTakeoff,
+    requiredField: "Outbound_Flight_Tickets_Required__c",
+    bookedField: "Outbound_Flight_Tickets_Booked__c",
+  },
+  {
+    label: "Transfers In",
+    icon: Car,
+    requiredField: "Inbound_Transfer_Tickets_Required__c",
+    bookedField: "Inbound_Transfer_Tickets_Booked__c",
+  },
+  {
+    label: "Transfers Out",
+    icon: Car,
+    requiredField: "Outbound_Transfer_Tickets_Required__c",
+    bookedField: "Outbound_Transfer_Tickets_Booked__c",
+  },
 ] as const;
 
-function TicketBar({ label, icon: Icon, required, booked }: { label: string; icon: React.ComponentType<{ className?: string }>; required: number; booked: number }) {
+// ── Ticket Bar Sub-component ──
+
+function TicketBar({
+  label,
+  icon: Icon,
+  required,
+  booked,
+}: {
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  required: number;
+  booked: number;
+}) {
   if (required === 0) return null;
   const pct = Math.min(100, Math.round((booked / required) * 100));
-  const color = pct >= 90 ? "bg-red-500" : pct >= 70 ? "bg-amber-500" : "bg-emerald-500";
+  const color =
+    pct >= 90 ? "bg-red-500" : pct >= 70 ? "bg-amber-500" : "bg-emerald-500";
   return (
     <div className="flex items-center gap-2 text-xs">
       <Icon className="size-3.5 text-muted-foreground shrink-0" />
       <span className="w-20 truncate text-muted-foreground">{label}</span>
       <div className="flex-1 h-2 bg-muted/30 rounded-full overflow-hidden">
-        <div className={`h-full ${color} rounded-full transition-all duration-500`} style={{ width: `${pct}%` }} />
+        <div
+          className={`h-full ${color} rounded-full transition-all duration-500`}
+          style={{ width: `${pct}%` }}
+        />
       </div>
       <span className="w-14 text-right tabular-nums text-muted-foreground">
         {booked}/{required}
@@ -71,610 +183,1445 @@ function TicketBar({ label, icon: Icon, required, booked }: { label: string; ico
   );
 }
 
-function InventoryCard({ event, index }: { event: SalesforceEvent; index: number }) {
-  const catKey = (event.Category__c || "").toLowerCase().replace(/\s+/g, "-");
-  const catStyle = EVENT_CATEGORY_COLORS[catKey] || EVENT_CATEGORY_COLORS[event.Category__c || ""] || { bg: "bg-muted/15", text: "text-muted-foreground" };
+// ── Event Card ──
+
+function EventCard({
+  event,
+  index,
+  onClick,
+}: {
+  event: SalesforceEvent;
+  index: number;
+  onClick: () => void;
+}) {
+  const catStyle = getCatStyle(event.Category__c);
   const daysLeft = event.Start_Date__c ? daysUntil(event.Start_Date__c) : null;
+  const isPast = daysLeft !== null && daysLeft < 0;
   const revenueTarget = event.Revenue_Target__c || 0;
   const revenueActual = event.Sum_of_Closed_Won_Gross__c || 0;
-  const revenuePct = revenueTarget > 0 ? Math.min(100, Math.round((revenueActual / revenueTarget) * 100)) : 0;
+  const revenuePct =
+    revenueTarget > 0
+      ? Math.min(100, Math.round((revenueActual / revenueTarget) * 100))
+      : 0;
+  const imageUrl = event.Event_Image_1__c;
+  const completionPct = event.Percentage_Reservations_Completion__c || 0;
+  const totalBooked = event.Total_Tickets_Booked__c || 0;
+  const totalRequired = event.Total_Tickets_Required__c || 0;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay: index * 0.03 }}
+      onClick={onClick}
+      className="group cursor-pointer"
+    >
+      <div
+        className={`relative overflow-hidden rounded-xl border border-border/40 bg-card hover:border-border/80 transition-all duration-300 hover:shadow-xl hover:shadow-black/5 dark:hover:shadow-black/20 ${isPast ? "opacity-60" : ""}`}
+      >
+        {/* Image Header */}
+        <div className="relative h-44 overflow-hidden bg-muted/20">
+          {imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={`/api/image-proxy?url=${encodeURIComponent(imageUrl)}`}
+              alt=""
+              className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+            />
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-br from-muted/40 to-muted/10 flex items-center justify-center">
+              <CalendarBlank className="size-12 text-muted-foreground/20" />
+            </div>
+          )}
+          {/* Gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+
+          {/* Top badges */}
+          <div className="absolute top-3 left-3 right-3 flex items-start justify-between">
+            <span
+              className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider backdrop-blur-sm ${catStyle.bg} ${catStyle.text} border border-white/10`}
+            >
+              {event.Category__c || "Event"}
+            </span>
+            {daysLeft !== null && (
+              <span
+                className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-bold backdrop-blur-sm ${
+                  isPast
+                    ? "bg-black/40 text-white/60"
+                    : daysLeft <= 7
+                      ? "bg-red-500/20 text-red-300 border border-red-500/20"
+                      : daysLeft <= 30
+                        ? "bg-amber-500/20 text-amber-300 border border-amber-500/20"
+                        : "bg-white/10 text-white/80 border border-white/10"
+                }`}
+              >
+                {isPast ? "Passed" : `${daysLeft}d`}
+              </span>
+            )}
+          </div>
+
+          {/* Date badge (bottom-left of image) */}
+          {event.Start_Date__c && (
+            <div className="absolute bottom-3 left-3">
+              <div className="flex items-center gap-1.5 bg-black/50 backdrop-blur-sm rounded-lg px-2.5 py-1.5 border border-white/10">
+                <div className="text-center">
+                  <div className="text-lg font-light text-white leading-none">
+                    {new Date(event.Start_Date__c).getDate()}
+                  </div>
+                  <div className="text-[9px] uppercase tracking-widest text-white/70 font-semibold">
+                    {new Date(event.Start_Date__c).toLocaleDateString("en-GB", {
+                      month: "short",
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Revenue mini-indicator (bottom-right of image) */}
+          {revenueTarget > 0 && (
+            <div className="absolute bottom-3 right-3">
+              <div className="flex items-center gap-1.5 bg-black/50 backdrop-blur-sm rounded-full px-2.5 py-1 border border-white/10">
+                <div className="w-16 h-1.5 bg-white/20 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${revenuePct >= 100 ? "bg-emerald-400" : revenuePct >= 50 ? "bg-blue-400" : "bg-amber-400"}`}
+                    style={{ width: `${revenuePct}%` }}
+                  />
+                </div>
+                <span className="text-[10px] text-white/70 tabular-nums font-medium">
+                  {revenuePct}%
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Card Body */}
+        <div className="p-4">
+          <h3 className="font-semibold text-sm leading-snug mb-1.5 line-clamp-2 group-hover:text-foreground transition-colors">
+            {event.Name}
+          </h3>
+
+          <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3">
+            {event.Location__r?.Name && (
+              <span className="flex items-center gap-1 truncate">
+                <MapPin className="size-3 shrink-0" />
+                {event.Location__r.Name}
+              </span>
+            )}
+            {event.Start_Date__c && event.End_Date__c && (
+              <span className="flex items-center gap-1 shrink-0">
+                <CalendarBlank className="size-3" />
+                {formatDateRange(event.Start_Date__c, event.End_Date__c)}
+              </span>
+            )}
+          </div>
+
+          {/* Revenue + Tickets row */}
+          <div className="flex items-center gap-3">
+            {revenueActual > 0 && (
+              <div className="flex items-center gap-1 text-xs">
+                <CurrencyGbp className="size-3 text-emerald-400" />
+                <span className="font-semibold tabular-nums text-foreground/90">
+                  {formatCurrency(revenueActual)}
+                </span>
+                {revenueTarget > 0 && (
+                  <span className="text-muted-foreground/50">
+                    / {formatCurrency(revenueTarget)}
+                  </span>
+                )}
+              </div>
+            )}
+            {totalRequired > 0 && (
+              <div className="flex items-center gap-1 text-xs text-muted-foreground ml-auto">
+                <Ticket className="size-3" />
+                <span className="tabular-nums">
+                  {totalBooked}/{totalRequired}
+                </span>
+                <span className="text-muted-foreground/50">
+                  ({Math.round(completionPct)}%)
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Arrow indicator */}
+          <div className="flex items-center justify-end mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium flex items-center gap-1">
+              View Details
+              <CaretRight className="size-3" />
+            </span>
+          </div>
+        </div>
+
+        {/* Past overlay */}
+        {isPast && (
+          <div className="pointer-events-none absolute inset-0 bg-background/30" />
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+// ── Full-Screen Event Detail ──
+
+function EventDetail({
+  event,
+  onClose,
+}: {
+  event: SalesforceEvent;
+  onClose: () => void;
+}) {
+  const [opportunities, setOpportunities] = useState<
+    SalesforceOpportunityFull[]
+  >([]);
+  const [oppsLoading, setOppsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<
+    "overview" | "tickets" | "deals" | "financials"
+  >("overview");
+
+  // Fetch linked opportunities
+  useEffect(() => {
+    const fetchOpps = async () => {
+      try {
+        const res = await fetch(`/api/events/inventory/${event.Id}`);
+        const data = await res.json();
+        if (data.success) setOpportunities(data.data);
+      } catch (e) {
+        console.error("Failed to load event opportunities", e);
+      } finally {
+        setOppsLoading(false);
+      }
+    };
+    fetchOpps();
+  }, [event.Id]);
+
+  // Close on escape
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  const catStyle = getCatStyle(event.Category__c);
+  const daysLeft = event.Start_Date__c ? daysUntil(event.Start_Date__c) : null;
+  const isPast = daysLeft !== null && daysLeft < 0;
+  const revenueTarget = event.Revenue_Target__c || 0;
+  const revenueActual = event.Sum_of_Closed_Won_Gross__c || 0;
+  const revenuePct =
+    revenueTarget > 0
+      ? Math.min(100, Math.round((revenueActual / revenueTarget) * 100))
+      : 0;
   const margin = event.Margin_Percentage__c;
   const totalBooked = event.Total_Tickets_Booked__c || 0;
   const totalRequired = event.Total_Tickets_Required__c || 0;
   const completionPct = event.Percentage_Reservations_Completion__c || 0;
 
+  // Get all images
+  const images = [
+    event.Event_Image_1__c,
+    event.Event_Image_2__c,
+    event.Event_Image_3__c,
+    event.Event_Image_4__c,
+    event.Event_Image_5__c,
+  ].filter(Boolean) as string[];
+
+  // Opportunity breakdowns
+  const oppsByStage = useMemo(() => {
+    const grouped: Record<string, SalesforceOpportunityFull[]> = {};
+    for (const opp of opportunities) {
+      const stage = opp.StageName;
+      if (!grouped[stage]) grouped[stage] = [];
+      grouped[stage].push(opp);
+    }
+    return grouped;
+  }, [opportunities]);
+
+  const totalOppRevenue = useMemo(
+    () =>
+      opportunities.reduce(
+        (sum, o) => sum + (o.Gross_Amount__c || o.Amount || 0),
+        0,
+      ),
+    [opportunities],
+  );
+
+  const wonOpps = useMemo(
+    () =>
+      opportunities.filter((o) =>
+        ["Agreement Signed", "Amended", "Amendment Signed"].includes(
+          o.StageName,
+        ),
+      ),
+    [opportunities],
+  );
+
+  const tabs = [
+    { id: "overview" as const, label: "Overview" },
+    { id: "tickets" as const, label: "Tickets" },
+    { id: "deals" as const, label: `Deals (${opportunities.length})` },
+    { id: "financials" as const, label: "Financials" },
+  ];
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: index * 0.04 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.3 }}
+      className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-stretch justify-center"
+      onClick={onClose}
     >
-      <Card className="overflow-hidden hover:shadow-lg transition-shadow">
-        <CardContent className="p-5">
-          {/* Header */}
-          <div className="flex items-start justify-between gap-3 mb-4">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${catStyle.bg} ${catStyle.text}`}>
-                  {event.Category__c || "Event"}
-                </span>
-                <h3 className="text-sm font-semibold truncate">{event.Name}</h3>
-              </div>
-              <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                {event.Location__r?.Name && (
-                  <span className="flex items-center gap-1">
-                    <MapPin className="size-3" />
-                    {event.Location__r.Name}
-                  </span>
-                )}
-                {event.Start_Date__c && (
-                  <span className="flex items-center gap-1">
-                    <CalendarBlank className="size-3" />
-                    {new Date(event.Start_Date__c).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-                  </span>
-                )}
-              </div>
-            </div>
-            {daysLeft !== null && (
-              <div className={`shrink-0 text-center px-2.5 py-1 rounded-lg text-xs font-bold ${
-                daysLeft <= 0 ? "bg-muted/30 text-muted-foreground" : daysLeft <= 7 ? "bg-red-500/15 text-red-400" : daysLeft <= 30 ? "bg-amber-500/15 text-amber-400" : "bg-emerald-500/15 text-emerald-400"
-              }`}>
-                {daysLeft <= 0 ? "Passed" : `${daysLeft}d`}
-              </div>
-            )}
-          </div>
+      <motion.div
+        initial={{ opacity: 0, y: 20, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 20, scale: 0.98 }}
+        transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+        className="w-full max-w-6xl m-6 bg-card rounded-2xl border border-border/50 overflow-hidden flex flex-col shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Hero Image */}
+        <div className="relative h-72 shrink-0 overflow-hidden">
+          {images.length > 0 ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={`/api/image-proxy?url=${encodeURIComponent(images[0])}`}
+              alt=""
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-br from-muted/40 to-muted/10" />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-card via-card/40 to-transparent" />
 
-          {/* Revenue + Margin row */}
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            <div className="rounded-lg bg-muted/10 p-3">
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <CurrencyGbp className="size-3.5 text-emerald-400" />
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Revenue</span>
+          {/* Close button */}
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 z-10 size-9 rounded-full bg-black/40 backdrop-blur-sm border border-white/10 flex items-center justify-center text-white/80 hover:text-white hover:bg-black/60 transition-colors"
+          >
+            <X className="size-4" weight="bold" />
+          </button>
+
+          {/* Event title overlay */}
+          <div className="absolute bottom-0 left-0 right-0 p-6">
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <span
+                    className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider backdrop-blur-sm ${catStyle.bg} ${catStyle.text} border border-white/10`}
+                  >
+                    {event.Category__c || "Event"}
+                  </span>
+                  {daysLeft !== null && (
+                    <span
+                      className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-bold ${
+                        isPast
+                          ? "bg-muted/30 text-muted-foreground"
+                          : daysLeft <= 7
+                            ? "bg-red-500/15 text-red-400"
+                            : daysLeft <= 30
+                              ? "bg-amber-500/15 text-amber-400"
+                              : "bg-emerald-500/15 text-emerald-400"
+                      }`}
+                    >
+                      {isPast ? "Event Passed" : `${daysLeft} days away`}
+                    </span>
+                  )}
+                </div>
+                <h2 className="text-2xl font-bold text-foreground">
+                  {event.Name}
+                </h2>
+                <div className="flex items-center gap-4 mt-1.5 text-sm text-muted-foreground">
+                  {event.Location__r?.Name && (
+                    <span className="flex items-center gap-1.5">
+                      <MapPin className="size-4" />
+                      {event.Location__r.Name}
+                    </span>
+                  )}
+                  <span className="flex items-center gap-1.5">
+                    <CalendarBlank className="size-4" />
+                    {formatDateRange(event.Start_Date__c, event.End_Date__c)}
+                  </span>
+                  {(event.Start_Time__c || event.End_Time__c) && (
+                    <span className="flex items-center gap-1.5">
+                      <Clock className="size-4" />
+                      {formatTime(event.Start_Time__c)}
+                      {event.End_Time__c &&
+                        ` – ${formatTime(event.End_Time__c)}`}
+                    </span>
+                  )}
+                </div>
               </div>
-              <div className="text-sm font-bold tabular-nums">{formatCurrency(revenueActual)}</div>
-              {revenueTarget > 0 && (
-                <>
-                  <div className="text-[10px] text-muted-foreground/60 mt-0.5">
-                    of {formatCurrency(revenueTarget)} target
+
+              {/* Quick stats */}
+              <div className="flex items-center gap-3 shrink-0">
+                {revenueTarget > 0 && (
+                  <div className="text-right">
+                    <div className="text-lg font-bold tabular-nums text-foreground">
+                      {formatCurrency(revenueActual)}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">
+                      of {formatCurrency(revenueTarget)} ({revenuePct}%)
+                    </div>
                   </div>
-                  <div className="h-1.5 bg-muted/30 rounded-full overflow-hidden mt-2">
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ${revenuePct >= 100 ? "bg-emerald-500" : revenuePct >= 50 ? "bg-blue-500" : "bg-amber-500"}`}
-                      style={{ width: `${revenuePct}%` }}
-                    />
-                  </div>
-                </>
-              )}
+                )}
+              </div>
             </div>
-            <div className="rounded-lg bg-muted/10 p-3">
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1.5">Margin</div>
-              <div className={`text-sm font-bold tabular-nums ${
-                margin != null && margin >= 30 ? "text-emerald-400" : margin != null && margin >= 15 ? "text-amber-400" : "text-red-400"
-              }`}>
-                {margin != null ? `${margin.toFixed(1)}%` : "—"}
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="border-b border-border/50 px-6">
+          <div className="flex items-center gap-1">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === tab.id
+                    ? "border-foreground text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground/70"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Tab content */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {activeTab === "overview" && (
+            <div className="space-y-6">
+              {/* KPI Row */}
+              <div className="grid grid-cols-5 gap-4">
+                <div className="rounded-xl bg-muted/10 border border-border/30 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <ChartLineUp className="size-4 text-emerald-400" />
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+                      Revenue
+                    </span>
+                  </div>
+                  <div className="text-lg font-bold tabular-nums">
+                    {formatCurrency(revenueActual)}
+                  </div>
+                  {revenueTarget > 0 && (
+                    <>
+                      <div className="text-[10px] text-muted-foreground/60 mt-0.5">
+                        Target: {formatCurrency(revenueTarget)}
+                      </div>
+                      <div className="h-1.5 bg-muted/30 rounded-full overflow-hidden mt-2">
+                        <div
+                          className={`h-full rounded-full transition-all ${revenuePct >= 100 ? "bg-emerald-500" : revenuePct >= 50 ? "bg-blue-500" : "bg-amber-500"}`}
+                          style={{ width: `${revenuePct}%` }}
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div className="rounded-xl bg-muted/10 border border-border/30 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CurrencyGbp className="size-4 text-blue-400" />
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+                      Margin
+                    </span>
+                  </div>
+                  <div
+                    className={`text-lg font-bold tabular-nums ${
+                      margin != null && margin >= 30
+                        ? "text-emerald-400"
+                        : margin != null && margin >= 15
+                          ? "text-amber-400"
+                          : "text-red-400"
+                    }`}
+                  >
+                    {margin != null ? `${margin.toFixed(1)}%` : "—"}
+                  </div>
+                  {event.Total_Margin_Value__c != null && (
+                    <div className="text-[10px] text-muted-foreground/60 mt-0.5">
+                      {formatCurrency(event.Total_Margin_Value__c)}
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-xl bg-muted/10 border border-border/30 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Ticket className="size-4 text-violet-400" />
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+                      Tickets
+                    </span>
+                  </div>
+                  <div className="text-lg font-bold tabular-nums">
+                    {totalBooked}
+                    <span className="text-sm font-normal text-muted-foreground">
+                      /{totalRequired}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-muted-foreground/60 mt-0.5">
+                    {Math.round(completionPct)}% fulfilled
+                  </div>
+                </div>
+
+                <div className="rounded-xl bg-muted/10 border border-border/30 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Users className="size-4 text-orange-400" />
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+                      Deals
+                    </span>
+                  </div>
+                  <div className="text-lg font-bold tabular-nums">
+                    {oppsLoading ? "…" : opportunities.length}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground/60 mt-0.5">
+                    {wonOpps.length} won
+                  </div>
+                </div>
+
+                <div className="rounded-xl bg-muted/10 border border-border/30 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CurrencyGbp className="size-4 text-teal-400" />
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+                      Payments
+                    </span>
+                  </div>
+                  <div className="text-lg font-bold tabular-nums">
+                    {formatCurrency(event.Total_Payments_Received__c || 0)}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground/60 mt-0.5">
+                    Collected
+                  </div>
+                </div>
               </div>
-              {event.Total_Margin_Value__c != null && (
-                <div className="text-[10px] text-muted-foreground/60 mt-0.5">
-                  {formatCurrency(event.Total_Margin_Value__c)}
+
+              {/* Description + Staff */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="col-span-2 rounded-xl bg-muted/10 border border-border/30 p-4">
+                  <h4 className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-3">
+                    Description
+                  </h4>
+                  {event.Description__c ? (
+                    <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                      {event.Description__c}
+                    </p>
+                  ) : event.Event_Notes__c ? (
+                    <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                      {event.Event_Notes__c}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground/50 italic">
+                      No description available
+                    </p>
+                  )}
+                </div>
+
+                <div className="rounded-xl bg-muted/10 border border-border/30 p-4">
+                  <h4 className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-3">
+                    Team & Operations
+                  </h4>
+                  <div className="space-y-3">
+                    {event.Owner?.Name && (
+                      <div>
+                        <div className="text-[10px] text-muted-foreground/50 uppercase tracking-wider">
+                          Owner
+                        </div>
+                        <div className="text-sm flex items-center gap-1.5 mt-0.5">
+                          <UserCircle className="size-4 text-muted-foreground" />
+                          {event.Owner.Name}
+                        </div>
+                      </div>
+                    )}
+                    {(event.A_B_On_Site_1__c || event.A_B_On_Site_2__c) && (
+                      <div>
+                        <div className="text-[10px] text-muted-foreground/50 uppercase tracking-wider">
+                          On-Site Staff
+                        </div>
+                        <div className="text-sm mt-0.5">
+                          {[event.A_B_On_Site_1__c, event.A_B_On_Site_2__c]
+                            .filter(Boolean)
+                            .join(", ")}
+                        </div>
+                      </div>
+                    )}
+                    {event.Total_Projects__c != null && (
+                      <div>
+                        <div className="text-[10px] text-muted-foreground/50 uppercase tracking-wider">
+                          Projects
+                        </div>
+                        <div className="text-sm mt-0.5">
+                          {event.Total_Projects__c}
+                        </div>
+                      </div>
+                    )}
+                    {event.Master_Package_Code__c && (
+                      <div>
+                        <div className="text-[10px] text-muted-foreground/50 uppercase tracking-wider">
+                          Package Code
+                        </div>
+                        <div className="text-sm mt-0.5 font-mono text-xs">
+                          {event.Master_Package_Code__c}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Pipeline by stage (mini) */}
+              {!oppsLoading && opportunities.length > 0 && (
+                <div className="rounded-xl bg-muted/10 border border-border/30 p-4">
+                  <h4 className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-3">
+                    Deal Pipeline
+                  </h4>
+                  <div className="flex items-center gap-2">
+                    {Object.entries(oppsByStage).map(([stage, opps]) => {
+                      const stageConfig = OPPORTUNITY_STAGES[stage];
+                      const stageTotal = opps.reduce(
+                        (s, o) => s + (o.Gross_Amount__c || o.Amount || 0),
+                        0,
+                      );
+                      const widthPct =
+                        totalOppRevenue > 0
+                          ? Math.max(
+                              8,
+                              (stageTotal / totalOppRevenue) * 100,
+                            )
+                          : 100 / Object.keys(oppsByStage).length;
+                      return (
+                        <div
+                          key={stage}
+                          className="flex-1 min-w-0"
+                          style={{ flex: widthPct }}
+                        >
+                          <div
+                            className={`h-8 rounded-lg flex items-center justify-center px-2 ${stageConfig?.bgColor || "bg-muted/30 text-muted-foreground"}`}
+                          >
+                            <span className="text-[10px] font-medium truncate">
+                              {stage}
+                            </span>
+                          </div>
+                          <div className="text-center mt-1">
+                            <div className="text-[10px] font-bold tabular-nums">
+                              {opps.length}
+                            </div>
+                            <div className="text-[9px] text-muted-foreground/50 tabular-nums">
+                              {formatCurrency(stageTotal)}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Images gallery */}
+              {images.length > 1 && (
+                <div className="rounded-xl bg-muted/10 border border-border/30 p-4">
+                  <h4 className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-3">
+                    Gallery
+                  </h4>
+                  <div className="grid grid-cols-4 gap-2">
+                    {images.map((img, i) => (
+                      <div
+                        key={i}
+                        className="aspect-video rounded-lg overflow-hidden bg-muted/20"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={`/api/image-proxy?url=${encodeURIComponent(img)}`}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
-          </div>
+          )}
 
-          {/* Ticket inventory */}
-          <div className="mb-3">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
-                Ticket Inventory
-              </span>
-              <span className="text-[10px] text-muted-foreground tabular-nums">
-                {totalBooked}/{totalRequired} ({Math.round(completionPct)}%)
-              </span>
-            </div>
-            <div className="space-y-1.5">
-              {TICKET_TYPES.map((tt) => {
-                const required = (event[tt.requiredField as keyof SalesforceEvent] as number | null) || 0;
-                const booked = (event[tt.bookedField as keyof SalesforceEvent] as number | null) || 0;
-                return (
-                  <TicketBar
-                    key={tt.label}
-                    label={tt.label}
-                    icon={tt.icon}
-                    required={required}
-                    booked={booked}
+          {activeTab === "tickets" && (
+            <div className="space-y-4">
+              {/* Overall ticket progress */}
+              <div className="rounded-xl bg-muted/10 border border-border/30 p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-sm font-medium">
+                    Overall Ticket Inventory
+                  </h4>
+                  <span className="text-sm tabular-nums font-bold">
+                    {totalBooked}/{totalRequired}{" "}
+                    <span className="text-muted-foreground font-normal">
+                      ({Math.round(completionPct)}%)
+                    </span>
+                  </span>
+                </div>
+                <div className="h-3 bg-muted/30 rounded-full overflow-hidden mb-6">
+                  <div
+                    className={`h-full rounded-full transition-all ${completionPct >= 90 ? "bg-red-500" : completionPct >= 70 ? "bg-amber-500" : "bg-emerald-500"}`}
+                    style={{ width: `${completionPct}%` }}
                   />
-                );
-              })}
-            </div>
-          </div>
+                </div>
 
-          {/* Staff assignments */}
-          {(event.A_B_On_Site_1__c || event.A_B_On_Site_2__c) && (
-            <div className="flex items-center gap-2 pt-3 border-t border-border/30">
-              <UserCircle className="size-3.5 text-muted-foreground" />
-              <span className="text-[10px] text-muted-foreground">
-                {[event.A_B_On_Site_1__c, event.A_B_On_Site_2__c].filter(Boolean).join(", ")}
-              </span>
+                <div className="space-y-2.5">
+                  {TICKET_TYPES.map((tt) => {
+                    const required =
+                      (event[
+                        tt.requiredField as keyof SalesforceEvent
+                      ] as number | null) || 0;
+                    const booked =
+                      (event[
+                        tt.bookedField as keyof SalesforceEvent
+                      ] as number | null) || 0;
+                    return (
+                      <TicketBar
+                        key={tt.label}
+                        label={tt.label}
+                        icon={tt.icon}
+                        required={required}
+                        booked={booked}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Scarcity alerts */}
+              {TICKET_TYPES.some((tt) => {
+                const req =
+                  (event[
+                    tt.requiredField as keyof SalesforceEvent
+                  ] as number | null) || 0;
+                const bkd =
+                  (event[
+                    tt.bookedField as keyof SalesforceEvent
+                  ] as number | null) || 0;
+                return req > 0 && bkd / req >= 0.8;
+              }) && (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Warning
+                      className="size-4 text-amber-400"
+                      weight="fill"
+                    />
+                    <span className="text-sm font-medium text-amber-400">
+                      Low Inventory Alert
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {TICKET_TYPES.filter((tt) => {
+                      const req =
+                        (event[
+                          tt.requiredField as keyof SalesforceEvent
+                        ] as number | null) || 0;
+                      const bkd =
+                        (event[
+                          tt.bookedField as keyof SalesforceEvent
+                        ] as number | null) || 0;
+                      return req > 0 && bkd / req >= 0.8;
+                    }).map((tt) => {
+                      const req =
+                        (event[
+                          tt.requiredField as keyof SalesforceEvent
+                        ] as number | null) || 0;
+                      const bkd =
+                        (event[
+                          tt.bookedField as keyof SalesforceEvent
+                        ] as number | null) || 0;
+                      return (
+                        <span
+                          key={tt.label}
+                          className="text-xs bg-amber-500/10 text-amber-300/80 px-2.5 py-1 rounded-full"
+                        >
+                          {tt.label}: {bkd}/{req} (
+                          {Math.round((bkd / req) * 100)}%)
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
-        </CardContent>
-      </Card>
+
+          {activeTab === "deals" && (
+            <div className="space-y-4">
+              {oppsLoading ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="h-16 rounded-xl bg-muted/20 animate-pulse"
+                    />
+                  ))}
+                </div>
+              ) : opportunities.length === 0 ? (
+                <p className="text-center text-muted-foreground py-12">
+                  No deals linked to this event yet.
+                </p>
+              ) : (
+                Object.entries(oppsByStage).map(([stage, opps]) => {
+                  const stageConfig = OPPORTUNITY_STAGES[stage];
+                  return (
+                    <div key={stage}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${stageConfig?.bgColor || "bg-muted/30 text-muted-foreground"}`}
+                        >
+                          {stage}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {opps.length} deal{opps.length !== 1 ? "s" : ""}
+                        </span>
+                        <span className="text-xs text-muted-foreground/50 ml-auto tabular-nums">
+                          {formatCurrency(
+                            opps.reduce(
+                              (s, o) =>
+                                s + (o.Gross_Amount__c || o.Amount || 0),
+                              0,
+                            ),
+                          )}
+                        </span>
+                      </div>
+                      <div className="space-y-1.5 mb-4">
+                        {opps.map((opp) => (
+                          <div
+                            key={opp.Id}
+                            className="flex items-center gap-3 rounded-lg bg-muted/10 border border-border/20 px-4 py-2.5 text-sm"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium truncate">
+                                {opp.Name}
+                              </div>
+                              <div className="text-xs text-muted-foreground flex items-center gap-2">
+                                {opp.Account?.Name && (
+                                  <span>{opp.Account.Name}</span>
+                                )}
+                                {opp.Owner?.Name && (
+                                  <>
+                                    <span className="text-muted-foreground/30">
+                                      •
+                                    </span>
+                                    <span>{opp.Owner.Name}</span>
+                                  </>
+                                )}
+                                {opp.Package_Sold__r?.Name && (
+                                  <>
+                                    <span className="text-muted-foreground/30">
+                                      •
+                                    </span>
+                                    <span className="text-violet-400/80">
+                                      {opp.Package_Sold__r.Name}
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <div className="font-bold tabular-nums">
+                                {formatCurrency(
+                                  opp.Gross_Amount__c || opp.Amount || 0,
+                                )}
+                              </div>
+                              {opp.Percentage_Paid__c != null && (
+                                <div className="text-[10px] text-muted-foreground tabular-nums flex items-center gap-1 justify-end">
+                                  {opp.Percentage_Paid__c >= 100 ? (
+                                    <CheckCircle className="size-3 text-emerald-400" />
+                                  ) : null}
+                                  {Math.round(opp.Percentage_Paid__c)}% paid
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+          {activeTab === "financials" && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-4">
+                <div className="rounded-xl bg-muted/10 border border-border/30 p-5">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-2">
+                    Revenue (Closed Won)
+                  </div>
+                  <div className="text-2xl font-bold tabular-nums text-emerald-400">
+                    {formatCurrency(revenueActual)}
+                  </div>
+                  {revenueTarget > 0 && (
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {revenuePct}% of {formatCurrency(revenueTarget)} target
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-xl bg-muted/10 border border-border/30 p-5">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-2">
+                    Payments Received
+                  </div>
+                  <div className="text-2xl font-bold tabular-nums text-teal-400">
+                    {formatCurrency(event.Total_Payments_Received__c || 0)}
+                  </div>
+                  {revenueActual > 0 && (
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {Math.round(
+                        ((event.Total_Payments_Received__c || 0) /
+                          revenueActual) *
+                          100,
+                      )}
+                      % collected
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-xl bg-muted/10 border border-border/30 p-5">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-2">
+                    Margin
+                  </div>
+                  <div
+                    className={`text-2xl font-bold tabular-nums ${margin != null && margin >= 30 ? "text-emerald-400" : margin != null && margin >= 15 ? "text-amber-400" : "text-red-400"}`}
+                  >
+                    {margin != null ? `${margin.toFixed(1)}%` : "—"}
+                  </div>
+                  {event.Total_Margin_Value__c != null && (
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {formatCurrency(event.Total_Margin_Value__c)} value
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Cost breakdown */}
+              <div className="rounded-xl bg-muted/10 border border-border/30 p-5">
+                <h4 className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-4">
+                  Cost Breakdown
+                </h4>
+                <div className="space-y-3">
+                  {[
+                    {
+                      label: "Booking Costs",
+                      value: event.Total_Booking_Cost__c,
+                    },
+                    {
+                      label: "Staff Costs",
+                      value: event.Total_Staff_Costs__c,
+                    },
+                  ]
+                    .filter((c) => c.value != null && c.value > 0)
+                    .map((cost) => (
+                      <div
+                        key={cost.label}
+                        className="flex items-center justify-between text-sm"
+                      >
+                        <span className="text-muted-foreground">
+                          {cost.label}
+                        </span>
+                        <span className="font-semibold tabular-nums">
+                          {formatCurrency(cost.value!)}
+                        </span>
+                      </div>
+                    ))}
+                  {(event.Total_Booking_Cost__c || 0) +
+                    (event.Total_Staff_Costs__c || 0) >
+                    0 && (
+                    <div className="flex items-center justify-between text-sm pt-2 border-t border-border/30">
+                      <span className="font-medium">Total Costs</span>
+                      <span className="font-bold tabular-nums">
+                        {formatCurrency(
+                          (event.Total_Booking_Cost__c || 0) +
+                            (event.Total_Staff_Costs__c || 0),
+                        )}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Pipeline total */}
+              {!oppsLoading && totalOppRevenue > 0 && (
+                <div className="rounded-xl bg-muted/10 border border-border/30 p-5">
+                  <h4 className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-2">
+                    Total Pipeline Value
+                  </h4>
+                  <div className="text-2xl font-bold tabular-nums">
+                    {formatCurrency(totalOppRevenue)}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Across {opportunities.length} deals
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </motion.div>
     </motion.div>
   );
 }
 
-function InventoryView({ events, loading }: { events: SalesforceEvent[]; loading: boolean }) {
-  if (loading) {
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="rounded-xl border border-border/30 bg-card/30 p-5 animate-pulse">
-            <div className="h-5 w-48 bg-muted/50 rounded mb-3" />
-            <div className="h-3 w-32 bg-muted/30 rounded mb-4" />
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              <div className="h-20 bg-muted/20 rounded-lg" />
-              <div className="h-20 bg-muted/20 rounded-lg" />
-            </div>
-            <div className="space-y-2">
-              <div className="h-3 bg-muted/20 rounded" />
-              <div className="h-3 bg-muted/20 rounded" />
-              <div className="h-3 bg-muted/20 rounded" />
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  if (events.length === 0) {
-    return <p className="text-muted-foreground text-center py-12">No event inventory data available.</p>;
-  }
-
-  // Sort: upcoming events first (by start date), passed events at the end
-  const sorted = [...events].sort((a, b) => {
-    const da = a.Start_Date__c || "";
-    const db = b.Start_Date__c || "";
-    return da.localeCompare(db);
-  });
-
-  // Scarcity alerts
-  const scarcityEvents = sorted.filter((e) => {
-    const pct = e.Percentage_Reservations_Completion__c || 0;
-    return pct >= 80 && (e.Total_Tickets_Remaining__c || 0) > 0;
-  });
-
-  return (
-    <div>
-      {/* Scarcity alerts */}
-      {scarcityEvents.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4"
-        >
-          <div className="flex items-center gap-2 mb-2">
-            <Warning className="size-4 text-amber-400" weight="fill" />
-            <span className="text-sm font-medium text-amber-400">Low Inventory Alerts</span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {scarcityEvents.map((e) => (
-              <span key={e.Id} className="text-xs bg-amber-500/10 text-amber-300/80 px-2.5 py-1 rounded-full">
-                {e.Name} — {e.Total_Tickets_Remaining__c} remaining ({Math.round(e.Percentage_Reservations_Completion__c || 0)}% full)
-              </span>
-            ))}
-          </div>
-        </motion.div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {sorted.map((event, i) => (
-          <InventoryCard key={event.Id} event={event} index={i} />
-        ))}
-      </div>
-    </div>
-  );
-}
+// ── Main Page ──
 
 export default function EventsPage() {
-  const [items, setItems] = useState<EventItem[]>([]);
+  const [events, setEvents] = useState<SalesforceEvent[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
-  const selectedCategory = "all" as const;
-  const [view, setView] = useState<"grid" | "list" | "inventory">("grid");
-  const [inventoryEvents, setInventoryEvents] = useState<SalesforceEvent[]>([]);
-  const [inventoryLoading, setInventoryLoading] = useState(false);
-  const [month, setMonth] = useState<string>(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  });
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const [search, setSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selectedMonth, setSelectedMonth] = useState<string>("all");
+  const [showPastEvents, setShowPastEvents] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<SalesforceEvent | null>(
+    null,
+  );
+  const [sortBy, setSortBy] = useState<"date" | "revenue" | "margin">("date");
+  const [showFilters, setShowFilters] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Local month cache for instant view switching
-  const cacheRef = useRef<Map<string, EventItem[]>>(new Map())
-
-  useEffect(() => {
-    const run = async () => {
-      try {
-        const params = new URLSearchParams();
-        params.set("limit", "500");
-        params.set("month", month);
-        if (selectedCategory !== "all") params.set("category", selectedCategory);
-        if (query.trim()) params.set("q", query.trim());
-        const viewFields = view === 'grid' ? 'grid' : 'list'
-        params.set('fields', viewFields)
-        // If month cached and no search/category, show instantly
-        const simpleKey = `${month}|${viewFields}`
-        if (!query && selectedCategory === 'all' && cacheRef.current.has(simpleKey)) {
-          setItems(cacheRef.current.get(simpleKey) as EventItem[])
-        }
-        const res = await fetch(`/api/events?${params.toString()}`);
-        const data = await res.json();
-        const raw: EventItem[] = data.items || [];
-        // De-duplicate by (name + start + end)
-        const seen = new Map<string, EventItem>();
-        for (const ev of raw) {
-          const k = `${ev.name}|${ev.startDate}|${ev.endDate}`;
-          if (!seen.has(k)) seen.set(k, ev);
-        }
-        const deduped = Array.from(seen.values())
-        setItems(deduped);
-        if (!query && selectedCategory === 'all') cacheRef.current.set(simpleKey, deduped)
-      } catch (e) {
-        console.error('Failed to load events', e)
-        setError("Failed to load events");
-      } finally {
-        setLoading(false);
-      }
-    };
-    setLoading(true);
-    run();
-  }, [month, query, view]);
-
-  // Prefetch adjacent months on idle
-  useEffect(() => {
-    type WindowWithRIC = Window & { requestIdleCallback?: (cb: IdleRequestCallback) => number; cancelIdleCallback?: (handle: number) => void }
-    const w = window as WindowWithRIC
-    const id = w.requestIdleCallback?.(async () => {
-      const [y, m] = month.split('-').map(Number)
-      const prev = new Date(Date.UTC(y, m - 2, 1))
-      const next = new Date(Date.UTC(y, m, 1))
-      for (const d of [prev, next]) {
-        const mm = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
-        const key = `${mm}|grid`
-        if (cacheRef.current.has(key)) continue
-        try {
-          const res = await fetch(`/api/events?month=${mm}&limit=500&fields=grid`)
-          const data = await res.json()
-          if (Array.isArray(data.items)) cacheRef.current.set(key, data.items)
-        } catch {}
-      }
-    })
-    return () => w.cancelIdleCallback?.(id as number)
-  }, [month])
-
-  // Fetch inventory data when switching to inventory view
-  const fetchInventory = useCallback(async () => {
-    setInventoryLoading(true);
+  // Fetch events from Salesforce
+  const fetchEvents = useCallback(async () => {
     try {
       const res = await fetch("/api/events/inventory");
       const data = await res.json();
-      if (data.success) setInventoryEvents(data.data);
+      if (data.success) setEvents(data.data);
     } catch (e) {
-      console.error("Failed to load inventory", e);
+      console.error("Failed to load events", e);
     } finally {
-      setInventoryLoading(false);
+      setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    if (view === "inventory" && inventoryEvents.length === 0) fetchInventory();
-  }, [view, inventoryEvents.length, fetchInventory]);
+    fetchEvents();
+  }, [fetchEvents]);
 
-  // Derive category set
-  const uniqueItems = useMemo(() => {
-    // Global de-duplication for both grid and list (by name + start + end)
-    const map = new Map<string, EventItem>();
-    for (const ev of items) {
-      const k = `${ev.name}|${ev.startDate}|${ev.endDate}`;
-      if (!map.has(k)) map.set(k, ev);
-    }
-    return Array.from(map.values());
-  }, [items]);
-
-  // Removed unused categories computation
-
-  // Category colors (static classes so Tailwind includes them)
-  const CAT_COLORS: Record<string, { start: string; cont: string }> = {
-    "formula-1": { start: "bg-red-500/80 text-white", cont: "bg-red-500/35" },
-    rugby: { start: "bg-violet-500/80 text-white", cont: "bg-violet-500/35" },
-    theatre: { start: "bg-pink-500/80 text-white", cont: "bg-pink-500/35" },
-    concerts: { start: "bg-indigo-500/80 text-white", cont: "bg-indigo-500/35" },
-    "horse-racing": { start: "bg-lime-500/80 text-black", cont: "bg-lime-500/35" },
-    golf: { start: "bg-teal-500/80 text-white", cont: "bg-teal-500/35" },
-    dining: { start: "bg-rose-500/80 text-white", cont: "bg-rose-500/35" },
-    experiences: { start: "bg-sky-500/80 text-white", cont: "bg-sky-500/35" },
-    tennis: { start: "bg-green-500/80 text-white", cont: "bg-green-500/35" },
-    festival: { start: "bg-fuchsia-500/80 text-white", cont: "bg-fuchsia-500/35" },
-    fashion: { start: "bg-cyan-500/80 text-black", cont: "bg-cyan-500/35" },
-    music: { start: "bg-purple-500/80 text-white", cont: "bg-purple-500/35" },
-    "rowing-sailing": { start: "bg-blue-500/80 text-white", cont: "bg-blue-500/35" },
-    football: { start: "bg-emerald-500/80 text-white", cont: "bg-emerald-500/35" },
-  };
-
-  function colorFor(category: string) {
-    return CAT_COLORS[category] || { start: "bg-muted/80 text-foreground", cont: "bg-muted/40" };
-  }
-
-  // Hover lightbox
-  const [hovered, setHovered] = useState<EventItem | null>(null);
-  const [hoverDetails, setHoverDetails] = useState<Record<string, Partial<EventItem>>>({});
-
-  // Fetch missing details (like imageUrl) on hover
+  // Auto-refresh every 60s
   useEffect(() => {
-    const fetchDetails = async () => {
-      if (!hovered) return;
-      if (hovered.imageUrl || hoverDetails[hovered.id]?.imageUrl) return;
-      try {
-        const res = await fetch(`/api/events/${hovered.id}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        setHoverDetails((prev) => ({ ...prev, [hovered.id]: data }));
-      } catch {}
+    const interval = setInterval(() => fetchEvents(), 60000);
+    return () => clearInterval(interval);
+  }, [fetchEvents]);
+
+  // Derive unique categories
+  const categories = useMemo(() => {
+    const cats = new Set<string>();
+    for (const e of events) {
+      if (e.Category__c) cats.add(e.Category__c);
+    }
+    return Array.from(cats).sort();
+  }, [events]);
+
+  // Derive unique months from events
+  const months = useMemo(() => {
+    const monthSet = new Set<string>();
+    for (const e of events) {
+      if (e.Start_Date__c) {
+        const d = new Date(e.Start_Date__c);
+        monthSet.add(
+          `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+        );
+      }
+    }
+    return Array.from(monthSet).sort();
+  }, [events]);
+
+  // Filtered and sorted events
+  const filteredEvents = useMemo(() => {
+    let result = [...events];
+
+    // Search
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(
+        (e) =>
+          e.Name.toLowerCase().includes(q) ||
+          (e.Category__c && e.Category__c.toLowerCase().includes(q)) ||
+          (e.Location__r?.Name &&
+            e.Location__r.Name.toLowerCase().includes(q)),
+      );
+    }
+
+    // Category
+    if (selectedCategory !== "all") {
+      result = result.filter((e) => e.Category__c === selectedCategory);
+    }
+
+    // Month
+    if (selectedMonth !== "all") {
+      result = result.filter((e) => {
+        if (!e.Start_Date__c) return false;
+        const d = new Date(e.Start_Date__c);
+        return (
+          `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}` ===
+          selectedMonth
+        );
+      });
+    }
+
+    // Past events
+    if (!showPastEvents) {
+      const today = new Date().toISOString().slice(0, 10);
+      result = result.filter((e) => {
+        // Keep events with no end date, or end date >= today
+        if (!e.End_Date__c && !e.Start_Date__c) return true;
+        const endDate = e.End_Date__c || e.Start_Date__c;
+        return endDate! >= today;
+      });
+    }
+
+    // Sort
+    switch (sortBy) {
+      case "date":
+        result.sort((a, b) =>
+          (a.Start_Date__c || "").localeCompare(b.Start_Date__c || ""),
+        );
+        break;
+      case "revenue":
+        result.sort(
+          (a, b) =>
+            (b.Sum_of_Closed_Won_Gross__c || 0) -
+            (a.Sum_of_Closed_Won_Gross__c || 0),
+        );
+        break;
+      case "margin":
+        result.sort(
+          (a, b) =>
+            (b.Margin_Percentage__c || 0) - (a.Margin_Percentage__c || 0),
+        );
+        break;
+    }
+
+    return result;
+  }, [
+    events,
+    search,
+    selectedCategory,
+    selectedMonth,
+    showPastEvents,
+    sortBy,
+  ]);
+
+  // Group events by month for the calendar view
+  const eventsByMonth = useMemo(() => {
+    const grouped: Record<string, SalesforceEvent[]> = {};
+    for (const e of filteredEvents) {
+      if (!e.Start_Date__c) continue;
+      const d = new Date(e.Start_Date__c);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(e);
+    }
+    return grouped;
+  }, [filteredEvents]);
+
+  // Summary stats
+  const stats = useMemo(() => {
+    const upcoming = filteredEvents.filter((e) => {
+      const d = daysUntil(e.Start_Date__c);
+      return d !== null && d >= 0;
+    });
+    const totalRevenue = filteredEvents.reduce(
+      (s, e) => s + (e.Sum_of_Closed_Won_Gross__c || 0),
+      0,
+    );
+    const totalTarget = filteredEvents.reduce(
+      (s, e) => s + (e.Revenue_Target__c || 0),
+      0,
+    );
+    const avgMargin =
+      filteredEvents.filter((e) => e.Margin_Percentage__c != null).length > 0
+        ? filteredEvents.reduce(
+            (s, e) => s + (e.Margin_Percentage__c || 0),
+            0,
+          ) /
+          filteredEvents.filter((e) => e.Margin_Percentage__c != null).length
+        : 0;
+
+    return {
+      total: filteredEvents.length,
+      upcoming: upcoming.length,
+      totalRevenue,
+      totalTarget,
+      avgMargin,
     };
-    fetchDetails();
-  }, [hovered, hoverDetails]);
+  }, [filteredEvents]);
 
-  // Month helpers
-  function shiftMonth(delta: number) {
-    const [y, m] = month.split("-").map(Number);
-    const d = new Date(Date.UTC(y, m - 1 + delta, 1));
-    setMonth(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`);
-  }
+  const activeFilters =
+    (selectedCategory !== "all" ? 1 : 0) +
+    (selectedMonth !== "all" ? 1 : 0) +
+    (showPastEvents ? 1 : 0) +
+    (search.trim() ? 1 : 0);
 
-  function formatMonthLabel(yyyyMM: string) {
+  const formatMonthLabel = (yyyyMM: string) => {
     const [y, m] = yyyyMM.split("-").map(Number);
     const d = new Date(Date.UTC(y, m - 1, 1));
     return d.toLocaleString(undefined, { month: "long", year: "numeric" });
-  }
-
-  // Build calendar grid days for the month
-  const daysGrid = useMemo(() => {
-    const [y, m] = month.split("-").map(Number);
-    const first = new Date(Date.UTC(y, m - 1, 1));
-    const startWeekday = (first.getUTCDay() + 6) % 7; // Mon=0..Sun=6
-    const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
-    const cells: { date: Date | null }[] = [];
-    for (let i = 0; i < startWeekday; i++) cells.push({ date: null });
-    for (let d = 1; d <= daysInMonth; d++) cells.push({ date: new Date(Date.UTC(y, m - 1, d)) });
-    while (cells.length % 7 !== 0) cells.push({ date: null });
-    const weeks: { date: Date | null }[][] = [];
-    for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
-    return weeks;
-  }, [month]);
-
-  // Removed unused eventsByDay computation
+  };
 
   return (
-      <div className="h-dvh overflow-y-auto bg-gradient-to-br from-background to-muted/20 p-6 pl-24 lg:p-8 lg:pl-24">
-        <div className="max-w-7xl mx-auto pb-24 border border-border/50 rounded-2xl p-4">
-          <div className="mb-6">
-            <div className="grid grid-cols-3 items-center gap-3">
-              {/* Left: Search */}
-              <div className="justify-self-start">
-                <Input
-                  placeholder="Search events..."
-                  className="w-56 md:w-64"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
+    <div
+      ref={scrollRef}
+      className="h-dvh overflow-y-auto bg-gradient-to-br from-background to-muted/20 p-6 pl-24 lg:p-8 lg:pl-24"
+    >
+      <div className="max-w-[1600px] mx-auto pb-24">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8"
+        >
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">Events</h1>
+              <p className="text-muted-foreground text-sm mt-1">
+                {stats.total} events
+                {stats.upcoming > 0 && ` • ${stats.upcoming} upcoming`}
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setLoading(true);
+                fetchEvents();
+              }}
+              className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-lg border border-border/50 hover:border-border"
+            >
+              <ArrowsClockwise
+                className={`size-3.5 ${loading ? "animate-spin" : ""}`}
+              />
+              Refresh
+            </button>
+          </div>
+
+          {/* Stats bar */}
+          <div className="grid grid-cols-4 gap-4 mb-6">
+            <div className="rounded-xl bg-card border border-border/40 p-4">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+                Total Events
               </div>
-              {/* Center: Title + Month Controls */}
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="justify-self-center flex flex-col items-center gap-2"
-              >
-                <h1 className="text-2xl md:text-3xl font-bold whitespace-nowrap pb-4">Upcoming Events</h1>
-                <div className="flex items-center gap-2">
-                  <Button className="px-2 py-1" variant="outline" onClick={() => shiftMonth(-1)} aria-label="Previous month">&larr;</Button>
-                  <div className="font-semibold w-32 md:w-44 text-center whitespace-nowrap">{formatMonthLabel(month)}</div>
-                  <Button className="px-2 py-1" variant="outline" onClick={() => shiftMonth(1)} aria-label="Next month">&rarr;</Button>
+              <div className="text-2xl font-bold tabular-nums mt-1">
+                {stats.total}
+              </div>
+            </div>
+            <div className="rounded-xl bg-card border border-border/40 p-4">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+                Total Revenue
+              </div>
+              <div className="text-2xl font-bold tabular-nums mt-1 text-emerald-400">
+                {formatCurrency(stats.totalRevenue)}
+              </div>
+              {stats.totalTarget > 0 && (
+                <div className="text-[10px] text-muted-foreground/50 mt-0.5">
+                  {Math.round((stats.totalRevenue / stats.totalTarget) * 100)}%
+                  of {formatCurrency(stats.totalTarget)}
                 </div>
-              </motion.div>
-              {/* Right: View toggle */}
-              <div className="justify-self-end flex items-center gap-2">
-                <Button variant={view === "grid" ? "default" : "outline"} onClick={() => setView("grid")}>Grid</Button>
-                <Button variant={view === "list" ? "default" : "outline"} onClick={() => setView("list")}>List</Button>
-                <Button variant={view === "inventory" ? "default" : "outline"} onClick={() => setView("inventory")}>Inventory</Button>
+              )}
+            </div>
+            <div className="rounded-xl bg-card border border-border/40 p-4">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+                Avg. Margin
+              </div>
+              <div
+                className={`text-2xl font-bold tabular-nums mt-1 ${stats.avgMargin >= 30 ? "text-emerald-400" : stats.avgMargin >= 15 ? "text-amber-400" : "text-red-400"}`}
+              >
+                {stats.avgMargin > 0 ? `${stats.avgMargin.toFixed(1)}%` : "—"}
+              </div>
+            </div>
+            <div className="rounded-xl bg-card border border-border/40 p-4">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+                Upcoming
+              </div>
+              <div className="text-2xl font-bold tabular-nums mt-1">
+                {stats.upcoming}
               </div>
             </div>
           </div>
 
-          {view === "inventory" ? (
-            <InventoryView
-              events={inventoryEvents}
-              loading={inventoryLoading}
-            />
-          ) : loading ? (
-            <p className="text-muted-foreground">Loading…</p>
-          ) : error ? (
-            <p className="text-destructive">{error}</p>
-          ) : items.length === 0 ? (
-            <p className="text-muted-foreground">No events yet.</p>
-          ) : view === "list" ? (
-            <div className="mx-auto max-w-6xl grid grid-cols-1 md:grid-cols-2 gap-6">
-              {uniqueItems.map((e, idx) => {
-                const isPast = new Date(e.endDate).toISOString().slice(0,10) < todayStr
-                return (
-                <motion.div key={e.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.01 }}>
-                  <Card className={`relative overflow-hidden hover:shadow-md transition h-full ${isPast ? 'opacity-90' : ''}`}>
-                    {/* Image (16:9) */}
-                    <div className="relative w-full aspect-video bg-muted">
-                      {e.imageUrl && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={`/api/image-proxy?url=${encodeURIComponent(e.imageUrl)}`}
-                          alt=""
-                          className="absolute inset-0 w-full h-full object-cover"
-                        />
-                      )}
-                      <div className="absolute top-2 right-2 text-xs px-2 py-1 rounded bg-background/80 border">
-                        {e.category}
-                      </div>
-                    </div>
-                    {/* Text */}
-                    <CardContent className="p-4">
-                      <div className="font-semibold text-base md:text-lg">{e.name}</div>
-                      <div className="text-sm text-muted-foreground mt-1">
-                        {new Date(e.startDate).toLocaleDateString()} – {new Date(e.endDate).toLocaleDateString()} • {e.location}
-                      </div>
-                      <div className="text-sm mt-3 line-clamp-4">{e.description}</div>
-                    </CardContent>
-                    {isPast && (
-                      <div className="pointer-events-none absolute inset-0 bg-black/40 flex items-center justify-center">
-                        <span className="text-white text-sm font-semibold tracking-wide uppercase">Event Passed</span>
-                      </div>
-                    )}
-                  </Card>
-                </motion.div>
-              )})}
+          {/* Search + Filters */}
+          <div className="flex items-center gap-3">
+            {/* Search */}
+            <div className="relative flex-1 max-w-md">
+              <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search events, venues, cities..."
+                className="w-full pl-9 pr-8 py-2 rounded-lg bg-card border border-border/50 text-sm focus:outline-none focus:border-foreground/30 focus:ring-1 focus:ring-foreground/10 transition-colors placeholder:text-muted-foreground/50"
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="size-3.5" />
+                </button>
+              )}
             </div>
-          ) : (
-            <div className="grid grid-cols-7 gap-2">
-              {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((d) => (
-                <div key={d} className="text-xs font-medium text-muted-foreground text-center py-2">{d}</div>
-              ))}
-              {daysGrid.map((week, wi) => {
-                const weekDates = week.map((c) => c.date).filter(Boolean) as Date[]
-                const weekStart = weekDates[0]
-                const weekEnd = weekDates[weekDates.length - 1]
 
-                // Build spanning bars for this week (overlay layer)
-                const bars: { e: EventItem; startCol: number; endCol: number; level: number; startsInWeek: boolean; endsInWeek: boolean }[] = []
-                const levels: { endCol: number }[] = []
-                for (const e of uniqueItems) {
-                  const s = new Date(e.startDate)
-                  const en = new Date(e.endDate)
-                  if (!weekStart || !weekEnd) continue
-                  if (en < weekStart || s > weekEnd) continue
-                  // compute start/end columns relative to this week
-                  let startCol = week.findIndex((c) => c.date && c.date >= s)
-                  if (startCol === -1) startCol = week.findIndex((c) => c.date !== null)
-                  const endColRev = [...week].reverse().findIndex((c) => c.date && c.date <= en)
-                  const endCol = endColRev === -1 ? week.length - 1 : week.length - 1 - endColRev
-                  const startsInWeek = s >= weekStart
-                  const endsInWeek = en <= weekEnd
-                  // simple stacking to avoid overlaps in same row
-                  let level = 0
-                  while (level < levels.length && levels[level].endCol >= startCol) level++
-                  if (level === levels.length) levels.push({ endCol })
-                  levels[level].endCol = Math.max(levels[level].endCol, endCol)
-                  bars.push({ e, startCol, endCol, level, startsInWeek, endsInWeek })
-                }
-
-                return (
-                  <div key={wi} className="relative col-span-7">
-                    {/* cells */}
-                    <div className="grid grid-cols-7 gap-2">
-                      {week.map((cell, di) => {
-                        const dayKey = cell.date ? cell.date.toISOString().slice(0,10) : `empty-${wi}-${di}`
-                        const isToday = cell.date ? cell.date.toISOString().slice(0,10) === todayStr : false
-                        return (
-                          <div
-                            key={dayKey}
-                            className={`min-h-24 rounded-lg border p-2 ${
-                              isToday
-                                ? 'bg-primary/10 text-foreground border-primary/30'
-                                : 'bg-card/60'
-                            }`}
-                          >
-                            <div className={`text-xs font-semibold ${isToday ? '' : 'opacity-70'}`}>
-                              {cell.date ? (isToday ? 'Today' : cell.date.getUTCDate()) : ''}
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                    {/* overlay spanning bars (bridge across cells) */}
-                    <div className="absolute inset-0 grid grid-cols-7 gap-2 p-2 pointer-events-none">
-                      {bars.map((b, idx) => {
-                        const colors = colorFor(b.e.category)
-                        const radius = b.startsInWeek && b.endsInWeek ? 'rounded-md' : b.startsInWeek ? 'rounded-l-md' : b.endsInWeek ? 'rounded-r-md' : 'rounded-none'
-                        const isPast = new Date(b.e.endDate).toISOString().slice(0,10) < todayStr
-                        return (
-                          <div
-                            key={`${b.e.id}-${idx}`}
-                            className="flex items-center"
-                            style={{ gridColumn: `${b.startCol + 1} / ${b.endCol + 2}`, marginTop: `${b.level * 12}px` }}
-                          >
-                            <div className={`h-6 w-full ${isPast ? 'bg-gray-500/60 text-white' : colors.start} ${radius} px-2 flex items-center overflow-hidden pointer-events-auto`}
-                              onMouseEnter={() => setHovered(b.e)}
-                              onMouseLeave={() => setHovered(null)}
-                            >
-                              {b.startsInWeek && (
-                                <span className="text-xs font-medium truncate">{b.e.name}</span>
-                              )}
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-          {/* Hover lightbox (soft fade, no click required) */}
-          {hovered && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center pointer-events-none"
-              onMouseEnter={() => setHovered(hovered)}
-              onMouseLeave={() => setHovered(null)}
-            >
-              <motion.div
-                initial={{ scale: 0.98, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.98, opacity: 0 }}
-                transition={{ duration: 0.15 }}
-                className="pointer-events-auto w-full max-w-xl mx-4 bg-card rounded-xl border overflow-hidden shadow-xl"
+            {/* Category dropdown */}
+            <div className="relative">
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="appearance-none pl-3 pr-8 py-2 rounded-lg bg-card border border-border/50 text-sm focus:outline-none focus:border-foreground/30 cursor-pointer"
               >
-                {(() => { const d: EventItem = { ...hovered, ...(hoverDetails[hovered.id] || {}) } as EventItem; return (
-                <>
-                <div className="relative w-full aspect-video bg-muted">
-                  {(d.imageUrl) && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={`/api/image-proxy?url=${encodeURIComponent(String(d.imageUrl))}`}
-                      alt=""
-                      className="absolute inset-0 w-full h-full object-cover"
-                    />
-                  )}
-                  <div className="absolute top-2 right-2 text-xs px-2 py-1 rounded bg-background/80 border">
-                    {d.category}
+                <option value="all">All Categories</option>
+                {categories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
+              <CaretDown className="absolute right-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
+            </div>
+
+            {/* Month dropdown */}
+            <div className="relative">
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="appearance-none pl-3 pr-8 py-2 rounded-lg bg-card border border-border/50 text-sm focus:outline-none focus:border-foreground/30 cursor-pointer"
+              >
+                <option value="all">All Months</option>
+                {months.map((m) => (
+                  <option key={m} value={m}>
+                    {formatMonthLabel(m)}
+                  </option>
+                ))}
+              </select>
+              <CaretDown className="absolute right-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
+            </div>
+
+            {/* Sort */}
+            <div className="relative">
+              <select
+                value={sortBy}
+                onChange={(e) =>
+                  setSortBy(e.target.value as "date" | "revenue" | "margin")
+                }
+                className="appearance-none pl-3 pr-8 py-2 rounded-lg bg-card border border-border/50 text-sm focus:outline-none focus:border-foreground/30 cursor-pointer"
+              >
+                <option value="date">Sort: Date</option>
+                <option value="revenue">Sort: Revenue</option>
+                <option value="margin">Sort: Margin</option>
+              </select>
+              <CaretDown className="absolute right-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
+            </div>
+
+            {/* Show past events toggle */}
+            <button
+              onClick={() => setShowPastEvents(!showPastEvents)}
+              className={`px-3 py-2 rounded-lg border text-sm transition-colors ${
+                showPastEvents
+                  ? "bg-foreground/10 border-foreground/20 text-foreground"
+                  : "bg-card border-border/50 text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {showPastEvents ? "Hide Past" : "Show Past"}
+            </button>
+
+            {/* Reset */}
+            {activeFilters > 0 && (
+              <button
+                onClick={() => {
+                  setSearch("");
+                  setSelectedCategory("all");
+                  setSelectedMonth("all");
+                  setShowPastEvents(false);
+                  setSortBy("date");
+                }}
+                className="px-3 py-2 rounded-lg border border-red-500/30 bg-red-500/5 text-red-400 text-sm hover:bg-red-500/10 transition-colors flex items-center gap-1.5"
+              >
+                <X className="size-3" />
+                Reset ({activeFilters})
+              </button>
+            )}
+          </div>
+        </motion.div>
+
+        {/* Events Grid */}
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div
+                key={i}
+                className="rounded-xl border border-border/30 bg-card/30 overflow-hidden animate-pulse"
+              >
+                <div className="h-44 bg-muted/30" />
+                <div className="p-4 space-y-2">
+                  <div className="h-4 w-3/4 bg-muted/30 rounded" />
+                  <div className="h-3 w-1/2 bg-muted/20 rounded" />
+                  <div className="h-3 w-2/3 bg-muted/20 rounded" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : filteredEvents.length === 0 ? (
+          <div className="text-center py-20">
+            <CalendarBlank className="size-12 mx-auto text-muted-foreground/30 mb-4" />
+            <p className="text-muted-foreground text-lg">No events found</p>
+            <p className="text-muted-foreground/60 text-sm mt-1">
+              Try adjusting your filters or search terms
+            </p>
+          </div>
+        ) : sortBy === "date" &&
+          selectedMonth === "all" &&
+          !search.trim() ? (
+          // Grouped by month when sorted by date and not filtering by a specific month
+          <div className="space-y-10">
+            {Object.entries(eventsByMonth)
+              .sort(([a], [b]) => a.localeCompare(b))
+              .map(([monthKey, monthEvents]) => (
+                <div key={monthKey}>
+                  <div className="flex items-center gap-3 mb-5">
+                    <h2 className="text-lg font-semibold">
+                      {formatMonthLabel(monthKey)}
+                    </h2>
+                    <div className="flex-1 h-px bg-border/50" />
+                    <span className="text-xs text-muted-foreground">
+                      {monthEvents.length} event
+                      {monthEvents.length !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                    {monthEvents.map((event, i) => (
+                      <EventCard
+                        key={event.Id}
+                        event={event}
+                        index={i}
+                        onClick={() => setSelectedEvent(event)}
+                      />
+                    ))}
                   </div>
                 </div>
-                <div className="p-4">
-                  <div className="text-lg font-semibold">{d.name}</div>
-                  <div className="text-sm text-muted-foreground mt-1">
-                    {new Date(d.startDate).toLocaleDateString()} – {new Date(d.endDate).toLocaleDateString()} {d.location ? `• ${d.location}` : ''}
-                  </div>
-                  {d.description && (
-                    <div className="text-sm mt-3">{d.description}</div>
-                  )}
-                </div>
-                </>
-                ) })()}
-              </motion.div>
-            </motion.div>
-          )}
-        </div>
+              ))}
+          </div>
+        ) : (
+          // Flat grid when searching, filtering by month, or sorting by non-date
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            {filteredEvents.map((event, i) => (
+              <EventCard
+                key={event.Id}
+                event={event}
+                index={i}
+                onClick={() => setSelectedEvent(event)}
+              />
+            ))}
+          </div>
+        )}
       </div>
+
+      {/* Full-screen event detail overlay */}
+      <AnimatePresence>
+        {selectedEvent && (
+          <EventDetail
+            event={selectedEvent}
+            onClose={() => setSelectedEvent(null)}
+          />
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
-
-

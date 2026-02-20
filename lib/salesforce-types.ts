@@ -169,7 +169,17 @@ export interface SalesforceEvent {
   A_B_On_Site_2__c: string | null
   // Images
   Event_Image_1__c: string | null
+  Event_Image_2__c: string | null
+  Event_Image_3__c: string | null
+  Event_Image_4__c: string | null
+  Event_Image_5__c: string | null
+  // Content
+  Description__c: string | null
+  Event_Notes__c: string | null
   Master_Package_Code__c: string | null
+  // Owner
+  OwnerId: string | null
+  Owner: { Name: string } | null
 }
 
 // ── Contact ──

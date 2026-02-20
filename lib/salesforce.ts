@@ -368,7 +368,10 @@ const EVENT_SELECT_FIELDS = `
   Percentage_Reservations_Completion__c,
   Total_Projects__c,
   A_B_On_Site_1__c, A_B_On_Site_2__c,
-  Event_Image_1__c, Master_Package_Code__c
+  Event_Image_1__c, Event_Image_2__c, Event_Image_3__c, Event_Image_4__c, Event_Image_5__c,
+  Description__c, Event_Notes__c,
+  Master_Package_Code__c,
+  OwnerId, Owner.Name
 `.trim()
 
 const CONTACT_SELECT_FIELDS = `
