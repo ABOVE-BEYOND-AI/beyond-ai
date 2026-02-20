@@ -4,10 +4,11 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 
 interface ThemeToggleProps {
-  showLabel?: boolean; // Kept for backwards compatibility if passed, but ignored visually
+  showLabel?: boolean;
 }
 
-export function ThemeToggle({ showLabel }: ThemeToggleProps) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function ThemeToggle(props: ThemeToggleProps) {
   const [isDark, setIsDark] = useState(false);
   const [mounted, setMounted] = useState(false);
 

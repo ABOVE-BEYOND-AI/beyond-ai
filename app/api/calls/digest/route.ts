@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
               analyses.push(cached)
               continue
             }
-          } catch (cacheErr) {
+          } catch {
             // Skip cache
           }
         }

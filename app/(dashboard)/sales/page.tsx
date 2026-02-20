@@ -4,9 +4,7 @@ import {
   Card,
   CardContent,
 } from "@/components/ui/card";
-import { TrendUp, ArrowsClockwise, CurrencyGbp, ArrowsOut, X } from "@phosphor-icons/react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCrown, faTrophy } from "@fortawesome/free-solid-svg-icons";
+import { TrendUp, ArrowsOut, X } from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGoogleAuth } from "@/components/google-auth-provider-clean";
 import { useRouter } from "next/navigation";
@@ -309,8 +307,8 @@ export default function SalesPage() {
   const [initialLoading, setInitialLoading] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState<SalesPeriod>("month");
   const [error, setError] = useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [, setLastUpdated] = useState<Date | null>(null);
+  const [, setIsRefreshing] = useState(false);
   const [fullscreenView, setFullscreenView] = useState<FullscreenView>(null);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
