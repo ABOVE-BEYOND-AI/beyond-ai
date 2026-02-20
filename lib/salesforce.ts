@@ -473,28 +473,33 @@ export async function convertLead(id: string): Promise<{ contactId: string; acco
 // ──────────────────────────────────────────────
 
 export async function getOpenOpportunities(filters?: PipelineFilters): Promise<SalesforceOpportunityFull[]> {
-  let whereClause = filters?.includeClosed ? '1=1' : 'IsClosed = false'
+  const conditions: string[] = []
 
+  if (!filters?.includeClosed) {
+    conditions.push('IsClosed = false')
+  }
   if (filters?.ownerId) {
-    whereClause += ` AND OwnerId = '${filters.ownerId}'`
+    conditions.push(`OwnerId = '${filters.ownerId}'`)
   }
   if (filters?.eventId) {
-    whereClause += ` AND Event__c = '${filters.eventId}'`
+    conditions.push(`Event__c = '${filters.eventId}'`)
   }
   if (filters?.eventCategory) {
-    whereClause += ` AND Event__r.Category__c = '${filters.eventCategory}'`
+    conditions.push(`Event__r.Category__c = '${filters.eventCategory}'`)
   }
   if (filters?.minAmount) {
-    whereClause += ` AND Amount >= ${filters.minAmount}`
+    conditions.push(`Amount >= ${filters.minAmount}`)
   }
   if (filters?.maxAmount) {
-    whereClause += ` AND Amount <= ${filters.maxAmount}`
+    conditions.push(`Amount <= ${filters.maxAmount}`)
   }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
 
   const soql = `
     SELECT ${PIPELINE_SELECT_FIELDS}
     FROM Opportunity
-    WHERE ${whereClause}
+    ${whereClause}
     ORDER BY LastModifiedDate DESC
     LIMIT 500
   `.trim()
@@ -513,7 +518,7 @@ export async function getOpenOpportunities(filters?: PipelineFilters): Promise<S
         LeadSource, NextStep,
         CreatedDate, LastModifiedDate, LastActivityDate
       FROM Opportunity
-      WHERE ${whereClause}
+      ${whereClause}
       ORDER BY LastModifiedDate DESC
       LIMIT 500
     `.trim()
