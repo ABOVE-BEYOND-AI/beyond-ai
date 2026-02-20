@@ -1025,9 +1025,9 @@ export default function EventsPage() {
       <div className="max-w-[1600px] mx-auto pb-24">
 
         {/* ── Sticky Header — Glassmorphic bar ── */}
-        <div className="sticky top-0 z-20 pb-2">
+        <div className="sticky top-0 z-20 pb-2 flex justify-center">
           <div
-            className="rounded-2xl px-4 py-3 flex items-center gap-3 max-w-[1100px]"
+            className="rounded-2xl px-4 py-3 flex items-center gap-3 w-full max-w-[1100px]"
             style={{
               background: "rgba(10,10,10,0.65)",
               backdropFilter: "blur(24px) saturate(1.4)",
