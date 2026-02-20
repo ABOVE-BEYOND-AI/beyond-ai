@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import NumberFlow from "@number-flow/react";
 import {
   CalendarBlank,
   MapPin,
@@ -459,7 +458,7 @@ function TicketBar({ label, icon: Icon, required, booked }: { label: string; ico
   );
 }
 
-// ── Event Card — website-inspired premium design ──
+// ── Event Card — premium, zero-shift design ──
 
 function EventCard({ event, onClick }: { event: SalesforceEvent; onClick: () => void }) {
   const catVisual = getCategoryVisual(event.Category__c);
@@ -472,133 +471,92 @@ function EventCard({ event, onClick }: { event: SalesforceEvent; onClick: () => 
   return (
     <div
       onClick={onClick}
-      className={`group cursor-pointer relative overflow-hidden transition-all duration-500 ${isPast ? "opacity-40 hover:opacity-60" : ""}`}
-      style={{
-        aspectRatio: "3/4",
-        borderRadius: "12px",
-        border: "1px solid rgba(255,255,255,0.05)",
-        boxShadow: "0 12px 30px rgba(0,0,0,0.22)",
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = "rgba(255,255,255,0.16)";
-        e.currentTarget.style.boxShadow = "0 0 0 1px rgba(255,255,255,0.16), 0 14px 32px rgba(0,0,0,0.28)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = "rgba(255,255,255,0.05)";
-        e.currentTarget.style.boxShadow = "0 12px 30px rgba(0,0,0,0.22)";
-      }}
+      className={`ab-card group cursor-pointer relative overflow-hidden rounded-xl ${isPast ? "opacity-40 hover:opacity-60" : ""}`}
+      style={{ aspectRatio: "3/4" }}
     >
-      {/* Background: image or category gradient */}
+      {/* Image or gradient background — always positioned absolutely */}
       {imageUrl ? (
-        <>
+        <div className="absolute inset-0">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={`/api/image-proxy?url=${encodeURIComponent(imageUrl)}`}
             alt=""
-            className="absolute inset-0 w-full h-full object-cover transition-all duration-700 opacity-80 group-hover:opacity-100 group-hover:scale-105"
+            className="absolute inset-0 w-full h-full object-cover will-change-transform transition-[transform,opacity] duration-700 ease-out opacity-85 group-hover:opacity-100 group-hover:scale-[1.04]"
             loading="lazy"
           />
-          {/* Bottom gradient for text readability */}
-          <div
-            className="absolute inset-0 transition-opacity duration-350"
-            style={{
-              background: "linear-gradient(to top, rgba(0,0,0,0.92), transparent 60%)",
-              opacity: 0.72,
-            }}
-          />
-          <div
-            className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-350 pointer-events-none"
-            style={{
-              background: "linear-gradient(to top, rgba(0,0,0,0.92), transparent 60%)",
-              opacity: undefined,
-            }}
-          />
-        </>
+          {/* Single clean gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+        </div>
       ) : (
-        <>
+        <div className="absolute inset-0">
           <div className={`absolute inset-0 bg-gradient-to-br ${catVisual.gradient}`} />
           <div className="absolute inset-0 flex items-center justify-center opacity-[0.06]">
             <CatIcon className="size-48" />
           </div>
-          <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E\")" }} />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-        </>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+        </div>
       )}
 
-      {/* Content — full height flex */}
-      <div className="relative z-[5] h-full flex flex-col justify-between p-5">
-        {/* Top: Date + Category */}
+      {/* Card content — fixed layout, no shifting */}
+      <div className="relative z-[2] h-full flex flex-col justify-between p-5">
+        {/* Top row: date + category */}
         <div className="flex items-start justify-between">
-          {startDate && (
-            <div className="flex flex-col pl-2.5" style={{ borderLeft: "1px solid #fff" }}>
-              <span className="text-[24px] font-light text-white leading-none">{startDate.getDate()}</span>
-              <span className="text-[10px] font-extrabold tracking-[0.1em] text-white/80 mt-1 uppercase">
+          {startDate ? (
+            <div className="flex flex-col pl-2.5 border-l border-white/80">
+              <span className="text-[22px] font-light text-white leading-none tabular-nums">{startDate.getDate()}</span>
+              <span className="text-[10px] font-bold tracking-[0.1em] text-white/70 mt-1 uppercase">
                 {startDate.toLocaleDateString("en-GB", { month: "short" })}
               </span>
             </div>
+          ) : (
+            <div />
           )}
-          <span
-            className="text-[9px] font-extrabold tracking-[0.1em] uppercase text-white px-2 py-1 rounded-[3px]"
-            style={{
-              border: "1px solid rgba(255,255,255,0.2)",
-              backdropFilter: "blur(4px)",
-            }}
-          >
+          <span className="text-[8px] font-bold tracking-[0.12em] uppercase text-white/90 px-1.5 py-[3px] rounded-[3px] border border-white/20 backdrop-blur-sm bg-black/10">
             {event.Category__c || "Event"}
           </span>
         </div>
 
-        {/* Bottom: Title + meta */}
-        <div className="transform translate-y-2.5 group-hover:translate-y-0 transition-transform duration-500">
-          {/* Title */}
-          <h3
-            className="text-white font-light leading-[1.1] mb-3 group-hover:-translate-y-[3px] transition-transform duration-350"
-            style={{
-              fontSize: "clamp(18px, 2vw, 26px)",
-              display: "-webkit-box",
-              WebkitBoxOrient: "vertical",
-              WebkitLineClamp: 3,
-              overflow: "hidden",
-            }}
-          >
+        {/* Bottom: title, location, arrow — always laid out, opacity transitions only */}
+        <div>
+          {/* Title — always visible */}
+          <h3 className="text-white font-light leading-[1.12] line-clamp-3 text-[clamp(17px,1.8vw,24px)] mb-2">
             {event.Name}
           </h3>
 
-          {/* Meta — fade in on hover */}
-          <div
-            className="opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-            style={{ transitionDelay: "120ms" }}
-          >
-            <div className="flex items-end justify-between pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.2)" }}>
-              <div>
-                {event.Location__r?.Name && (
-                  <>
-                    <div className="text-[10px] tracking-[0.12em] text-white/40 mb-1">LOCATION</div>
-                    <div className="text-[13px] font-light text-white/90">{event.Location__r.Name}</div>
-                  </>
-                )}
-              </div>
-              {/* Arrow */}
-              <div
-                className="size-8 bg-white text-black rounded-full flex items-center justify-center transform translate-x-1.5 group-hover:translate-x-0 transition-transform duration-400"
-              >
-                <CaretRight className="size-3.5" weight="bold" />
-              </div>
+          {/* Meta row — always occupies space, fades in on hover */}
+          <div className="flex items-end justify-between pt-2.5 border-t border-white/[0.12] opacity-0 group-hover:opacity-100 transition-opacity duration-400 ease-out">
+            <div className="min-w-0 flex-1">
+              {event.Location__r?.Name ? (
+                <>
+                  <div className="text-[9px] tracking-[0.14em] text-white/35 mb-0.5 uppercase">Location</div>
+                  <div className="text-[12px] font-light text-white/80 truncate">{event.Location__r.Name}</div>
+                </>
+              ) : (
+                <>
+                  <div className="text-[9px] tracking-[0.14em] text-white/35 mb-0.5 uppercase">Date</div>
+                  <div className="text-[12px] font-light text-white/80">{formatDateRange(event.Start_Date__c, event.End_Date__c)}</div>
+                </>
+              )}
+            </div>
+            <div className="size-7 rounded-full bg-white flex items-center justify-center shrink-0 ml-3">
+              <CaretRight className="size-3 text-black" weight="bold" />
             </div>
           </div>
-
-          {/* Countdown badge — always visible, compact */}
-          {daysLeft !== null && !isPast && (
-            <div className="mt-3 group-hover:hidden">
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                daysLeft <= 7 ? "bg-red-500/25 text-red-300" : daysLeft <= 30 ? "bg-amber-500/25 text-amber-300" : "bg-white/10 text-white/60"
-              }`}>
-                {daysLeft}d away
-              </span>
-            </div>
-          )}
         </div>
       </div>
+
+      {/* Card border glow — CSS-only, no JS handlers */}
+      <style jsx>{`
+        .ab-card {
+          border: 1px solid rgba(255,255,255,0.05);
+          box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+          transition: border-color 0.5s ease, box-shadow 0.4s ease;
+        }
+        .ab-card:hover {
+          border-color: rgba(255,255,255,0.14);
+          box-shadow: 0 0 0 1px rgba(255,255,255,0.12), 0 12px 28px rgba(0,0,0,0.3);
+        }
+      `}</style>
     </div>
   );
 }
@@ -1062,16 +1020,14 @@ export default function EventsPage() {
     return yyyyMM.split("-")[0];
   };
 
-  const [searchOpen, setSearchOpen] = useState(false);
-
   return (
-    <div ref={scrollRef} className="h-dvh overflow-y-auto bg-background p-6 pl-24 lg:p-8 lg:pl-24">
+    <div ref={scrollRef} className="h-dvh overflow-y-auto bg-background p-4 pl-24 lg:p-5 lg:pl-24">
       <div className="max-w-[1600px] mx-auto pb-24">
 
-        {/* ── Sticky Header — Glassmorphic, compact, scroll-aware ── */}
-        <div className="sticky top-0 z-20 -mt-6 lg:-mt-8 pt-3 pb-2">
+        {/* ── Sticky Header — Glassmorphic bar ── */}
+        <div className="sticky top-0 z-20 pb-2">
           <div
-            className="rounded-2xl px-4 py-2.5 flex items-center gap-3"
+            className="rounded-2xl px-4 py-3 flex items-center gap-3 max-w-[1100px]"
             style={{
               background: "rgba(10,10,10,0.65)",
               backdropFilter: "blur(24px) saturate(1.4)",
@@ -1080,114 +1036,73 @@ export default function EventsPage() {
               boxShadow: "0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)",
             }}
           >
-            {/* Month title with NumberFlow-style animated transition */}
-            <div className="flex items-baseline gap-2.5 min-w-0 shrink-0">
-              <AnimatePresence mode="wait">
+            {/* Month title — fixed width to prevent jumping */}
+            <div className="flex items-baseline gap-0 shrink-0 overflow-hidden" style={{ width: "140px" }}>
+              <AnimatePresence mode="wait" initial={false}>
                 <motion.span
                   key={currentMonth}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-                  className="text-[15px] font-bold text-white tracking-tight"
+                  initial={{ opacity: 0, y: 10, filter: "blur(4px)" }}
+                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                  exit={{ opacity: 0, y: -10, filter: "blur(4px)" }}
+                  transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                  className="text-[15px] font-bold text-white tracking-tight whitespace-nowrap"
                 >
-                  {loading ? "Events" : formatMonthName(currentMonth)}
-                </motion.span>
-              </AnimatePresence>
-              <AnimatePresence mode="wait">
-                <motion.span
-                  key={formatYear(currentMonth)}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="text-[11px] font-medium text-white/30"
-                >
-                  {formatYear(currentMonth)}
+                  {loading ? "Events" : `${formatMonthName(currentMonth)} ${formatYear(currentMonth)}`}
                 </motion.span>
               </AnimatePresence>
             </div>
 
-            {/* Subtle divider */}
-            <div className="h-4 w-px bg-white/10 shrink-0" />
+            {/* Divider */}
+            <div className="h-4 w-px bg-white/8 shrink-0" />
 
             {/* EVENTS CALENDAR label */}
-            <span className="text-[9px] font-extrabold tracking-[0.2em] uppercase text-white/25 shrink-0">
+            <span className="text-[9px] font-extrabold tracking-[0.2em] uppercase text-white/20 shrink-0">
               Events Calendar
             </span>
 
-            {/* Event count */}
-            <div className="flex items-center gap-1.5 shrink-0">
-              <div className="size-1.5 rounded-full bg-emerald-400/60" />
-              <span className="text-[11px] tabular-nums text-white/40 font-medium">
-                <NumberFlow
-                  value={filteredEvents.length}
-                  transformTiming={{ duration: 400, easing: "ease-out" }}
-                  spinTiming={{ duration: 350, easing: "ease-out" }}
-                  opacityTiming={{ duration: 200, easing: "ease-out" }}
-                  willChange={false}
-                />
-              </span>
-            </div>
-
             <div className="flex-1" />
 
-            {/* Search — expandable */}
-            <div className="relative flex items-center">
-              <AnimatePresence>
-                {searchOpen && (
-                  <motion.div
-                    initial={{ width: 0, opacity: 0 }}
-                    animate={{ width: 200, opacity: 1 }}
-                    exit={{ width: 0, opacity: 0 }}
-                    transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-                    className="overflow-hidden mr-1"
-                  >
-                    <input
-                      type="text"
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      placeholder="Search events..."
-                      autoFocus
-                      className="w-full pl-2 pr-6 py-1 rounded-lg text-[12px] text-white placeholder:text-white/25 bg-white/5 border border-white/10 focus:outline-none focus:border-white/20"
-                    />
-                    {search && (
-                      <button onClick={() => { setSearch(""); setSearchOpen(false); }} className="absolute right-8 top-1/2 -translate-y-1/2">
-                        <X className="size-2.5 text-white/40" />
-                      </button>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-              <button
-                onClick={() => setSearchOpen(!searchOpen)}
-                className="size-7 rounded-lg flex items-center justify-center text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors"
-              >
-                <MagnifyingGlass className="size-3.5" weight="bold" />
-              </button>
+            {/* Search — always visible */}
+            <div className="relative w-40">
+              <MagnifyingGlass className="absolute left-2 top-1/2 -translate-y-1/2 size-3 text-white/25" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search..."
+                className="w-full pl-7 pr-6 py-1.5 rounded-lg text-[11px] text-white placeholder:text-white/20 bg-white/[0.04] border border-white/[0.08] focus:outline-none focus:border-white/15 transition-colors"
+              />
+              {search && (
+                <button onClick={() => setSearch("")} className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5">
+                  <X className="size-2.5 text-white/30 hover:text-white/60" />
+                </button>
+              )}
             </div>
 
-            {/* Category dropdown */}
-            <div className="relative">
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="appearance-none pl-2 pr-6 py-1 rounded-lg text-[11px] font-medium text-white/50 bg-white/5 border border-white/8 hover:border-white/15 focus:outline-none focus:border-white/20 cursor-pointer transition-colors"
-                style={{ maxWidth: "130px" }}
-              >
-                <option value="all">All</option>
-                {categories.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
-              </select>
-              <CaretDown className="absolute right-1.5 top-1/2 -translate-y-1/2 size-2.5 text-white/30 pointer-events-none" />
-            </div>
+            {/* Category dropdown — no custom caret, styled select only */}
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="appearance-none pl-2.5 pr-2.5 py-1.5 rounded-lg text-[11px] font-medium text-white/40 bg-white/[0.04] border border-white/[0.08] hover:border-white/12 focus:outline-none focus:border-white/15 cursor-pointer transition-colors"
+              style={{
+                maxWidth: "120px",
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.25)' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+                backgroundRepeat: "no-repeat",
+                backgroundPosition: "right 6px center",
+                paddingRight: "22px",
+              }}
+            >
+              <option value="all">All</option>
+              {categories.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+            </select>
 
-            {/* Past toggle — pill-style */}
+            {/* Past toggle */}
             <button
               onClick={() => setShowPastEvents(!showPastEvents)}
-              className={`px-2 py-1 rounded-lg text-[11px] font-medium transition-all duration-200 ${
+              className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all duration-200 ${
                 !showPastEvents
                   ? "bg-white/10 text-white/70 border border-white/15"
-                  : "text-white/30 hover:text-white/50 border border-transparent hover:border-white/8"
+                  : "text-white/25 hover:text-white/45 border border-transparent hover:border-white/[0.06]"
               }`}
             >
               {showPastEvents ? "Hide Past" : "Show Past"}
@@ -1196,7 +1111,7 @@ export default function EventsPage() {
             {/* Refresh */}
             <button
               onClick={() => { setLoading(true); fetchEvents(); }}
-              className="size-7 rounded-lg flex items-center justify-center text-white/30 hover:text-white/60 hover:bg-white/5 transition-colors"
+              className="size-7 rounded-lg flex items-center justify-center text-white/25 hover:text-white/50 hover:bg-white/[0.04] transition-colors"
             >
               <ArrowsClockwise className={`size-3 ${loading ? "animate-spin" : ""}`} />
             </button>
