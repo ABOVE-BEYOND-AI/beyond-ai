@@ -31,7 +31,6 @@ export function getGoogleAuthUrl(): string {
     response_type: 'code',
     scope: GOOGLE_OAUTH_CONFIG.scopes.join(' '),
     access_type: 'offline',
-    prompt: 'consent',
     include_granted_scopes: 'true',
   })
 
@@ -131,5 +130,37 @@ export async function validateAccessToken(accessToken: string): Promise<boolean>
     return response.ok
   } catch {
     return false
+  }
+}
+
+// Refresh access token using refresh token (server-side)
+export async function refreshAccessToken(refreshToken: string): Promise<GoogleTokens> {
+  const response = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      client_id: GOOGLE_OAUTH_CONFIG.clientId,
+      client_secret: GOOGLE_OAUTH_CONFIG.clientSecret,
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token',
+    }),
+  })
+
+  if (!response.ok) {
+    const error = await response.text()
+    console.error('Token refresh failed:', error)
+    throw new Error(`Token refresh failed: ${response.status}`)
+  }
+
+  const tokens = await response.json()
+
+  return {
+    access_token: tokens.access_token,
+    refresh_token: refreshToken, // Google doesn't return a new refresh token, keep the original
+    expires_at: tokens.expires_in ? Date.now() + (tokens.expires_in * 1000) : undefined,
+    token_type: tokens.token_type || 'Bearer',
+    scope: tokens.scope || GOOGLE_OAUTH_CONFIG.scopes.join(' '),
   }
 }

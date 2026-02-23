@@ -1,6 +1,6 @@
 // Authentication utilities and session management
 import { GoogleUser, GoogleTokens, AuthSession } from './types'
-import { validateAccessToken, refreshAccessToken } from './google-auth'
+import { validateAccessToken, refreshAccessToken } from './google-oauth-clean'
 import { saveUserSession, clearUserSession } from './redis-database'
 
 // JWT-like session token utilities (using simple encoding for now)

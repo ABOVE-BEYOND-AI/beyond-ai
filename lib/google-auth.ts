@@ -31,7 +31,6 @@ export function getGoogleAuthUrl(): string {
     response_type: 'code',
     scope: GOOGLE_OAUTH_CONFIG.scopes.join(' '),
     access_type: 'offline',
-    prompt: 'consent',
     include_granted_scopes: 'true',
   })
 

@@ -96,7 +96,7 @@ const navigation = [
   { name: "Events", href: "/events", icon: CustomIcons.Events, active: true },
   { name: "Clients", href: "/clients", icon: CustomIcons.Clients, active: true },
   { name: "Analytics", href: "/analytics", icon: CustomIcons.Analytics, active: true },
-  { name: "Settings", href: "#", icon: CustomIcons.Settings, active: false },
+  { name: "Settings", href: "/settings", icon: CustomIcons.Settings, active: true },
 ];
 
 
@@ -381,12 +381,14 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
 
                       {/* Action buttons */}
                       <div className="flex items-center gap-0.5 shrink-0">
-                        <button
+                        <Link
+                          href="/settings"
                           className="p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-muted/50"
                           aria-label="Settings"
+                          onClick={() => setIsOpen(false)}
                         >
                           <Settings className="size-4" strokeWidth={1.5} />
-                        </button>
+                        </Link>
                         <button
                           onClick={signOut}
                           className="p-1.5 text-muted-foreground hover:text-red-500 transition-colors rounded-md hover:bg-red-500/10"

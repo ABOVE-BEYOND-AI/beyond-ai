@@ -9,12 +9,36 @@ export interface GoogleUser {
   family_name?: string
 }
 
+export type UserRole = 'admin' | 'member' | 'viewer'
+
 export interface User {
   email: string
   name: string
   avatar_url: string
+  role: UserRole
   created_at: string
   updated_at: string
+}
+
+// Persistent token storage — stored separately from short-lived sessions
+export interface StoredTokens {
+  google_refresh_token?: string
+  google_access_token?: string
+  google_token_expires_at?: number
+  google_scopes?: string
+  canva_access_token?: string
+  canva_refresh_token?: string
+  canva_token_expires_at?: number
+  canva_scopes?: string
+}
+
+export interface Integration {
+  service: 'google' | 'canva' | 'slack'
+  connected: boolean
+  email?: string
+  scopes?: string[]
+  connected_at?: string
+  expires_at?: number
 }
 
 export interface Itinerary {
