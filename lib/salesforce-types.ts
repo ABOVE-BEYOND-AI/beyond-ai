@@ -224,6 +224,19 @@ export interface ABNote {
   CreatedDate: string
 }
 
+/** Expanded note with Contact relationship for Notes Hub */
+export interface ABNoteExpanded {
+  Id: string
+  Name: string
+  Body__c: string | null
+  Contact__c: string | null
+  Contact__r: { Name: string; Id: string } | null
+  OwnerId: string
+  Owner: { Alias: string; Name?: string } | null
+  CreatedDate: string
+  LastModifiedDate: string
+}
+
 // ── Target__c ──
 
 export interface SalesforceTarget {
@@ -285,4 +298,73 @@ export interface ClientFilters {
   search?: string
   ownerId?: string
   minSpend?: number
+  maxSpend?: number
+  sortBy?: 'spend' | 'activity' | 'name' | 'created'
+  view?: 'all' | 'personal' | 'business'
+  interests?: string
+  noteKeyword?: string
+}
+
+// ── Note Filters ──
+
+export interface NoteFilters {
+  search?: string
+  contactId?: string
+  ownerId?: string
+  limit?: number
+  offset?: number
+}
+
+// ── Breadwinner / Finance types ──
+
+export interface BreadwinnerInvoice {
+  Id: string
+  Name: string
+  [key: string]: unknown // Dynamic fields discovered via describeObject
+}
+
+export interface FinanceFilters {
+  status?: string
+  accountId?: string
+  overdue?: boolean
+  overdueWeeks?: number
+}
+
+// ── Dialer types ──
+
+export interface DialerListItem {
+  id: string
+  name: string
+  phone: string | null
+  mobilePhone: string | null
+  company: string | null
+  email: string | null
+  type: 'lead' | 'contact'
+  eventInterest?: string | null
+  lastActivity?: string | null
+  totalSpend?: number | null
+  recentNote?: string | null
+  owner?: string | null
+}
+
+// ── Notification types ──
+
+export interface NotificationPreferences {
+  stale_deals: boolean
+  payment_overdue: boolean
+  call_reminders: boolean
+  follow_up_reminders: boolean
+  new_leads: boolean
+  daily_recap: boolean
+  slack_dm: boolean
+}
+
+export interface AppNotification {
+  id: string
+  type: 'stale_deal' | 'payment_overdue' | 'call_reminder' | 'follow_up' | 'new_lead' | 'daily_recap' | 'general'
+  title: string
+  body: string
+  link?: string
+  read: boolean
+  createdAt: string
 }

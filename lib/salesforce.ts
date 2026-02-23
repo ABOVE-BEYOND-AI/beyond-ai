@@ -71,7 +71,7 @@ async function authenticate(): Promise<{ access_token: string; instance_url: str
 /**
  * Execute a SOQL query against Salesforce
  */
-async function query<T>(soql: string): Promise<SalesforceQueryResponse<T>> {
+export async function query<T>(soql: string): Promise<SalesforceQueryResponse<T>> {
   const { access_token, instance_url } = await authenticate()
 
   const url = `${instance_url}/services/data/v59.0/query?q=${encodeURIComponent(soql)}`
@@ -283,11 +283,15 @@ export type {
   SalesforceEvent as SalesforceEventRecord,
   SalesforceContact,
   ABNote,
+  ABNoteExpanded,
   SalesforceTarget,
   SalesforceCommission,
   LeadFilters,
   PipelineFilters,
   ClientFilters,
+  NoteFilters,
+  BreadwinnerInvoice,
+  FinanceFilters,
 } from './salesforce-types'
 
 import type {
@@ -296,11 +300,15 @@ import type {
   SalesforceEvent as SalesforceEventRecord,
   SalesforceContact,
   ABNote,
+  ABNoteExpanded,
   SalesforceTarget,
   SalesforceCommission,
   LeadFilters,
   PipelineFilters,
   ClientFilters,
+  NoteFilters,
+  BreadwinnerInvoice,
+  FinanceFilters,
 } from './salesforce-types'
 
 import { LEAD_SOURCE_GROUPS } from './constants'
@@ -576,17 +584,58 @@ export async function getContacts(filters?: ClientFilters): Promise<SalesforceCo
 
   if (filters?.search) {
     const s = filters.search.replace(/'/g, "\\'")
-    whereClause += ` AND (Name LIKE '%${s}%' OR Email LIKE '%${s}%')`
+    whereClause += ` AND (Name LIKE '%${s}%' OR Email LIKE '%${s}%' OR Account.Name LIKE '%${s}%')`
   }
   if (filters?.ownerId) {
     whereClause += ` AND OwnerId = '${filters.ownerId}'`
+  }
+  if (filters?.minSpend) {
+    whereClause += ` AND Total_Spend_to_Date__c >= ${filters.minSpend}`
+  }
+  if (filters?.maxSpend) {
+    whereClause += ` AND Total_Spend_to_Date__c <= ${filters.maxSpend}`
+  }
+  if (filters?.view === 'personal') {
+    whereClause += ` AND Account.IsPersonAccount = true`
+  } else if (filters?.view === 'business') {
+    whereClause += ` AND Account.IsPersonAccount = false`
+  }
+  if (filters?.interests) {
+    const interestTerms = filters.interests.split(',').map(i => i.trim()).filter(Boolean)
+    for (const term of interestTerms) {
+      const it = term.replace(/'/g, "\\'")
+      whereClause += ` AND Interests__c LIKE '%${it}%'`
+    }
+  }
+
+  // Determine ORDER BY based on sortBy
+  let orderBy = 'LastActivityDate DESC NULLS LAST'
+  if (filters?.sortBy === 'spend') orderBy = 'Total_Spend_to_Date__c DESC NULLS LAST'
+  else if (filters?.sortBy === 'name') orderBy = 'Name ASC'
+  else if (filters?.sortBy === 'created') orderBy = 'CreatedDate DESC'
+
+  // If noteKeyword filter, find matching contact IDs from notes first
+  if (filters?.noteKeyword) {
+    try {
+      const nk = filters.noteKeyword.replace(/'/g, "\\'")
+      const noteResult = await query<{ Contact__c: string }>(`
+        SELECT Contact__c FROM A_B_Note__c
+        WHERE Body__c LIKE '%${nk}%' AND Contact__c != null
+        LIMIT 500
+      `.trim())
+      const noteContactIds = [...new Set(noteResult.records.map(n => n.Contact__c))]
+      if (noteContactIds.length === 0) return []
+      whereClause += ` AND Id IN ('${noteContactIds.join("','")}')`
+    } catch {
+      // Notes query failed, continue without note filter
+    }
   }
 
   const soql = `
     SELECT ${CONTACT_SELECT_FIELDS}
     FROM Contact
     WHERE ${whereClause}
-    ORDER BY LastActivityDate DESC NULLS LAST
+    ORDER BY ${orderBy}
     LIMIT 200
   `.trim()
 
@@ -603,7 +652,7 @@ export async function getContacts(filters?: ClientFilters): Promise<SalesforceCo
         CreatedDate, LastActivityDate
       FROM Contact
       WHERE ${whereClause}
-      ORDER BY LastActivityDate DESC NULLS LAST
+      ORDER BY ${orderBy}
       LIMIT 200
     `.trim()
     result = await query<SalesforceContact>(fallbackSoql)
@@ -829,6 +878,143 @@ export async function updateRecord(objectType: string, id: string, fields: Recor
   }
 }
 
+/**
+ * Create a new record in Salesforce and return the new record ID
+ */
+export async function createRecord(objectType: string, fields: Record<string, unknown>): Promise<string> {
+  const { access_token, instance_url } = await authenticate()
+
+  const response = await fetch(`${instance_url}/services/data/v59.0/sobjects/${objectType}/`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${access_token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(fields),
+  })
+
+  if (!response.ok) {
+    const errorBody = await response.text()
+    throw new Error(`Salesforce create failed: ${response.status} - ${errorBody}`)
+  }
+
+  const data = await response.json()
+  return data.id as string
+}
+
+/**
+ * Delete a record from Salesforce
+ */
+export async function deleteRecord(objectType: string, id: string): Promise<void> {
+  const { access_token, instance_url } = await authenticate()
+
+  const response = await fetch(`${instance_url}/services/data/v59.0/sobjects/${objectType}/${id}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${access_token}`,
+    },
+  })
+
+  if (!response.ok && response.status !== 204) {
+    const errorBody = await response.text()
+    throw new Error(`Salesforce delete failed: ${response.status} - ${errorBody}`)
+  }
+}
+
+/**
+ * Create multiple records in a single Salesforce Composite API call (up to 200)
+ */
+export async function createRecordsBatch(
+  objectType: string,
+  recordsList: Record<string, unknown>[]
+): Promise<{ id: string; success: boolean; errors: string[] }[]> {
+  const { access_token, instance_url } = await authenticate()
+
+  // Salesforce composite limit: 200 records per call
+  const batches: Record<string, unknown>[][] = []
+  for (let i = 0; i < recordsList.length; i += 200) {
+    batches.push(recordsList.slice(i, i + 200))
+  }
+
+  const allResults: { id: string; success: boolean; errors: string[] }[] = []
+
+  for (const batch of batches) {
+    const response = await fetch(
+      `${instance_url}/services/data/v59.0/composite/sobjects`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          allOrNone: false,
+          records: batch.map(fields => ({
+            attributes: { type: objectType },
+            ...fields,
+          })),
+        }),
+      }
+    )
+
+    if (!response.ok) {
+      const errorBody = await response.text()
+      throw new Error(`Salesforce batch create failed: ${response.status} - ${errorBody}`)
+    }
+
+    const data = await response.json()
+    allResults.push(
+      ...data.map((r: { id: string; success: boolean; errors: { message: string }[] }) => ({
+        id: r.id || '',
+        success: r.success,
+        errors: r.errors?.map((e: { message: string }) => e.message) || [],
+      }))
+    )
+  }
+
+  return allResults
+}
+
+/**
+ * Describe a Salesforce object to discover its fields
+ * Useful for Breadwinner and other managed package objects
+ */
+export async function describeObject(objectType: string): Promise<{
+  name: string
+  label: string
+  fields: { name: string; label: string; type: string; length: number; nillable: boolean }[]
+}> {
+  const { access_token, instance_url } = await authenticate()
+
+  const response = await fetch(
+    `${instance_url}/services/data/v59.0/sobjects/${objectType}/describe`,
+    {
+      headers: {
+        Authorization: `Bearer ${access_token}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  )
+
+  if (!response.ok) {
+    const errorBody = await response.text()
+    throw new Error(`Salesforce describe failed: ${response.status} - ${errorBody}`)
+  }
+
+  const data = await response.json()
+  return {
+    name: data.name,
+    label: data.label,
+    fields: data.fields.map((f: { name: string; label: string; type: string; length: number; nillable: boolean }) => ({
+      name: f.name,
+      label: f.label,
+      type: f.type,
+      length: f.length,
+      nillable: f.nillable,
+    })),
+  }
+}
+
 // ──────────────────────────────────────────────
 // SALES DASHBOARD (existing)
 // ──────────────────────────────────────────────
@@ -864,4 +1050,338 @@ export async function getDashboardData(period: SalesPeriod = 'month') {
       year: computeTotals(yearDeals),
     },
   }
+}
+
+// ──────────────────────────────────────────────
+// NOTES (A_B_Note__c)
+// ──────────────────────────────────────────────
+
+const NOTE_SELECT_FIELDS = `
+  Id, Name, Body__c,
+  Contact__c, Contact__r.Name, Contact__r.Id,
+  OwnerId, Owner.Alias, Owner.Name,
+  CreatedDate, LastModifiedDate
+`.trim()
+
+/**
+ * Search notes by keyword in Body__c
+ */
+export async function searchNotes(keyword: string, filters?: NoteFilters): Promise<ABNoteExpanded[]> {
+  const conditions: string[] = []
+  const escapedKeyword = keyword.replace(/'/g, "\\'")
+  conditions.push(`Body__c LIKE '%${escapedKeyword}%'`)
+
+  if (filters?.contactId) {
+    conditions.push(`Contact__c = '${filters.contactId}'`)
+  }
+  if (filters?.ownerId) {
+    conditions.push(`OwnerId = '${filters.ownerId}'`)
+  }
+
+  const limit = filters?.limit || 200
+  const soql = `
+    SELECT ${NOTE_SELECT_FIELDS}
+    FROM A_B_Note__c
+    WHERE ${conditions.join(' AND ')}
+    ORDER BY CreatedDate DESC
+    LIMIT ${limit}
+  `.trim()
+
+  const result = await query<ABNoteExpanded>(soql)
+  return result.records
+}
+
+/**
+ * Get all notes with optional filters
+ */
+export async function getAllNotes(filters?: NoteFilters): Promise<ABNoteExpanded[]> {
+  const conditions: string[] = ['Id != null']
+
+  if (filters?.contactId) {
+    conditions.push(`Contact__c = '${filters.contactId}'`)
+  }
+  if (filters?.ownerId) {
+    conditions.push(`OwnerId = '${filters.ownerId}'`)
+  }
+  if (filters?.search) {
+    const s = filters.search.replace(/'/g, "\\'")
+    conditions.push(`Body__c LIKE '%${s}%'`)
+  }
+
+  const limit = filters?.limit || 200
+  const offset = filters?.offset || 0
+  const soql = `
+    SELECT ${NOTE_SELECT_FIELDS}
+    FROM A_B_Note__c
+    WHERE ${conditions.join(' AND ')}
+    ORDER BY CreatedDate DESC
+    LIMIT ${limit}
+    ${offset > 0 ? `OFFSET ${offset}` : ''}
+  `.trim()
+
+  const result = await query<ABNoteExpanded>(soql)
+  return result.records
+}
+
+/**
+ * Get a single note by ID
+ */
+export async function getNoteById(noteId: string): Promise<ABNoteExpanded> {
+  const soql = `
+    SELECT ${NOTE_SELECT_FIELDS}
+    FROM A_B_Note__c
+    WHERE Id = '${noteId}'
+    LIMIT 1
+  `.trim()
+
+  const result = await query<ABNoteExpanded>(soql)
+  if (result.records.length === 0) throw new Error('Note not found')
+  return result.records[0]
+}
+
+/**
+ * Create a new note
+ */
+export async function createNote(contactId: string | null, body: string): Promise<string> {
+  const fields: Record<string, unknown> = { Body__c: body }
+  if (contactId) fields.Contact__c = contactId
+  return createRecord('A_B_Note__c', fields)
+}
+
+/**
+ * Update an existing note body
+ */
+export async function updateNote(noteId: string, body: string): Promise<void> {
+  await updateRecord('A_B_Note__c', noteId, { Body__c: body })
+}
+
+/**
+ * Delete a note
+ */
+export async function deleteNote(noteId: string): Promise<void> {
+  await deleteRecord('A_B_Note__c', noteId)
+}
+
+/**
+ * Get contacts for note creation (lightweight query for picker)
+ */
+export async function getContactsForPicker(search?: string): Promise<{ Id: string; Name: string; Email: string | null; Account: { Name: string } | null }[]> {
+  let whereClause = 'Id != null'
+  if (search) {
+    const s = search.replace(/'/g, "\\'")
+    whereClause += ` AND (Name LIKE '%${s}%' OR Email LIKE '%${s}%')`
+  }
+
+  const soql = `
+    SELECT Id, Name, Email, Account.Name
+    FROM Contact
+    WHERE ${whereClause}
+    ORDER BY Name ASC
+    LIMIT 20
+  `.trim()
+
+  const result = await query<{ Id: string; Name: string; Email: string | null; Account: { Name: string } | null }>(soql)
+  return result.records
+}
+
+// ──────────────────────────────────────────────
+// FINANCE (Breadwinner / Payment data)
+// ──────────────────────────────────────────────
+
+/**
+ * Get accounts with Breadwinner financial rollup data
+ */
+export async function getAccountFinancials(): Promise<{
+  Id: string; Name: string
+  Bread_Winner__Total_Amount_Invoiced__c: number | null
+  Bread_Winner__Total_Amount_Paid__c: number | null
+  Bread_Winner__Total_Amount_Due__c: number | null
+  Bread_Winner__Total_Amount_Overdue__c: number | null
+  Bread_Winner__Total_Unallocated_Credit__c: number | null
+  Bread_Winner__Total_Draft_Amount__c: number | null
+}[]> {
+  const soql = `
+    SELECT Id, Name,
+      Bread_Winner__Total_Amount_Invoiced__c,
+      Bread_Winner__Total_Amount_Paid__c,
+      Bread_Winner__Total_Amount_Due__c,
+      Bread_Winner__Total_Amount_Overdue__c,
+      Bread_Winner__Total_Unallocated_Credit__c,
+      Bread_Winner__Total_Draft_Amount__c
+    FROM Account
+    WHERE Bread_Winner__Total_Amount_Invoiced__c > 0
+    ORDER BY Bread_Winner__Total_Amount_Overdue__c DESC NULLS LAST
+    LIMIT 500
+  `.trim()
+
+  const result = await query<{
+    Id: string; Name: string
+    Bread_Winner__Total_Amount_Invoiced__c: number | null
+    Bread_Winner__Total_Amount_Paid__c: number | null
+    Bread_Winner__Total_Amount_Due__c: number | null
+    Bread_Winner__Total_Amount_Overdue__c: number | null
+    Bread_Winner__Total_Unallocated_Credit__c: number | null
+    Bread_Winner__Total_Draft_Amount__c: number | null
+  }>(soql)
+  return result.records
+}
+
+/**
+ * Get payment plan progress across won deals
+ */
+export async function getPaymentPlanProgress(): Promise<SalesforceOpportunityFull[]> {
+  const soql = `
+    SELECT ${PIPELINE_SELECT_FIELDS}
+    FROM Opportunity
+    WHERE StageName IN ('Agreement Signed', 'Amended', 'Amendment Signed')
+      AND Total_Balance__c > 0
+    ORDER BY Total_Balance__c DESC
+    LIMIT 500
+  `.trim()
+
+  const result = await query<SalesforceOpportunityFull>(soql)
+  return result.records
+}
+
+/**
+ * Get accounts with unallocated credit
+ */
+export async function getCreditAccounts(): Promise<{
+  Id: string; Name: string
+  Bread_Winner__Total_Unallocated_Credit__c: number | null
+  Bread_Winner__Total_Amount_Invoiced__c: number | null
+  Bread_Winner__Total_Amount_Paid__c: number | null
+}[]> {
+  const soql = `
+    SELECT Id, Name,
+      Bread_Winner__Total_Unallocated_Credit__c,
+      Bread_Winner__Total_Amount_Invoiced__c,
+      Bread_Winner__Total_Amount_Paid__c
+    FROM Account
+    WHERE Bread_Winner__Total_Unallocated_Credit__c > 0
+    ORDER BY Bread_Winner__Total_Unallocated_Credit__c DESC
+    LIMIT 200
+  `.trim()
+
+  const result = await query<{
+    Id: string; Name: string
+    Bread_Winner__Total_Unallocated_Credit__c: number | null
+    Bread_Winner__Total_Amount_Invoiced__c: number | null
+    Bread_Winner__Total_Amount_Paid__c: number | null
+  }>(soql)
+  return result.records
+}
+
+// ──────────────────────────────────────────────
+// DIALER (callable leads/contacts)
+// ──────────────────────────────────────────────
+
+export interface DialerFilters {
+  type?: 'leads' | 'contacts' | 'all'
+  eventInterest?: string
+  status?: string
+  tags?: string
+  ownerId?: string
+  minSpend?: number
+  maxSpend?: number
+  noteKeyword?: string
+  lastActivityBefore?: string
+}
+
+/**
+ * Get leads with phone numbers for the dialer
+ */
+export async function getCallableLeads(filters?: DialerFilters): Promise<SalesforceLead[]> {
+  const conditions: string[] = [
+    'IsConverted = false',
+    '(Phone != null OR MobilePhone != null)',
+  ]
+
+  if (filters?.status) conditions.push(`Status = '${filters.status}'`)
+  if (filters?.eventInterest) {
+    const s = filters.eventInterest.replace(/'/g, "\\'")
+    conditions.push(`Event_of_Interest__c LIKE '%${s}%'`)
+  }
+  if (filters?.ownerId) conditions.push(`OwnerId = '${filters.ownerId}'`)
+  if (filters?.lastActivityBefore) conditions.push(`LastActivityDate < ${filters.lastActivityBefore}`)
+
+  const soql = `
+    SELECT ${LEAD_SELECT_FIELDS}
+    FROM Lead
+    WHERE ${conditions.join(' AND ')}
+    ORDER BY LastActivityDate ASC NULLS FIRST
+    LIMIT 200
+  `.trim()
+
+  const result = await query<SalesforceLead>(soql)
+  return result.records
+}
+
+/**
+ * Get contacts with phone numbers for the dialer
+ */
+export async function getCallableContacts(filters?: DialerFilters): Promise<SalesforceContact[]> {
+  const conditions: string[] = [
+    '(Phone != null OR MobilePhone != null)',
+  ]
+
+  if (filters?.ownerId) conditions.push(`OwnerId = '${filters.ownerId}'`)
+  if (filters?.minSpend) conditions.push(`Total_Spend_to_Date__c >= ${filters.minSpend}`)
+  if (filters?.maxSpend) conditions.push(`Total_Spend_to_Date__c <= ${filters.maxSpend}`)
+
+  const soql = `
+    SELECT ${CONTACT_SELECT_FIELDS}
+    FROM Contact
+    WHERE ${conditions.join(' AND ')}
+    ORDER BY LastActivityDate ASC NULLS FIRST
+    LIMIT 200
+  `.trim()
+
+  const result = await query<SalesforceContact>(soql)
+  return result.records
+}
+
+// ──────────────────────────────────────────────
+// EVENT RECAP
+// ──────────────────────────────────────────────
+
+/**
+ * Get deals closed today
+ */
+export async function getDealsClosedToday(): Promise<SalesforceOpportunityFull[]> {
+  const soql = `
+    SELECT ${PIPELINE_SELECT_FIELDS}
+    FROM Opportunity
+    WHERE CloseDate = TODAY
+      AND StageName IN ('Agreement Signed', 'Amended', 'Amendment Signed')
+    ORDER BY Gross_Amount__c DESC NULLS LAST
+    LIMIT 50
+  `.trim()
+  const result = await query<SalesforceOpportunityFull>(soql)
+  return result.records
+}
+
+/**
+ * Get leads generated today
+ */
+export async function getLeadsCreatedToday(): Promise<number> {
+  const soql = `SELECT COUNT() total FROM Lead WHERE CreatedDate = TODAY`
+  const result = await query<{ total: number }>(soql)
+  return result.totalSize
+}
+
+/**
+ * Get upcoming events in the next N days
+ */
+export async function getUpcomingEvents(days: number = 7): Promise<SalesforceEventRecord[]> {
+  const soql = `
+    SELECT ${EVENT_SELECT_FIELDS}
+    FROM Event__c
+    WHERE Start_Date__c >= TODAY
+      AND Start_Date__c <= NEXT_N_DAYS:${days}
+    ORDER BY Start_Date__c ASC
+    LIMIT 20
+  `.trim()
+  const result = await query<SalesforceEventRecord>(soql)
+  return result.records
 }

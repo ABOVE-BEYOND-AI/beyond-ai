@@ -1,11 +1,12 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useGoogleAuth } from "@/components/google-auth-provider-clean"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { motion } from "framer-motion"
 import {
+  Bell,
   Check,
   ExternalLink,
   Loader2,
@@ -13,6 +14,7 @@ import {
   Shield,
   Unplug,
 } from "lucide-react"
+import type { NotificationPreferences } from "@/lib/salesforce-types"
 
 interface Integration {
   service: "google" | "canva" | "slack"
@@ -55,6 +57,10 @@ export default function SettingsPage() {
   const [integrations, setIntegrations] = useState<Integration[]>([])
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null)
   const [loadingIntegrations, setLoadingIntegrations] = useState(true)
+  const [notifPrefs, setNotifPrefs] = useState<NotificationPreferences | null>(null)
+  const [loadingPrefs, setLoadingPrefs] = useState(true)
+  const [savingPrefs, setSavingPrefs] = useState(false)
+  const [prefsSaved, setPrefsSaved] = useState(false)
 
   useEffect(() => {
     if (!loading && !user) {
@@ -72,8 +78,48 @@ export default function SettingsPage() {
         })
         .catch(console.error)
         .finally(() => setLoadingIntegrations(false))
+
+      fetch("/api/notifications/preferences")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success) setNotifPrefs(data.data)
+        })
+        .catch(console.error)
+        .finally(() => setLoadingPrefs(false))
     }
   }, [user])
+
+  const handleTogglePref = useCallback(
+    (key: keyof NotificationPreferences) => {
+      if (!notifPrefs) return
+      setNotifPrefs({ ...notifPrefs, [key]: !notifPrefs[key] })
+      setPrefsSaved(false)
+    },
+    [notifPrefs]
+  )
+
+  const handleSavePrefs = useCallback(async () => {
+    if (!notifPrefs) return
+    setSavingPrefs(true)
+    setPrefsSaved(false)
+    try {
+      const res = await fetch("/api/notifications/preferences", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(notifPrefs),
+      })
+      const json = await res.json()
+      if (json.success) {
+        setNotifPrefs(json.data)
+        setPrefsSaved(true)
+        setTimeout(() => setPrefsSaved(false), 2000)
+      }
+    } catch (err) {
+      console.error("Failed to save notification preferences:", err)
+    } finally {
+      setSavingPrefs(false)
+    }
+  }, [notifPrefs])
 
   if (loading || !user) {
     return (
@@ -165,6 +211,78 @@ export default function SettingsPage() {
                 ))}
               </div>
             )}
+          </motion.div>
+
+          {/* Notifications */}
+          <motion.div variants={item} className="space-y-4">
+            <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Notifications
+            </h2>
+
+            {loadingPrefs ? (
+              <div className="rounded-xl border border-border bg-card p-8 flex justify-center">
+                <Loader2 className="size-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : notifPrefs ? (
+              <div className="rounded-xl border border-border bg-card divide-y divide-border/50">
+                <NotifToggle
+                  label="Stale Deal Alerts"
+                  description="Deals with no activity for 14+ days"
+                  checked={notifPrefs.stale_deals}
+                  onChange={() => handleTogglePref("stale_deals")}
+                />
+                <NotifToggle
+                  label="Overdue Payment Alerts"
+                  description="Invoices past their due date"
+                  checked={notifPrefs.payment_overdue}
+                  onChange={() => handleTogglePref("payment_overdue")}
+                />
+                <NotifToggle
+                  label="New Lead Alerts"
+                  description="New leads assigned to you"
+                  checked={notifPrefs.new_leads}
+                  onChange={() => handleTogglePref("new_leads")}
+                />
+                <NotifToggle
+                  label="Follow-up Reminders"
+                  description="Reminders for scheduled follow-ups"
+                  checked={notifPrefs.follow_up_reminders}
+                  onChange={() => handleTogglePref("follow_up_reminders")}
+                />
+                <NotifToggle
+                  label="Daily Recap"
+                  description="Summary of your day's activity"
+                  checked={notifPrefs.daily_recap}
+                  onChange={() => handleTogglePref("daily_recap")}
+                />
+                <NotifToggle
+                  label="Slack DM Delivery"
+                  description="Also send notifications as Slack DMs"
+                  checked={notifPrefs.slack_dm}
+                  onChange={() => handleTogglePref("slack_dm")}
+                />
+                <div className="px-5 py-4 flex items-center justify-end gap-3">
+                  {prefsSaved && (
+                    <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                      <Check className="size-3" />
+                      Saved
+                    </span>
+                  )}
+                  <button
+                    onClick={handleSavePrefs}
+                    disabled={savingPrefs}
+                    className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+                  >
+                    {savingPrefs ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <Bell className="size-3.5" />
+                    )}
+                    Save preferences
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </motion.div>
 
           {/* Sign Out */}
@@ -313,4 +431,39 @@ function ServiceIcon({ service }: { service: string }) {
     )
   }
   return <Unplug className="size-4 text-muted-foreground" />
+}
+
+function NotifToggle({
+  label,
+  description,
+  checked,
+  onChange,
+}: {
+  label: string
+  description: string
+  checked: boolean
+  onChange: () => void
+}) {
+  return (
+    <div className="flex items-center justify-between px-5 py-4">
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium">{label}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+      </div>
+      <button
+        role="switch"
+        aria-checked={checked}
+        onClick={onChange}
+        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ml-4 ${
+          checked ? "bg-primary" : "bg-muted"
+        }`}
+      >
+        <span
+          className={`inline-block size-4 transform rounded-full bg-white shadow-sm transition-transform ${
+            checked ? "translate-x-6" : "translate-x-1"
+          }`}
+        />
+      </button>
+    </div>
+  )
 }

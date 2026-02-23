@@ -19,6 +19,15 @@ import {
   SpinnerGap,
   Pulse,
   ArrowsOut,
+  MagnifyingGlass,
+  CalendarBlank,
+  Funnel,
+  FileText,
+  Briefcase,
+  CalendarCheck,
+  UserPlus,
+  CurrencyGbp,
+  Confetti,
 } from "@phosphor-icons/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faLightbulb, faTrophy } from "@fortawesome/free-solid-svg-icons";
@@ -30,7 +39,7 @@ import NumberFlow from "@number-flow/react";
 
 // ── Types ──
 
-type Tab = "overview" | "intelligence" | "digest";
+type Tab = "overview" | "intelligence" | "digest" | "transcripts";
 type CallPeriod = "today" | "week" | "month";
 type FullscreenView = null | "reps" | "calls";
 
@@ -109,6 +118,27 @@ interface CallAnalysis {
   analysed_at: string;
 }
 
+interface TranscriptSearchResult {
+  callId: number;
+  agentName: string;
+  contactName: string;
+  duration: number;
+  direction: "inbound" | "outbound";
+  startedAt: number;
+  excerpt: string;
+  matchCount: number;
+}
+
+interface EventRecapData {
+  date: string;
+  dealsClosedToday: { name: string; amount: number; owner: string; event: string; accountName: string; guests: number | null }[];
+  totalDealValue: number;
+  leadsCreatedToday: number;
+  upcomingEvents: { name: string; startDate: string; category: string | null; revenueTarget: number | null; closedWonGross: number | null; percentageToTarget: number | null }[];
+  callStats: { total: number; inbound: number; outbound: number; answered: number; missed: number; totalDuration: number; avgDuration: number } | null;
+  generatedAt: string;
+}
+
 interface DailyDigest {
   period: string;
   generated_at: string;
@@ -157,6 +187,7 @@ const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: "overview", label: "Overview", icon: Pulse },
   { key: "intelligence", label: "Call Intelligence", icon: Brain },
   { key: "digest", label: "AI Digest", icon: MagicWand },
+  { key: "transcripts", label: "Transcript Search", icon: MagnifyingGlass },
 ];
 
 const PERIODS: { key: CallPeriod; label: string; shortLabel: string }[] = [
@@ -206,6 +237,24 @@ function timeAgo(unixTimestamp: number): string {
 
 function periodLabel(period: CallPeriod): string {
   return PERIODS.find((p) => p.key === period)?.shortLabel || "today";
+}
+
+// ── Highlight keyword in excerpt ──
+
+function highlightExcerpt(excerpt: string, keyword: string): React.ReactNode {
+  if (!keyword) return excerpt;
+  const regex = new RegExp(`(${keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi");
+  const parts = excerpt.split(regex);
+
+  return parts.map((part, i) =>
+    regex.test(part) ? (
+      <span key={i} className="bg-primary/25 text-primary font-semibold rounded-sm px-0.5">
+        {part}
+      </span>
+    ) : (
+      <span key={i}>{part}</span>
+    )
+  );
 }
 
 // ── Activity Bar Chart (full-width, taller, colored) ──
@@ -756,6 +805,20 @@ export default function CallsPage() {
   const [digest, setDigest] = useState<DailyDigest | null>(null);
   const [digestLoading, setDigestLoading] = useState(false);
 
+  // Event recap state
+  const [eventRecap, setEventRecap] = useState<EventRecapData | null>(null);
+  const [recapLoading, setRecapLoading] = useState(false);
+
+  // Transcript search tab state
+  const [transcriptQuery, setTranscriptQuery] = useState("");
+  const [transcriptResults, setTranscriptResults] = useState<TranscriptSearchResult[]>([]);
+  const [transcriptLoading, setTranscriptLoading] = useState(false);
+  const [transcriptCount, setTranscriptCount] = useState<number | null>(null);
+  const [transcriptFromDate, setTranscriptFromDate] = useState("");
+  const [transcriptToDate, setTranscriptToDate] = useState("");
+  const [transcriptDirection, setTranscriptDirection] = useState<"" | "inbound" | "outbound">("");
+  const [hasSearched, setHasSearched] = useState(false);
+
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hasFetchedOnce = useRef(false);
 
@@ -874,6 +937,80 @@ export default function CallsPage() {
       setDigestLoading(false);
     }
   };
+
+  // ── Fetch event recap ──
+
+  const fetchEventRecap = async (forceRefresh = false) => {
+    setRecapLoading(true);
+    try {
+      const response = await fetch("/api/calls/event-recap", {
+        method: forceRefresh ? "POST" : "GET",
+        ...(forceRefresh
+          ? {
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ force_refresh: true }),
+            }
+          : {}),
+      });
+      const result = await response.json();
+      if (result.success) {
+        setEventRecap(result.data);
+      }
+    } catch (err) {
+      console.error("Error fetching event recap:", err);
+    } finally {
+      setRecapLoading(false);
+    }
+  };
+
+  // Auto-load recap when switching to digest tab
+  useEffect(() => {
+    if (activeTab === "digest" && !eventRecap && !recapLoading) {
+      fetchEventRecap();
+    }
+  }, [activeTab, eventRecap, recapLoading]);
+
+  // ── Search transcripts ──
+
+  const searchTranscripts = async () => {
+    if (!transcriptQuery.trim()) return;
+    setTranscriptLoading(true);
+    setHasSearched(true);
+
+    try {
+      const params = new URLSearchParams({ keyword: transcriptQuery.trim() });
+      if (transcriptFromDate) params.set("fromDate", transcriptFromDate);
+      if (transcriptToDate) params.set("toDate", transcriptToDate);
+      if (transcriptDirection) params.set("direction", transcriptDirection);
+
+      const response = await fetch(`/api/calls/transcripts?${params}`);
+      const result = await response.json();
+      if (result.success) {
+        setTranscriptResults(result.data.results || []);
+        if (result.data.totalStored !== undefined) {
+          setTranscriptCount(result.data.totalStored);
+        }
+      }
+    } catch (err) {
+      console.error("Transcript search error:", err);
+    } finally {
+      setTranscriptLoading(false);
+    }
+  };
+
+  // Fetch stored transcript count on tab switch
+  useEffect(() => {
+    if (activeTab === "transcripts" && transcriptCount === null) {
+      fetch("/api/calls/transcripts?keyword=&limit=0")
+        .then((r) => r.json())
+        .then((result) => {
+          if (result.success && result.data?.totalStored !== undefined) {
+            setTranscriptCount(result.data.totalStored);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [activeTab, transcriptCount]);
 
   // ── Derived values ──
   const stats = callData?.stats;
@@ -1416,6 +1553,124 @@ export default function CallsPage() {
                   </motion.div>
                 ) : digest ? (
                   <div className="space-y-5">
+                    {/* ── Today's Recap ── */}
+                    {eventRecap && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="rounded-2xl bg-card border border-border/50 overflow-hidden"
+                      >
+                        <div className="px-5 py-4 border-b border-border/50 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <Confetti className="size-[18px] text-amber-500" />
+                            <h3 className="text-base font-semibold">Today&apos;s Recap</h3>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(eventRecap.generatedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => fetchEventRecap(true)}
+                            disabled={recapLoading}
+                            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            {recapLoading ? "Refreshing..." : "Refresh"}
+                          </button>
+                        </div>
+                        <div className="p-5">
+                          {/* Recap metric cards */}
+                          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+                            <div className="rounded-xl bg-foreground/[0.03] border border-foreground/[0.06] p-3 text-center">
+                              <Briefcase className="size-5 text-emerald-500 mx-auto mb-1.5" />
+                              <p className="text-xl font-bold tabular-nums text-emerald-500">
+                                £{Math.round(eventRecap.totalDealValue).toLocaleString()}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
+                                Deals Closed
+                              </p>
+                            </div>
+                            <div className="rounded-xl bg-foreground/[0.03] border border-foreground/[0.06] p-3 text-center">
+                              <CalendarCheck className="size-5 text-blue-500 mx-auto mb-1.5" />
+                              <p className="text-xl font-bold tabular-nums">{eventRecap.dealsClosedToday.length}</p>
+                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
+                                Bookings Today
+                              </p>
+                            </div>
+                            <div className="rounded-xl bg-foreground/[0.03] border border-foreground/[0.06] p-3 text-center">
+                              <UserPlus className="size-5 text-violet-500 mx-auto mb-1.5" />
+                              <p className="text-xl font-bold tabular-nums">{eventRecap.leadsCreatedToday}</p>
+                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
+                                New Leads
+                              </p>
+                            </div>
+                            {eventRecap.callStats && (
+                              <div className="rounded-xl bg-foreground/[0.03] border border-foreground/[0.06] p-3 text-center">
+                                <Phone className="size-5 text-amber-500 mx-auto mb-1.5" />
+                                <p className="text-xl font-bold tabular-nums">{eventRecap.callStats.total}</p>
+                                <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
+                                  Calls Made
+                                </p>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Deals closed */}
+                          {eventRecap.dealsClosedToday.length > 0 && (
+                            <div className="mb-4">
+                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Deals Closed Today</p>
+                              <div className="space-y-2">
+                                {eventRecap.dealsClosedToday.map((deal, i) => (
+                                  <div key={i} className="flex items-center justify-between p-2.5 rounded-lg bg-emerald-500/5 border border-emerald-500/10">
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-medium truncate">{deal.name}</p>
+                                      <p className="text-xs text-muted-foreground">{deal.owner} · {deal.event}</p>
+                                    </div>
+                                    <p className="text-sm font-bold tabular-nums text-emerald-500 shrink-0">
+                                      £{Math.round(deal.amount).toLocaleString()}
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Upcoming events */}
+                          {eventRecap.upcomingEvents.length > 0 && (
+                            <div>
+                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Upcoming Events (Next 7 Days)</p>
+                              <div className="space-y-2">
+                                {eventRecap.upcomingEvents.map((event, i) => (
+                                  <div key={i} className="flex items-center justify-between p-2.5 rounded-lg bg-foreground/[0.02] border border-foreground/[0.06]">
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-medium truncate">{event.name}</p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {new Date(event.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                                        {event.category && ` · ${event.category}`}
+                                      </p>
+                                    </div>
+                                    {event.revenueTarget && (
+                                      <div className="text-right shrink-0">
+                                        <p className="text-xs text-muted-foreground tabular-nums">
+                                          £{Math.round(event.closedWonGross || 0).toLocaleString()} / £{Math.round(event.revenueTarget).toLocaleString()}
+                                        </p>
+                                        {event.percentageToTarget !== null && (
+                                          <div className="w-20 h-1.5 bg-foreground/[0.06] rounded-full overflow-hidden mt-1">
+                                            <div
+                                              className="h-full bg-primary rounded-full"
+                                              style={{ width: `${Math.min(event.percentageToTarget, 100)}%` }}
+                                            />
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </motion.div>
+                    )}
+
                     {/* Team Summary */}
                     <motion.div
                       initial={{ opacity: 0, y: 12 }}
@@ -1560,6 +1815,231 @@ export default function CallsPage() {
                       Generate Digest
                     </button>
                   </div>
+                )}
+              </motion.div>
+            )}
+
+            {/* ═══════════════ TRANSCRIPT SEARCH TAB ═══════════════ */}
+            {activeTab === "transcripts" && (
+              <motion.div
+                key="transcripts"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-5"
+              >
+                {/* Header */}
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center justify-between"
+                >
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <h2 className="text-xl font-bold tracking-tight">Transcript Search</h2>
+                      {transcriptCount !== null && (
+                        <span className="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium tabular-nums">
+                          {transcriptCount} stored
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Search across all call transcripts by keyword, objection, or phrase
+                    </p>
+                  </div>
+                </motion.div>
+
+                {/* Search Bar & Filters */}
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.05 }}
+                  className="rounded-2xl bg-card border border-border/50 p-5 space-y-4"
+                >
+                  {/* Main search row */}
+                  <div className="flex gap-3">
+                    <div className="flex-1 relative">
+                      <MagnifyingGlass className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-muted-foreground/50" />
+                      <input
+                        type="text"
+                        value={transcriptQuery}
+                        onChange={(e) => setTranscriptQuery(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && searchTranscripts()}
+                        placeholder='Search transcripts... e.g. "too expensive", "competitor", "budget"'
+                        className="w-full pl-12 pr-4 py-3 rounded-xl bg-muted/50 border border-border/40 text-sm placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
+                      />
+                    </div>
+                    <button
+                      onClick={searchTranscripts}
+                      disabled={transcriptLoading || !transcriptQuery.trim()}
+                      className="px-6 py-3 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm font-medium disabled:opacity-50 shadow-lg flex items-center gap-2 shrink-0"
+                    >
+                      {transcriptLoading ? (
+                        <SpinnerGap className="size-4 animate-spin" />
+                      ) : (
+                        <MagnifyingGlass className="size-4" />
+                      )}
+                      Search
+                    </button>
+                  </div>
+
+                  {/* Filter row */}
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Funnel className="size-3.5" />
+                      <span className="font-medium">Filters:</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CalendarBlank className="size-3.5 text-muted-foreground/50" />
+                      <input
+                        type="date"
+                        value={transcriptFromDate}
+                        onChange={(e) => setTranscriptFromDate(e.target.value)}
+                        className="px-2.5 py-1.5 rounded-lg bg-muted/50 border border-border/40 text-xs focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        placeholder="From"
+                      />
+                      <span className="text-xs text-muted-foreground/40">→</span>
+                      <input
+                        type="date"
+                        value={transcriptToDate}
+                        onChange={(e) => setTranscriptToDate(e.target.value)}
+                        className="px-2.5 py-1.5 rounded-lg bg-muted/50 border border-border/40 text-xs focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        placeholder="To"
+                      />
+                    </div>
+                    <select
+                      value={transcriptDirection}
+                      onChange={(e) => setTranscriptDirection(e.target.value as "" | "inbound" | "outbound")}
+                      className="px-2.5 py-1.5 rounded-lg bg-muted/50 border border-border/40 text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer"
+                    >
+                      <option value="">All directions</option>
+                      <option value="inbound">Inbound</option>
+                      <option value="outbound">Outbound</option>
+                    </select>
+                    {(transcriptFromDate || transcriptToDate || transcriptDirection) && (
+                      <button
+                        onClick={() => {
+                          setTranscriptFromDate("");
+                          setTranscriptToDate("");
+                          setTranscriptDirection("");
+                        }}
+                        className="text-xs text-muted-foreground hover:text-foreground transition-colors underline"
+                      >
+                        Clear filters
+                      </button>
+                    )}
+                  </div>
+                </motion.div>
+
+                {/* Results */}
+                {transcriptLoading ? (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="text-center py-16"
+                  >
+                    <MagnifyingGlass className="size-10 text-primary mx-auto mb-4 animate-pulse" />
+                    <p className="text-base font-semibold mb-1">Searching transcripts...</p>
+                    <p className="text-sm text-muted-foreground">
+                      Scanning {transcriptCount || "all"} stored call transcripts
+                    </p>
+                  </motion.div>
+                ) : hasSearched && transcriptResults.length === 0 ? (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="text-center py-16 text-muted-foreground"
+                  >
+                    <FileText className="size-12 mx-auto mb-4 opacity-20" />
+                    <p className="text-lg font-semibold mb-1">No matches found</p>
+                    <p className="text-sm">
+                      Try a different keyword or adjust your date filters
+                    </p>
+                  </motion.div>
+                ) : transcriptResults.length > 0 ? (
+                  <div className="space-y-3">
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="flex items-center justify-between px-1"
+                    >
+                      <p className="text-sm text-muted-foreground">
+                        <span className="font-semibold text-foreground">{transcriptResults.length}</span>{" "}
+                        {transcriptResults.length === 1 ? "call" : "calls"} matching &ldquo;
+                        <span className="font-medium text-foreground">{transcriptQuery}</span>&rdquo;
+                      </p>
+                    </motion.div>
+
+                    {transcriptResults.map((result, index) => (
+                      <motion.button
+                        key={result.callId}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.03 }}
+                        onClick={() => analyseCallById(result.callId)}
+                        className="w-full text-left rounded-2xl bg-card border border-border/50 hover:border-foreground/15 hover:bg-muted/30 transition-all overflow-hidden group"
+                      >
+                        <div className="p-4 pb-3 flex items-center gap-4">
+                          <div className="size-10 rounded-xl flex items-center justify-center shrink-0 bg-muted/40 text-muted-foreground">
+                            {result.direction === "inbound" ? (
+                              <PhoneIncoming className="size-5" />
+                            ) : (
+                              <PhoneOutgoing className="size-5" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-semibold truncate">{result.contactName}</p>
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium tabular-nums shrink-0">
+                                {result.matchCount} {result.matchCount === 1 ? "match" : "matches"}
+                              </span>
+                            </div>
+                            <p className="text-xs text-muted-foreground truncate tabular-nums">
+                              {result.agentName} · {formatDuration(result.duration)} ·{" "}
+                              {new Date(result.startedAt * 1000).toLocaleDateString("en-GB", {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              })}{" "}
+                              {formatTime(result.startedAt)}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-xs px-2 py-1 rounded-lg bg-primary/10 text-primary border border-primary/20 opacity-0 group-hover:opacity-100 transition-opacity">
+                              Analyse
+                            </span>
+                            <CaretRight className="size-4 text-muted-foreground/30 group-hover:text-foreground transition-colors" />
+                          </div>
+                        </div>
+
+                        {/* Excerpt with keyword highlighting */}
+                        <div className="px-4 pb-4">
+                          <div className="text-xs leading-relaxed text-muted-foreground/80 bg-muted/30 rounded-lg px-3 py-2.5 border border-border/30 font-mono">
+                            {highlightExcerpt(result.excerpt, transcriptQuery)}
+                          </div>
+                        </div>
+                      </motion.button>
+                    ))}
+                  </div>
+                ) : (
+                  <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 }}
+                    className="text-center py-16 text-muted-foreground"
+                  >
+                    <MagnifyingGlass className="size-12 mx-auto mb-4 opacity-20" />
+                    <p className="text-lg font-semibold mb-1">Search call transcripts</p>
+                    <p className="text-sm max-w-md mx-auto mb-2">
+                      Every call analysed with AI is automatically transcribed and stored. Search for keywords, objections, or phrases across all calls.
+                    </p>
+                    {transcriptCount !== null && transcriptCount > 0 && (
+                      <p className="text-xs text-muted-foreground/60 mt-3">
+                        {transcriptCount} transcripts available to search
+                      </p>
+                    )}
+                  </motion.div>
                 )}
               </motion.div>
             )}

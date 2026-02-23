@@ -12,6 +12,11 @@ export async function GET(request: NextRequest) {
     if (searchParams.get('search')) filters.search = searchParams.get('search')!
     if (searchParams.get('ownerId')) filters.ownerId = searchParams.get('ownerId')!
     if (searchParams.get('minSpend')) filters.minSpend = Number(searchParams.get('minSpend'))
+    if (searchParams.get('maxSpend')) filters.maxSpend = Number(searchParams.get('maxSpend'))
+    if (searchParams.get('sortBy')) filters.sortBy = searchParams.get('sortBy') as ClientFilters['sortBy']
+    if (searchParams.get('view')) filters.view = searchParams.get('view') as ClientFilters['view']
+    if (searchParams.get('interests')) filters.interests = searchParams.get('interests')!
+    if (searchParams.get('noteKeyword')) filters.noteKeyword = searchParams.get('noteKeyword')!
 
     const contacts = await getContacts(filters)
 

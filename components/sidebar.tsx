@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -11,10 +11,12 @@ import {
   LogOut,
   Settings,
   CircleUser,
+  Bell,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGoogleAuth } from "@/components/google-auth-provider-clean";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { NotificationPanel } from "@/components/notification-panel";
 
 type IconProps = React.SVGProps<SVGSVGElement>;
 
@@ -78,6 +80,30 @@ const CustomIcons = {
       <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
     </svg>
   ),
+  Notes: (props: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" />
+      <line x1="16" y1="17" x2="8" y2="17" />
+      <line x1="10" y1="9" x2="8" y2="9" />
+    </svg>
+  ),
+  Finance: (props: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <line x1="12" y1="1" x2="12" y2="23" />
+      <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+    </svg>
+  ),
+  Dialer: (props: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+      <line x1="12" y1="18" x2="12.01" y2="18" />
+      <path d="M8 6h8" />
+      <path d="M8 10h8" />
+      <path d="M8 14h8" />
+    </svg>
+  ),
   Settings: (props: IconProps) => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <circle cx="12" cy="12" r="3" />
@@ -93,8 +119,11 @@ const navigation = [
   { name: "Pipeline", href: "/pipeline", icon: CustomIcons.Pipeline, active: true },
   { name: "Calls", href: "/calls", icon: CustomIcons.Calls, active: true },
   { name: "Outreach", href: "/outreach", icon: CustomIcons.Outreach, active: true },
+  { name: "Dialer", href: "/dialer", icon: CustomIcons.Dialer, active: true },
   { name: "Events", href: "/events", icon: CustomIcons.Events, active: true },
   { name: "Clients", href: "/clients", icon: CustomIcons.Clients, active: true },
+  { name: "Notes", href: "/notes", icon: CustomIcons.Notes, active: true },
+  { name: "Finance", href: "/finance", icon: CustomIcons.Finance, active: true },
   { name: "Analytics", href: "/analytics", icon: CustomIcons.Analytics, active: true },
   { name: "Settings", href: "/settings", icon: CustomIcons.Settings, active: true },
 ];
@@ -108,10 +137,40 @@ interface SidebarProps {
 export function Sidebar({ onExpandChange }: SidebarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const pathname = usePathname();
   const { user, loading, signIn, signOut } = useGoogleAuth();
 
   const isExpanded = isOpen || isHovered;
+
+  // Fetch unread notification count
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const res = await fetch("/api/notifications?unread=true&limit=1");
+      const json = await res.json();
+      if (json.success) {
+        setUnreadCount(json.data.unreadCount ?? 0);
+      }
+    } catch {
+      // Silently fail — notification count is non-critical
+    }
+  }, []);
+
+  // Poll for unread count when user is authenticated
+  useEffect(() => {
+    if (!user) return;
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 60_000); // Every 60s
+    return () => clearInterval(interval);
+  }, [user, fetchUnreadCount]);
+
+  // Refresh count when panel closes
+  useEffect(() => {
+    if (!notifOpen && user) {
+      fetchUnreadCount();
+    }
+  }, [notifOpen, user, fetchUnreadCount]);
 
   // Notify parent of expansion state changes
   useEffect(() => {
@@ -308,11 +367,58 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
             })}
           </nav>
 
-          {/* Theme Toggle + User Profile Section */}
+          {/* Theme Toggle + Notification Bell */}
           <div className="border-t border-border/50 relative h-14 flex items-center">
             <div className="absolute left-[10px]">
               <ThemeToggle showLabel={false} />
             </div>
+            {user && (
+              <AnimatePresence>
+                {isExpanded && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="absolute right-3"
+                  >
+                    <button
+                      onClick={() => setNotifOpen(true)}
+                      className="relative p-2 text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-muted/50"
+                      aria-label="Notifications"
+                    >
+                      <Bell className="size-[18px]" strokeWidth={1.5} />
+                      {unreadCount > 0 && (
+                        <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-red-500 rounded-full shadow-sm">
+                          {unreadCount > 99 ? "99+" : unreadCount}
+                        </span>
+                      )}
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            )}
+            {/* Bell for collapsed state */}
+            {user && !isExpanded && (
+              <div className="absolute right-0 left-0 flex justify-center mt-9 group/bell">
+                <button
+                  onClick={() => setNotifOpen(true)}
+                  className="relative p-2 text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-muted/50"
+                  aria-label="Notifications"
+                >
+                  <Bell className="size-[18px]" strokeWidth={1.5} />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-red-500 rounded-full shadow-sm">
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </span>
+                  )}
+                </button>
+                {/* Tooltip */}
+                <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 px-3 py-2 bg-card border border-border rounded-lg shadow-lg opacity-0 group-hover/bell:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
+                  Notifications{unreadCount > 0 ? ` (${unreadCount})` : ""}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="border-t border-border relative h-[64px] flex items-center group">
@@ -462,6 +568,9 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
           </div>
         </div>
       </motion.aside>
+
+      {/* Notification Panel */}
+      <NotificationPanel isOpen={notifOpen} onClose={() => setNotifOpen(false)} />
     </>
   );
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCall } from '@/lib/aircall'
 import { analyseCall, type CallAnalysis } from '@/lib/call-analysis'
+import { storeTranscript } from '@/lib/transcript-store'
 import { Redis } from '@upstash/redis'
 import OpenAI from 'openai'
 
@@ -155,6 +156,15 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`📝 Transcript ready (${transcript.length} chars). Analysing with Claude...`)
+
+    // Store transcript for search (non-blocking)
+    storeTranscript(callId, {
+      agentName,
+      contactName,
+      duration: call.duration,
+      direction: call.direction,
+      startedAt: call.started_at,
+    }, transcript).catch(err => console.warn('Failed to store transcript:', err))
 
     // Step 3: Analyse with Claude
     const analysis = await analyseCall({

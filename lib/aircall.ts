@@ -350,6 +350,41 @@ export function computeRepStats(calls: AircallCall[]): RepCallStats[] {
 }
 
 /**
+ * Create an outbound call via Aircall
+ * The call is initiated from the Aircall app on the user's device
+ */
+export async function createOutboundCall(userId: number, phoneNumber: string): Promise<AircallCall> {
+  const data = await aircallFetch<{ call: AircallCall }>('/calls', {
+    method: 'POST',
+    body: JSON.stringify({
+      number_id: userId,
+      to: phoneNumber,
+    }),
+  })
+  return data.call
+}
+
+/**
+ * Add a tag to a call
+ */
+export async function addTagToCall(callId: number, tagName: string): Promise<void> {
+  await aircallFetch(`/calls/${callId}/tags`, {
+    method: 'POST',
+    body: JSON.stringify({ tags: [tagName] }),
+  })
+}
+
+/**
+ * Add a comment/note to a call
+ */
+export async function addCommentToCall(callId: number, body: string): Promise<void> {
+  await aircallFetch(`/calls/${callId}/comments`, {
+    method: 'POST',
+    body: JSON.stringify({ body }),
+  })
+}
+
+/**
  * Format transcript utterances into readable text for AI analysis
  */
 export function formatTranscriptForAI(transcript: AircallTranscription, call: AircallCall): string {
