@@ -17,6 +17,7 @@ const PROTECTED_ROUTES = [
   '/notes',
   '/finance',
   '/dialer',
+  '/chat',
 ]
 
 // Routes that should redirect to dashboard if already authenticated

@@ -158,6 +158,68 @@ function toSoqlDate(d: Date): string {
 }
 
 // ──────────────────────────────────────────────
+// SOQL Sanitization Utilities
+// ──────────────────────────────────────────────
+
+/** Salesforce ID pattern: 15 or 18 alphanumeric characters */
+const SFID_PATTERN = /^[a-zA-Z0-9]{15,18}$/
+
+/** Allowed interest field names for SOQL field injection prevention */
+const ALLOWED_INTEREST_FIELDS = [
+  'Formula_1__c',
+  'Football__c',
+  'Rugby__c',
+  'Tennis__c',
+  'Live_Music__c',
+  'Culinary__c',
+  'Luxury_Lifestyle_Celebrity__c',
+  'Unique_Experiences__c',
+  'Other__c',
+]
+
+/**
+ * Escape single quotes in a string value for safe SOQL interpolation.
+ * Replaces ' with \' to prevent SOQL injection.
+ */
+export function sanitizeSoqlValue(value: string): string {
+  return value.replace(/'/g, "\\'")
+}
+
+/**
+ * Validate a field name against an allowlist to prevent SOQL field injection.
+ * Throws an error if the field name is not in the allowed list.
+ */
+export function validateSoqlFieldName(field: string, allowed: string[]): string {
+  if (!allowed.includes(field)) {
+    throw new Error(`Invalid SOQL field name: "${field}". Allowed fields: ${allowed.join(', ')}`)
+  }
+  return field
+}
+
+/**
+ * Validate that a value matches the Salesforce ID pattern (15 or 18 alphanumeric chars).
+ * Throws an error if the value is not a valid Salesforce ID.
+ */
+function validateSalesforceId(value: string, fieldName: string): string {
+  if (!SFID_PATTERN.test(value)) {
+    throw new Error(`Invalid Salesforce ID for ${fieldName}: "${value}"`)
+  }
+  return value
+}
+
+/**
+ * Validate and coerce a value to a safe number for SOQL.
+ * Throws an error if the value is not a valid number.
+ */
+function validateNumber(value: number | string, fieldName: string): number {
+  const num = Number(value)
+  if (isNaN(num) || !isFinite(num)) {
+    throw new Error(`Invalid numeric value for ${fieldName}: "${value}"`)
+  }
+  return num
+}
+
+// ──────────────────────────────────────────────
 // Public API functions
 // ──────────────────────────────────────────────
 
@@ -180,7 +242,7 @@ const CLOSED_STAGES = process.env.SALESFORCE_CLOSED_STAGES
   : ['Agreement Signed', 'Closed Won']
 
 function stageFilter(): string {
-  return CLOSED_STAGES.map(s => `'${s}'`).join(', ')
+  return CLOSED_STAGES.map(s => `'${sanitizeSoqlValue(s)}'`).join(', ')
 }
 
 /**
@@ -398,20 +460,21 @@ export async function getLeads(filters?: LeadFilters): Promise<SalesforceLead[]>
   let whereClause = 'IsConverted = false'
 
   if (filters?.status) {
-    whereClause += ` AND Status = '${filters.status}'`
+    whereClause += ` AND Status = '${sanitizeSoqlValue(filters.status)}'`
   }
 
   if (filters?.sourceGroup && LEAD_SOURCE_GROUPS[filters.sourceGroup]) {
-    const sources = LEAD_SOURCE_GROUPS[filters.sourceGroup].map(s => `'${s}'`).join(', ')
+    const sources = LEAD_SOURCE_GROUPS[filters.sourceGroup].map(s => `'${sanitizeSoqlValue(s)}'`).join(', ')
     whereClause += ` AND LeadSource IN (${sources})`
   }
 
   if (filters?.ownerId) {
+    validateSalesforceId(filters.ownerId, 'ownerId')
     whereClause += ` AND OwnerId = '${filters.ownerId}'`
   }
 
   if (filters?.search) {
-    const s = filters.search.replace(/'/g, "\\'")
+    const s = sanitizeSoqlValue(filters.search)
     whereClause += ` AND (Name LIKE '%${s}%' OR Company LIKE '%${s}%' OR Email LIKE '%${s}%')`
   }
 
@@ -432,7 +495,8 @@ export async function getLeads(filters?: LeadFilters): Promise<SalesforceLead[]>
 
   // Interest category filter
   if (filters?.interest) {
-    whereClause += ` AND ${filters.interest} = true`
+    const validField = validateSoqlFieldName(filters.interest, ALLOWED_INTEREST_FIELDS)
+    whereClause += ` AND ${validField} = true`
   }
 
   const soql = `
@@ -494,19 +558,21 @@ export async function getOpenOpportunities(filters?: PipelineFilters): Promise<S
     conditions.push('IsClosed = false')
   }
   if (filters?.ownerId) {
+    validateSalesforceId(filters.ownerId, 'ownerId')
     conditions.push(`OwnerId = '${filters.ownerId}'`)
   }
   if (filters?.eventId) {
+    validateSalesforceId(filters.eventId, 'eventId')
     conditions.push(`Event__c = '${filters.eventId}'`)
   }
   if (filters?.eventCategory) {
-    conditions.push(`Event__r.Category__c = '${filters.eventCategory}'`)
+    conditions.push(`Event__r.Category__c = '${sanitizeSoqlValue(filters.eventCategory)}'`)
   }
   if (filters?.minAmount) {
-    conditions.push(`Amount >= ${filters.minAmount}`)
+    conditions.push(`Amount >= ${validateNumber(filters.minAmount, 'minAmount')}`)
   }
   if (filters?.maxAmount) {
-    conditions.push(`Amount <= ${filters.maxAmount}`)
+    conditions.push(`Amount <= ${validateNumber(filters.maxAmount, 'maxAmount')}`)
   }
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
@@ -563,6 +629,7 @@ export async function getEventsWithInventory(): Promise<SalesforceEventRecord[]>
 }
 
 export async function getEventOpportunities(eventId: string): Promise<SalesforceOpportunityFull[]> {
+  validateSalesforceId(eventId, 'eventId')
   const soql = `
     SELECT ${PIPELINE_SELECT_FIELDS}
     FROM Opportunity
@@ -583,17 +650,18 @@ export async function getContacts(filters?: ClientFilters): Promise<SalesforceCo
   let whereClause = 'Id != null'
 
   if (filters?.search) {
-    const s = filters.search.replace(/'/g, "\\'")
+    const s = sanitizeSoqlValue(filters.search)
     whereClause += ` AND (Name LIKE '%${s}%' OR Email LIKE '%${s}%' OR Account.Name LIKE '%${s}%')`
   }
   if (filters?.ownerId) {
+    validateSalesforceId(filters.ownerId, 'ownerId')
     whereClause += ` AND OwnerId = '${filters.ownerId}'`
   }
   if (filters?.minSpend) {
-    whereClause += ` AND Total_Spend_to_Date__c >= ${filters.minSpend}`
+    whereClause += ` AND Total_Spend_to_Date__c >= ${validateNumber(filters.minSpend, 'minSpend')}`
   }
   if (filters?.maxSpend) {
-    whereClause += ` AND Total_Spend_to_Date__c <= ${filters.maxSpend}`
+    whereClause += ` AND Total_Spend_to_Date__c <= ${validateNumber(filters.maxSpend, 'maxSpend')}`
   }
   if (filters?.view === 'personal') {
     whereClause += ` AND Account.IsPersonAccount = true`
@@ -603,7 +671,7 @@ export async function getContacts(filters?: ClientFilters): Promise<SalesforceCo
   if (filters?.interests) {
     const interestTerms = filters.interests.split(',').map(i => i.trim()).filter(Boolean)
     for (const term of interestTerms) {
-      const it = term.replace(/'/g, "\\'")
+      const it = sanitizeSoqlValue(term)
       whereClause += ` AND Interests__c LIKE '%${it}%'`
     }
   }
@@ -617,7 +685,7 @@ export async function getContacts(filters?: ClientFilters): Promise<SalesforceCo
   // If noteKeyword filter, find matching contact IDs from notes first
   if (filters?.noteKeyword) {
     try {
-      const nk = filters.noteKeyword.replace(/'/g, "\\'")
+      const nk = sanitizeSoqlValue(filters.noteKeyword)
       const noteResult = await query<{ Contact__c: string }>(`
         SELECT Contact__c FROM A_B_Note__c
         WHERE Body__c LIKE '%${nk}%' AND Contact__c != null
@@ -625,6 +693,7 @@ export async function getContacts(filters?: ClientFilters): Promise<SalesforceCo
       `.trim())
       const noteContactIds = [...new Set(noteResult.records.map(n => n.Contact__c))]
       if (noteContactIds.length === 0) return []
+      // noteContactIds come from Salesforce query results, so they are already valid IDs
       whereClause += ` AND Id IN ('${noteContactIds.join("','")}')`
     } catch {
       // Notes query failed, continue without note filter
@@ -661,6 +730,7 @@ export async function getContacts(filters?: ClientFilters): Promise<SalesforceCo
 }
 
 export async function getContactDetail(contactId: string): Promise<SalesforceContact> {
+  validateSalesforceId(contactId, 'contactId')
   const soql = `
     SELECT ${CONTACT_SELECT_FIELDS}
     FROM Contact
@@ -674,6 +744,7 @@ export async function getContactDetail(contactId: string): Promise<SalesforceCon
 }
 
 export async function getContactOpportunities(contactId: string): Promise<SalesforceOpportunityFull[]> {
+  validateSalesforceId(contactId, 'contactId')
   const soql = `
     SELECT ${PIPELINE_SELECT_FIELDS}
     FROM Opportunity
@@ -687,6 +758,7 @@ export async function getContactOpportunities(contactId: string): Promise<Salesf
 }
 
 export async function getContactNotes(contactId: string): Promise<ABNote[]> {
+  validateSalesforceId(contactId, 'contactId')
   // A_B_Note__c may relate to Contact via a lookup
   const soql = `
     SELECT Id, Name, Body__c, OwnerId, Owner.Alias, CreatedDate
@@ -746,6 +818,7 @@ export async function getChannelAttribution(): Promise<ChannelAttribution[]> {
 export interface RepPerformance {
   name: string
   email: string
+  ownerId: string
   totalDeals: number
   totalRevenue: number
   avgDealSize: number
@@ -754,7 +827,7 @@ export interface RepPerformance {
 
 export async function getRepPerformance(): Promise<RepPerformance[]> {
   const soql = `
-    SELECT Id, Amount, Gross_Amount__c, Owner.Name, Owner.Email, Total_Number_of_Guests__c
+    SELECT Id, Amount, Gross_Amount__c, OwnerId, Owner.Name, Owner.Email, Total_Number_of_Guests__c
     FROM Opportunity
     WHERE StageName IN ('Agreement Signed', 'Amended', 'Amendment Signed')
       AND CloseDate >= THIS_YEAR
@@ -763,6 +836,7 @@ export async function getRepPerformance(): Promise<RepPerformance[]> {
 
   const result = await query<{
     Id: string; Amount: number | null; Gross_Amount__c: number | null;
+    OwnerId: string;
     Owner: { Name: string; Email?: string } | null;
     Total_Number_of_Guests__c: number | null
   }>(soql)
@@ -771,11 +845,13 @@ export async function getRepPerformance(): Promise<RepPerformance[]> {
   for (const r of result.records) {
     const name = r.Owner?.Name || 'Unknown'
     const email = r.Owner?.Email || ''
+    const ownerId = r.OwnerId || ''
     const key = email || name
-    const existing = repMap.get(key) || { name, email, totalDeals: 0, totalRevenue: 0, avgDealSize: 0, totalGuests: 0 }
+    const existing = repMap.get(key) || { name, email, ownerId, totalDeals: 0, totalRevenue: 0, avgDealSize: 0, totalGuests: 0 }
     existing.totalDeals += 1
     existing.totalRevenue += r.Gross_Amount__c ?? r.Amount ?? 0
     existing.totalGuests += r.Total_Number_of_Guests__c ?? 0
+    if (!existing.ownerId && ownerId) existing.ownerId = ownerId
     repMap.set(key, existing)
   }
 
@@ -828,7 +904,7 @@ export async function getMonthlyTargets(year: string, month: string): Promise<Sa
   const soql = `
     SELECT Id, Name, Target_Amount__c, OwnerId, Owner.Name, Type__c, Month__c, Year__c, Days_Absent__c
     FROM Target__c
-    WHERE Year__c = '${year}' AND Month__c = '${month}'
+    WHERE Year__c = '${sanitizeSoqlValue(year)}' AND Month__c = '${sanitizeSoqlValue(month)}'
     LIMIT 100
   `.trim()
 
@@ -847,7 +923,7 @@ export async function getCommissionData(year: string): Promise<SalesforceCommiss
       Avg_Rolling_Commission__c,
       Month__c, Month_Name__c, Year__c
     FROM Commissions__c
-    WHERE Year__c = '${year}'
+    WHERE Year__c = '${sanitizeSoqlValue(year)}'
     ORDER BY Month__c DESC
     LIMIT 200
   `.trim()
@@ -1068,17 +1144,19 @@ const NOTE_SELECT_FIELDS = `
  */
 export async function searchNotes(keyword: string, filters?: NoteFilters): Promise<ABNoteExpanded[]> {
   const conditions: string[] = []
-  const escapedKeyword = keyword.replace(/'/g, "\\'")
+  const escapedKeyword = sanitizeSoqlValue(keyword)
   conditions.push(`Body__c LIKE '%${escapedKeyword}%'`)
 
   if (filters?.contactId) {
+    validateSalesforceId(filters.contactId, 'contactId')
     conditions.push(`Contact__c = '${filters.contactId}'`)
   }
   if (filters?.ownerId) {
+    validateSalesforceId(filters.ownerId, 'ownerId')
     conditions.push(`OwnerId = '${filters.ownerId}'`)
   }
 
-  const limit = filters?.limit || 200
+  const limit = validateNumber(filters?.limit || 200, 'limit')
   const soql = `
     SELECT ${NOTE_SELECT_FIELDS}
     FROM A_B_Note__c
@@ -1098,18 +1176,20 @@ export async function getAllNotes(filters?: NoteFilters): Promise<ABNoteExpanded
   const conditions: string[] = ['Id != null']
 
   if (filters?.contactId) {
+    validateSalesforceId(filters.contactId, 'contactId')
     conditions.push(`Contact__c = '${filters.contactId}'`)
   }
   if (filters?.ownerId) {
+    validateSalesforceId(filters.ownerId, 'ownerId')
     conditions.push(`OwnerId = '${filters.ownerId}'`)
   }
   if (filters?.search) {
-    const s = filters.search.replace(/'/g, "\\'")
+    const s = sanitizeSoqlValue(filters.search)
     conditions.push(`Body__c LIKE '%${s}%'`)
   }
 
-  const limit = filters?.limit || 200
-  const offset = filters?.offset || 0
+  const limit = validateNumber(filters?.limit || 200, 'limit')
+  const offset = validateNumber(filters?.offset || 0, 'offset')
   const soql = `
     SELECT ${NOTE_SELECT_FIELDS}
     FROM A_B_Note__c
@@ -1127,6 +1207,7 @@ export async function getAllNotes(filters?: NoteFilters): Promise<ABNoteExpanded
  * Get a single note by ID
  */
 export async function getNoteById(noteId: string): Promise<ABNoteExpanded> {
+  validateSalesforceId(noteId, 'noteId')
   const soql = `
     SELECT ${NOTE_SELECT_FIELDS}
     FROM A_B_Note__c
@@ -1168,7 +1249,7 @@ export async function deleteNote(noteId: string): Promise<void> {
 export async function getContactsForPicker(search?: string): Promise<{ Id: string; Name: string; Email: string | null; Account: { Name: string } | null }[]> {
   let whereClause = 'Id != null'
   if (search) {
-    const s = search.replace(/'/g, "\\'")
+    const s = sanitizeSoqlValue(search)
     whereClause += ` AND (Name LIKE '%${s}%' OR Email LIKE '%${s}%')`
   }
 
@@ -1297,13 +1378,16 @@ export async function getCallableLeads(filters?: DialerFilters): Promise<Salesfo
     '(Phone != null OR MobilePhone != null)',
   ]
 
-  if (filters?.status) conditions.push(`Status = '${filters.status}'`)
+  if (filters?.status) conditions.push(`Status = '${sanitizeSoqlValue(filters.status)}'`)
   if (filters?.eventInterest) {
-    const s = filters.eventInterest.replace(/'/g, "\\'")
+    const s = sanitizeSoqlValue(filters.eventInterest)
     conditions.push(`Event_of_Interest__c LIKE '%${s}%'`)
   }
-  if (filters?.ownerId) conditions.push(`OwnerId = '${filters.ownerId}'`)
-  if (filters?.lastActivityBefore) conditions.push(`LastActivityDate < ${filters.lastActivityBefore}`)
+  if (filters?.ownerId) {
+    validateSalesforceId(filters.ownerId, 'ownerId')
+    conditions.push(`OwnerId = '${filters.ownerId}'`)
+  }
+  if (filters?.lastActivityBefore) conditions.push(`LastActivityDate < ${sanitizeSoqlValue(filters.lastActivityBefore)}`)
 
   const soql = `
     SELECT ${LEAD_SELECT_FIELDS}
@@ -1325,9 +1409,12 @@ export async function getCallableContacts(filters?: DialerFilters): Promise<Sale
     '(Phone != null OR MobilePhone != null)',
   ]
 
-  if (filters?.ownerId) conditions.push(`OwnerId = '${filters.ownerId}'`)
-  if (filters?.minSpend) conditions.push(`Total_Spend_to_Date__c >= ${filters.minSpend}`)
-  if (filters?.maxSpend) conditions.push(`Total_Spend_to_Date__c <= ${filters.maxSpend}`)
+  if (filters?.ownerId) {
+    validateSalesforceId(filters.ownerId, 'ownerId')
+    conditions.push(`OwnerId = '${filters.ownerId}'`)
+  }
+  if (filters?.minSpend) conditions.push(`Total_Spend_to_Date__c >= ${validateNumber(filters.minSpend, 'minSpend')}`)
+  if (filters?.maxSpend) conditions.push(`Total_Spend_to_Date__c <= ${validateNumber(filters.maxSpend, 'maxSpend')}`)
 
   const soql = `
     SELECT ${CONTACT_SELECT_FIELDS}
@@ -1374,11 +1461,12 @@ export async function getLeadsCreatedToday(): Promise<number> {
  * Get upcoming events in the next N days
  */
 export async function getUpcomingEvents(days: number = 7): Promise<SalesforceEventRecord[]> {
+  const safeDays = validateNumber(days, 'days')
   const soql = `
     SELECT ${EVENT_SELECT_FIELDS}
     FROM Event__c
     WHERE Start_Date__c >= TODAY
-      AND Start_Date__c <= NEXT_N_DAYS:${days}
+      AND Start_Date__c <= NEXT_N_DAYS:${safeDays}
     ORDER BY Start_Date__c ASC
     LIMIT 20
   `.trim()
