@@ -229,7 +229,7 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
       >
         <div className="flex flex-col h-full bg-card/50">
           {/* Logo */}
-          <div className="h-16 border-b border-border relative overflow-hidden">
+          <div className="h-[72px] border-b border-border relative overflow-hidden">
             <Link href="/" className="absolute inset-0 flex items-center" onClick={() => setIsOpen(false)}>
               {/* Favicon - shown when collapsed */}
               <div className="absolute left-5 top-1/2 -translate-y-1/2">
@@ -265,7 +265,7 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.3 }}
-                    className="absolute left-5 top-1/2 -translate-y-1/2"
+                    className="absolute left-6 top-1/2 -translate-y-1/2"
                   >
                     <Image
                       src="/ab-logo-gold.webp"
@@ -281,7 +281,7 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 py-6 space-y-1">
+          <nav className="flex-1 py-3 space-y-0.5 overflow-y-auto scrollbar-hide">
             {navigation.map((item) => {
               const isActive = item.href === pathname || (item.href === "/itinerary" && pathname === "/itinerary");
               return (
@@ -289,7 +289,7 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
                   key={item.name}
                   href={item.href}
                   className={cn(
-                    "flex items-center rounded-xl transition-all duration-300 group h-11 relative mx-[18px] my-0.5",
+                    "flex items-center rounded-lg transition-all duration-300 group h-10 relative mx-[18px] my-0",
                     isActive
                       ? "bg-transparent"
                       : "hover:bg-black/[0.03] dark:hover:bg-white/[0.02]",
@@ -306,7 +306,7 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
                   {isActive && (
                     <motion.div
                       layoutId="active-nav-row"
-                      className="absolute inset-0 bg-black/[0.04] dark:bg-black/60 rounded-xl border border-black/[0.05] dark:border-white/[0.05] shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[inset_0_1px_3px_rgba(0,0,0,0.8)]"
+                      className="absolute inset-0 bg-black/[0.04] dark:bg-black/60 rounded-lg border border-black/[0.05] dark:border-white/[0.05] shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[inset_0_1px_3px_rgba(0,0,0,0.8)]"
                       transition={{ type: "spring", stiffness: 350, damping: 30 }}
                     />
                   )}
@@ -344,7 +344,7 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
                       >
                         <span 
                           className={cn(
-                            "text-[14.5px] tracking-tight whitespace-nowrap transition-colors duration-300",
+                            "text-[13.5px] tracking-tight whitespace-nowrap transition-colors duration-300",
                             isActive ? "font-semibold text-foreground" : "font-medium text-muted-foreground group-hover:text-foreground"
                           )}
                         >
@@ -376,21 +376,20 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
             })}
           </nav>
 
-          {/* Theme Toggle + Notification Bell */}
-          <div className="border-t border-border/50 relative h-14 flex items-center">
-            <div className="absolute left-[10px]">
-              <ThemeToggle showLabel={false} />
-            </div>
-            {user && (
-              <AnimatePresence>
-                {isExpanded && (
+          {/* Notification Bell */}
+          {user && (
+            <div className="border-t border-border/50 h-11 flex items-center relative">
+              <AnimatePresence mode="wait">
+                {isExpanded ? (
                   <motion.div
+                    key="bell-expanded"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.2 }}
-                    className="absolute right-3"
+                    className="flex items-center justify-between w-full px-5"
                   >
+                    <span className="text-[13px] text-muted-foreground font-medium">Notifications</span>
                     <button
                       onClick={() => setNotifOpen(true)}
                       className="relative p-2 text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-muted/50"
@@ -404,33 +403,43 @@ export function Sidebar({ onExpandChange }: SidebarProps) {
                       )}
                     </button>
                   </motion.div>
+                ) : (
+                  <motion.div
+                    key="bell-collapsed"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="w-full flex justify-center group/bell"
+                  >
+                    <button
+                      onClick={() => setNotifOpen(true)}
+                      className="relative p-2 text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-muted/50"
+                      aria-label="Notifications"
+                    >
+                      <Bell className="size-[18px]" strokeWidth={1.5} />
+                      {unreadCount > 0 && (
+                        <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-red-500 rounded-full shadow-sm">
+                          {unreadCount > 99 ? "99+" : unreadCount}
+                        </span>
+                      )}
+                    </button>
+                    {/* Tooltip */}
+                    <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 px-3 py-2 bg-card border border-border rounded-lg shadow-lg opacity-0 group-hover/bell:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
+                      Notifications{unreadCount > 0 ? ` (${unreadCount})` : ""}
+                    </div>
+                  </motion.div>
                 )}
               </AnimatePresence>
-            )}
-            {/* Bell for collapsed state */}
-            {user && !isExpanded && (
-              <div className="absolute right-0 left-0 flex justify-center mt-9 group/bell">
-                <button
-                  onClick={() => setNotifOpen(true)}
-                  className="relative p-2 text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-muted/50"
-                  aria-label="Notifications"
-                >
-                  <Bell className="size-[18px]" strokeWidth={1.5} />
-                  {unreadCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-red-500 rounded-full shadow-sm">
-                      {unreadCount > 99 ? "99+" : unreadCount}
-                    </span>
-                  )}
-                </button>
-                {/* Tooltip */}
-                <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 px-3 py-2 bg-card border border-border rounded-lg shadow-lg opacity-0 group-hover/bell:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
-                  Notifications{unreadCount > 0 ? ` (${unreadCount})` : ""}
-                </div>
-              </div>
-            )}
+            </div>
+          )}
+
+          {/* Theme Toggle */}
+          <div className={cn("h-11 flex items-center px-[10px]", !user && "border-t border-border/50")}>
+            <ThemeToggle showLabel={false} />
           </div>
 
-          <div className="border-t border-border relative h-[64px] flex items-center group">
+          <div className="border-t border-border relative h-[56px] flex items-center group">
             {loading ? (
               // Loading state
               <>
