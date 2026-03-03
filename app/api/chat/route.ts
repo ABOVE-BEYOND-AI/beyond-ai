@@ -1,4 +1,4 @@
-import { streamText, tool, stepCountIs } from 'ai'
+import { streamText, tool, stepCountIs, convertToModelMessages } from 'ai'
 import { anthropic } from '@ai-sdk/anthropic'
 import { z } from 'zod'
 import { cookies } from 'next/headers'
@@ -104,7 +104,11 @@ export async function POST(req: Request) {
     })
   }
 
-  const { messages } = await req.json()
+  const { messages: uiMessages } = await req.json()
+
+  // Convert UIMessage format (parts) to ModelMessage format (content)
+  // useChat v6 sends UIMessages with `parts`, but streamText expects ModelMessages with `content`
+  const messages = await convertToModelMessages(uiMessages)
 
   const result = streamText({
     model: anthropic('claude-sonnet-4-20250514'),
