@@ -1,5 +1,5 @@
 import { streamText, tool, stepCountIs, convertToModelMessages } from 'ai'
-import { anthropic } from '@ai-sdk/anthropic'
+import { google } from '@ai-sdk/google'
 import { z } from 'zod'
 import { cookies } from 'next/headers'
 import {
@@ -111,16 +111,8 @@ export async function POST(req: Request) {
   const messages = await convertToModelMessages(uiMessages)
 
   const result = streamText({
-    model: anthropic('claude-sonnet-4-20250514'),
-    system: [
-      {
-        role: 'system' as const,
-        content: SYSTEM_PROMPT,
-        providerOptions: {
-          anthropic: { cacheControl: { type: 'ephemeral' } },
-        },
-      },
-    ],
+    model: google('gemini-3-flash-preview'),
+    system: SYSTEM_PROMPT,
     messages,
     stopWhen: stepCountIs(5),
     tools: {
