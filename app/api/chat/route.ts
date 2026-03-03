@@ -110,12 +110,9 @@ export async function POST(req: Request) {
   // useChat v6 sends UIMessages with `parts`, but streamText expects ModelMessages with `content`
   const messages = await convertToModelMessages(uiMessages)
 
-  const result = streamText({
-    model: google('gemini-3-flash-preview'),
-    system: SYSTEM_PROMPT,
-    messages,
-    stopWhen: stepCountIs(5),
-    tools: {
+  // Gemini 2.5 Flash (stable) — swap to 'gemini-3-flash-preview' when it exits preview
+  const MODEL = 'gemini-2.5-flash' as const
+  const tools = {
       searchLeads: tool({
         description: 'Search and filter leads in Salesforce. Use for any query about leads, lead counts, lead status, or lead owners.',
         inputSchema: z.object({
@@ -431,7 +428,14 @@ export async function POST(req: Request) {
           }
         },
       }),
-    },
+  }
+
+  const result = streamText({
+    model: google(MODEL),
+    system: SYSTEM_PROMPT,
+    messages,
+    stopWhen: stepCountIs(5),
+    tools,
   })
 
   return result.toUIMessageStreamResponse()
