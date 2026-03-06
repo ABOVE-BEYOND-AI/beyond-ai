@@ -21,6 +21,7 @@ export default function ChatPage() {
   const [input, setInput] = useState('')
   const [historyOpen, setHistoryOpen] = useState(false)
   const [conversationId, setConversationId] = useState<string | null>(null)
+  const [queuedMessage, setQueuedMessage] = useState<string | null>(null)
   const [savingMessages, setSavingMessages] = useState(false)
   const prevMessageCountRef = useRef(0)
 
@@ -135,22 +136,40 @@ export default function ChatPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, conversationId])
 
+  useEffect(() => {
+    if (!queuedMessage || !conversationId || isLoading) return
+    sendMessage({ text: queuedMessage })
+    setQueuedMessage(null)
+  }, [conversationId, isLoading, queuedMessage, sendMessage])
+
   // ── Message handlers ────────────────────────────────
+
+  const queueOrSendMessage = useCallback(async (text: string) => {
+    if (conversationId) {
+      sendMessage({ text })
+      return
+    }
+
+    setQueuedMessage(text)
+    const id = await ensureConversation()
+    if (!id) {
+      setQueuedMessage(null)
+      sendMessage({ text })
+    }
+  }, [conversationId, ensureConversation, sendMessage])
 
   const handleSend = useCallback(async () => {
     const trimmed = input.trim()
     if (!trimmed || isLoading) return
 
-    await ensureConversation()
-    sendMessage({ text: trimmed })
     setInput('')
-  }, [input, isLoading, sendMessage, ensureConversation])
+    await queueOrSendMessage(trimmed)
+  }, [input, isLoading, queueOrSendMessage])
 
   const handlePromptSelect = useCallback(async (prompt: string) => {
     if (isLoading) return
-    await ensureConversation()
-    sendMessage({ text: prompt })
-  }, [isLoading, sendMessage, ensureConversation])
+    await queueOrSendMessage(prompt)
+  }, [isLoading, queueOrSendMessage])
 
   const handleRetry = useCallback(() => {
     if (messages.length > 0) {
@@ -161,16 +180,17 @@ export default function ChatPage() {
           .map((p: any) => p.text)
           .join('\n') || ''
         if (text) {
-          sendMessage({ text })
+          queueOrSendMessage(text)
         }
       }
     }
-  }, [messages, sendMessage])
+  }, [messages, queueOrSendMessage])
 
   // ── Conversation navigation ─────────────────────────
 
   const handleNewConversation = useCallback(() => {
     setConversationId(null)
+    setQueuedMessage(null)
     setMessages([])
     prevMessageCountRef.current = 0
     setHistoryOpen(false)
@@ -188,6 +208,7 @@ export default function ChatPage() {
       if (!res.ok) return
 
       const data = await res.json()
+      setQueuedMessage(null)
       setConversationId(id)
 
       if (data.messages?.length > 0) {

@@ -16,6 +16,10 @@ export function CallsCard({ data }: { data: any }) {
   }
 
   const periodLabel = period.charAt(0).toUpperCase() + period.slice(1)
+  const totalCalls = stats?.total_calls ?? stats?.total ?? 0
+  const inboundCalls = stats?.inbound_calls ?? stats?.inbound ?? 0
+  const outboundCalls = stats?.outbound_calls ?? stats?.outbound ?? 0
+  const avgDuration = stats?.avg_duration ?? stats?.avgDuration ?? 0
 
   return (
     <div className="w-full rounded-xl border border-border bg-card overflow-hidden">
@@ -26,10 +30,10 @@ export function CallsCard({ data }: { data: any }) {
       <div className="p-4 space-y-4">
         {stats && (
           <div className="grid grid-cols-4 gap-3">
-            <StatBox label="Total" value={stats.total?.toString() || '0'} />
-            <StatBox label="Inbound" value={stats.inbound?.toString() || '0'} />
-            <StatBox label="Outbound" value={stats.outbound?.toString() || '0'} />
-            <StatBox label="Avg Duration" value={stats.avgDuration ? `${Math.round(stats.avgDuration / 60)}m` : '0m'} />
+            <StatBox label="Total" value={totalCalls.toString()} />
+            <StatBox label="Inbound" value={inboundCalls.toString()} />
+            <StatBox label="Outbound" value={outboundCalls.toString()} />
+            <StatBox label="Avg Duration" value={avgDuration ? `${Math.round(avgDuration / 60)}m` : '0m'} />
           </div>
         )}
         {repStats?.length > 0 && (
@@ -40,9 +44,9 @@ export function CallsCard({ data }: { data: any }) {
                 <div key={i} className="flex items-center justify-between text-sm">
                   <span className="text-foreground">{rep.name || rep.email || 'Unknown'}</span>
                   <div className="flex items-center gap-3 text-muted-foreground text-xs tabular-nums">
-                    <span>{rep.total || 0} calls</span>
-                    {rep.avgDuration && (
-                      <span>{Math.round(rep.avgDuration / 60)}m avg</span>
+                    <span>{rep.total_calls || rep.total || 0} calls</span>
+                    {(rep.avg_duration || rep.avgDuration) && (
+                      <span>{Math.round((rep.avg_duration || rep.avgDuration) / 60)}m avg</span>
                     )}
                   </div>
                 </div>

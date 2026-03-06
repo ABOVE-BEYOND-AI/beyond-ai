@@ -113,9 +113,12 @@ export interface SalesforceOpportunity {
   Gross_Amount__c: number | null              // Gross Amount (formula: Net + Service Charge + Processing Fee)
   Service_Charge__c: number | null            // Service Charge (formula)
   Processing_Fee__c: number | null            // Processing Fee (formula)
+  OwnerId?: string
+  LeadSource?: string | null
+  Total_Number_of_Guests__c?: number | null
   Owner: { Name: string; Email?: string } | null
   Account: { Name: string } | null
-  Event__r: { Name: string } | null           // Event lookup (relationship name)
+  Event__r: { Name: string; Category__c?: string | null } | null // Event lookup (relationship name)
   CreatedDate: string
 }
 
@@ -253,9 +256,10 @@ function stageFilter(): string {
 const SELECT_FIELDS = `
   Id, Name, StageName, CloseDate, Amount,
   Gross_Amount__c, Service_Charge__c, Processing_Fee__c,
+  OwnerId, LeadSource, Total_Number_of_Guests__c,
   Owner.Name, Owner.Email,
   Account.Name,
-  Event__r.Name,
+  Event__r.Name, Event__r.Category__c,
   CreatedDate
 `.trim()
 
@@ -444,17 +448,92 @@ const EVENT_SELECT_FIELDS = `
   OwnerId, Owner.Name
 `.trim()
 
-const CONTACT_SELECT_FIELDS = `
-  Id, Name, FirstName, LastName, Email, Phone, MobilePhone,
-  AccountId, Account.Name, Account.Type, Account.Industry,
-  Title, LeadSource,
-  LinkedIn__c, Facebook__c, Twitter__c,
-  Total_Spend_to_Date__c, Total_Won_Opportunities__c,
-  Tags__c, Interests__c, Recent_Note__c, Score__c,
-  Work_Email__c, Secondary_Email__c,
-  OwnerId, Owner.Name,
-  CreatedDate, LastActivityDate
-`.trim()
+const CONTACT_STANDARD_FIELDS = [
+  'Id',
+  'Name',
+  'FirstName',
+  'LastName',
+  'Email',
+  'Phone',
+  'MobilePhone',
+  'AccountId',
+  'Account.Name',
+  'Account.Type',
+  'Account.Industry',
+  'Title',
+  'LeadSource',
+  'OwnerId',
+  'Owner.Name',
+  'CreatedDate',
+  'LastActivityDate',
+]
+
+const CONTACT_OPTIONAL_FIELDS = [
+  'LinkedIn__c',
+  'Facebook__c',
+  'Twitter__c',
+  'Total_Spend_to_Date__c',
+  'Total_Won_Opportunities__c',
+  'Tags__c',
+  'Interests__c',
+  'Recent_Note__c',
+  'Score__c',
+  'Work_Email__c',
+  'Secondary_Email__c',
+]
+
+const DESCRIBE_CACHE_TTL_MS = 60 * 60 * 1000
+const describeFieldCache = new Map<string, { expiresAt: number; fields: Set<string> }>()
+
+async function getObjectFieldNames(objectType: string): Promise<Set<string> | null> {
+  const cached = describeFieldCache.get(objectType)
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.fields
+  }
+
+  try {
+    const description = await describeObject(objectType)
+    const fields = new Set(description.fields.map((field) => field.name))
+    describeFieldCache.set(objectType, {
+      fields,
+      expiresAt: Date.now() + DESCRIBE_CACHE_TTL_MS,
+    })
+    return fields
+  } catch (error) {
+    console.warn(`Failed to describe ${objectType}, falling back to standard fields:`, error)
+    return null
+  }
+}
+
+function hasObjectField(fieldNames: Set<string> | null, fieldName: string): boolean {
+  return fieldNames?.has(fieldName) ?? false
+}
+
+function buildContactSelectFields(fieldNames: Set<string> | null): string {
+  if (!fieldNames) return CONTACT_STANDARD_FIELDS.join(',\n  ')
+  return [
+    ...CONTACT_STANDARD_FIELDS,
+    ...CONTACT_OPTIONAL_FIELDS.filter((field) => fieldNames.has(field)),
+  ].join(',\n  ')
+}
+
+function buildContactSearchClause(search: string, fieldNames: Set<string> | null): string {
+  const s = sanitizeSoqlValue(search)
+  const searchTerms = [
+    `Name LIKE '%${s}%'`,
+    `Email LIKE '%${s}%'`,
+    `Account.Name LIKE '%${s}%'`,
+  ]
+
+  if (hasObjectField(fieldNames, 'Work_Email__c')) {
+    searchTerms.push(`Work_Email__c LIKE '%${s}%'`)
+  }
+  if (hasObjectField(fieldNames, 'Secondary_Email__c')) {
+    searchTerms.push(`Secondary_Email__c LIKE '%${s}%'`)
+  }
+
+  return `(${searchTerms.join(' OR ')})`
+}
 
 // ──────────────────────────────────────────────
 // LEADS
@@ -508,7 +587,7 @@ export async function getLeads(filters?: LeadFilters): Promise<SalesforceLead[]>
     FROM Lead
     WHERE ${whereClause}
     ORDER BY LastActivityDate DESC NULLS LAST
-    LIMIT 500
+    LIMIT 2000
   `.trim()
 
   const result = await query<SalesforceLead>(soql)
@@ -624,8 +703,11 @@ export async function getEventsWithInventory(): Promise<SalesforceEventRecord[]>
   const soql = `
     SELECT ${EVENT_SELECT_FIELDS}
     FROM Event__c
+    WHERE Start_Date__c = null
+      OR Start_Date__c >= LAST_N_DAYS:365
+      OR End_Date__c >= TODAY
     ORDER BY Start_Date__c ASC NULLS LAST
-    LIMIT 200
+    LIMIT 1000
   `.trim()
 
   const result = await query<SalesforceEventRecord>(soql)
@@ -651,20 +733,21 @@ export async function getEventOpportunities(eventId: string): Promise<Salesforce
 // ──────────────────────────────────────────────
 
 export async function getContacts(filters?: ClientFilters): Promise<SalesforceContact[]> {
+  const contactFields = await getObjectFieldNames('Contact')
+  const selectFields = buildContactSelectFields(contactFields)
   let whereClause = 'Id != null'
 
   if (filters?.search) {
-    const s = sanitizeSoqlValue(filters.search)
-    whereClause += ` AND (Name LIKE '%${s}%' OR Email LIKE '%${s}%' OR Work_Email__c LIKE '%${s}%' OR Secondary_Email__c LIKE '%${s}%' OR Account.Name LIKE '%${s}%')`
+    whereClause += ` AND ${buildContactSearchClause(filters.search, contactFields)}`
   }
   if (filters?.ownerId) {
     validateSalesforceId(filters.ownerId, 'ownerId')
     whereClause += ` AND OwnerId = '${filters.ownerId}'`
   }
-  if (filters?.minSpend) {
+  if (filters?.minSpend && hasObjectField(contactFields, 'Total_Spend_to_Date__c')) {
     whereClause += ` AND Total_Spend_to_Date__c >= ${validateNumber(filters.minSpend, 'minSpend')}`
   }
-  if (filters?.maxSpend) {
+  if (filters?.maxSpend && hasObjectField(contactFields, 'Total_Spend_to_Date__c')) {
     whereClause += ` AND Total_Spend_to_Date__c <= ${validateNumber(filters.maxSpend, 'maxSpend')}`
   }
   if (filters?.view === 'personal') {
@@ -672,7 +755,7 @@ export async function getContacts(filters?: ClientFilters): Promise<SalesforceCo
   } else if (filters?.view === 'business') {
     whereClause += ` AND Account.IsPersonAccount = false`
   }
-  if (filters?.interests) {
+  if (filters?.interests && hasObjectField(contactFields, 'Interests__c')) {
     const interestTerms = filters.interests.split(',').map(i => i.trim()).filter(Boolean)
     for (const term of interestTerms) {
       const it = sanitizeSoqlValue(term)
@@ -682,9 +765,13 @@ export async function getContacts(filters?: ClientFilters): Promise<SalesforceCo
 
   // Determine ORDER BY based on sortBy
   let orderBy = 'LastActivityDate DESC NULLS LAST'
-  if (filters?.sortBy === 'spend') orderBy = 'Total_Spend_to_Date__c DESC NULLS LAST'
-  else if (filters?.sortBy === 'name') orderBy = 'Name ASC'
-  else if (filters?.sortBy === 'created') orderBy = 'CreatedDate DESC'
+  if (filters?.sortBy === 'spend' && hasObjectField(contactFields, 'Total_Spend_to_Date__c')) {
+    orderBy = 'Total_Spend_to_Date__c DESC NULLS LAST'
+  } else if (filters?.sortBy === 'name') {
+    orderBy = 'Name ASC'
+  } else if (filters?.sortBy === 'created') {
+    orderBy = 'CreatedDate DESC'
+  }
 
   // If noteKeyword filter, find matching contact IDs from notes first
   if (filters?.noteKeyword) {
@@ -705,7 +792,7 @@ export async function getContacts(filters?: ClientFilters): Promise<SalesforceCo
   }
 
   const soql = `
-    SELECT ${CONTACT_SELECT_FIELDS}
+    SELECT ${selectFields}
     FROM Contact
     WHERE ${whereClause}
     ORDER BY ${orderBy}
@@ -719,16 +806,10 @@ export async function getContacts(filters?: ClientFilters): Promise<SalesforceCo
     // Fallback: retry with only standard Contact fields
     console.warn('Contacts query failed, retrying with standard fields only:', err)
       const fallbackSoql = `
-        SELECT Id, Name, FirstName, LastName, Email, Phone, MobilePhone,
-        AccountId, Account.Name, Title,
-        Total_Spend_to_Date__c, Total_Won_Opportunities__c,
-        Tags__c, Interests__c, Recent_Note__c, Score__c,
-        LinkedIn__c,
-        OwnerId, Owner.Name,
-        CreatedDate, LastActivityDate
+        SELECT ${CONTACT_STANDARD_FIELDS.join(',\n        ')}
       FROM Contact
       WHERE ${whereClause}
-      ORDER BY ${orderBy}
+      ORDER BY ${orderBy.includes('Total_Spend_to_Date__c') ? 'LastActivityDate DESC NULLS LAST' : orderBy}
       LIMIT 200
     `.trim()
     result = await query<SalesforceContact>(fallbackSoql)
@@ -738,8 +819,9 @@ export async function getContacts(filters?: ClientFilters): Promise<SalesforceCo
 
 export async function getContactDetail(contactId: string): Promise<SalesforceContact> {
   validateSalesforceId(contactId, 'contactId')
+  const contactFields = await getObjectFieldNames('Contact')
   const soql = `
-    SELECT ${CONTACT_SELECT_FIELDS}
+    SELECT ${buildContactSelectFields(contactFields)}
     FROM Contact
     WHERE Id = '${contactId}'
     LIMIT 1
@@ -791,24 +873,13 @@ export interface ChannelAttribution {
 }
 
 export async function getChannelAttribution(): Promise<ChannelAttribution[]> {
-  // Can't use GROUP BY with formula fields, so fetch records and aggregate in-code
-  const soql = `
-    SELECT Id, Amount, Gross_Amount__c, LeadSource
-    FROM Opportunity
-    WHERE StageName IN ('Agreement Signed', 'Amended', 'Amendment Signed')
-      AND CloseDate >= THIS_YEAR
-      AND LeadSource != null
-    LIMIT 2000
-  `.trim()
-
-  const result = await query<{ Id: string; Amount: number | null; Gross_Amount__c: number | null; LeadSource: string }>(soql)
-
+  const deals = await fetchDealsForPeriod('year')
   const sourceMap = new Map<string, { totalDeals: number; totalRevenue: number }>()
-  for (const r of result.records) {
-    const source = r.LeadSource || 'Unknown'
+  for (const deal of deals) {
+    const source = deal.LeadSource?.trim() || 'Unattributed'
     const existing = sourceMap.get(source) || { totalDeals: 0, totalRevenue: 0 }
     existing.totalDeals += 1
-    existing.totalRevenue += r.Gross_Amount__c ?? r.Amount ?? 0
+    existing.totalRevenue += grossAmount(deal)
     sourceMap.set(source, existing)
   }
 
@@ -833,31 +904,17 @@ export interface RepPerformance {
 }
 
 export async function getRepPerformance(): Promise<RepPerformance[]> {
-  const soql = `
-    SELECT Id, Amount, Gross_Amount__c, OwnerId, Owner.Name, Owner.Email, Total_Number_of_Guests__c
-    FROM Opportunity
-    WHERE StageName IN ('Agreement Signed', 'Amended', 'Amendment Signed')
-      AND CloseDate >= THIS_YEAR
-    LIMIT 2000
-  `.trim()
-
-  const result = await query<{
-    Id: string; Amount: number | null; Gross_Amount__c: number | null;
-    OwnerId: string;
-    Owner: { Name: string; Email?: string } | null;
-    Total_Number_of_Guests__c: number | null
-  }>(soql)
-
+  const deals = await fetchDealsForPeriod('year')
   const repMap = new Map<string, RepPerformance>()
-  for (const r of result.records) {
-    const name = r.Owner?.Name || 'Unknown'
-    const email = r.Owner?.Email || ''
-    const ownerId = r.OwnerId || ''
+  for (const deal of deals) {
+    const name = deal.Owner?.Name || 'Unknown'
+    const email = deal.Owner?.Email || ''
+    const ownerId = deal.OwnerId || ''
     const key = email || name
     const existing = repMap.get(key) || { name, email, ownerId, totalDeals: 0, totalRevenue: 0, avgDealSize: 0, totalGuests: 0 }
     existing.totalDeals += 1
-    existing.totalRevenue += r.Gross_Amount__c ?? r.Amount ?? 0
-    existing.totalGuests += r.Total_Number_of_Guests__c ?? 0
+    existing.totalRevenue += grossAmount(deal)
+    existing.totalGuests += deal.Total_Number_of_Guests__c ?? 0
     if (!existing.ownerId && ownerId) existing.ownerId = ownerId
     repMap.set(key, existing)
   }
@@ -876,28 +933,22 @@ export interface EventPerformance {
 }
 
 export async function getEventPerformance(): Promise<EventPerformance[]> {
-  const soql = `
-    SELECT Id, Amount, Gross_Amount__c, Event__r.Name, Event__r.Category__c
-    FROM Opportunity
-    WHERE StageName IN ('Agreement Signed', 'Amended', 'Amendment Signed')
-      AND CloseDate >= THIS_YEAR
-      AND Event__c != null
-    LIMIT 2000
-  `.trim()
-
-  const result = await query<{
-    Id: string; Amount: number | null; Gross_Amount__c: number | null;
-    Event__r: { Name: string; Category__c?: string } | null
-  }>(soql)
-
+  const deals = await fetchDealsForPeriod('year')
   const eventMap = new Map<string, EventPerformance>()
-  for (const r of result.records) {
-    const name = r.Event__r?.Name || 'Unknown'
-    const existing = eventMap.get(name) || { eventName: name, eventCategory: r.Event__r?.Category__c || null, totalDeals: 0, totalRevenue: 0, totalGross: 0 }
+  for (const deal of deals) {
+    if (!deal.Event__r?.Name) continue
+    const key = `${deal.Event__r.Name}::${deal.Event__r.Category__c || ''}`
+    const existing = eventMap.get(key) || {
+      eventName: deal.Event__r.Name,
+      eventCategory: deal.Event__r.Category__c || null,
+      totalDeals: 0,
+      totalRevenue: 0,
+      totalGross: 0,
+    }
     existing.totalDeals += 1
-    existing.totalRevenue += r.Amount ?? 0
-    existing.totalGross += r.Gross_Amount__c ?? r.Amount ?? 0
-    eventMap.set(name, existing)
+    existing.totalRevenue += deal.Amount ?? 0
+    existing.totalGross += grossAmount(deal)
+    eventMap.set(key, existing)
   }
 
   return Array.from(eventMap.values()).sort((a, b) => b.totalGross - a.totalGross)
@@ -1254,10 +1305,10 @@ export async function deleteNote(noteId: string): Promise<void> {
  * Get contacts for note creation (lightweight query for picker)
  */
 export async function getContactsForPicker(search?: string): Promise<{ Id: string; Name: string; Email: string | null; Account: { Name: string } | null }[]> {
+  const contactFields = await getObjectFieldNames('Contact')
   let whereClause = 'Id != null'
   if (search) {
-    const s = sanitizeSoqlValue(search)
-    whereClause += ` AND (Name LIKE '%${s}%' OR Email LIKE '%${s}%' OR Work_Email__c LIKE '%${s}%' OR Secondary_Email__c LIKE '%${s}%')`
+    whereClause += ` AND ${buildContactSearchClause(search, contactFields)}`
   }
 
   const soql = `
@@ -1412,6 +1463,7 @@ export async function getCallableLeads(filters?: DialerFilters): Promise<Salesfo
  * Get contacts with phone numbers for the dialer
  */
 export async function getCallableContacts(filters?: DialerFilters): Promise<SalesforceContact[]> {
+  const contactFields = await getObjectFieldNames('Contact')
   const conditions: string[] = [
     '(Phone != null OR MobilePhone != null)',
   ]
@@ -1420,11 +1472,15 @@ export async function getCallableContacts(filters?: DialerFilters): Promise<Sale
     validateSalesforceId(filters.ownerId, 'ownerId')
     conditions.push(`OwnerId = '${filters.ownerId}'`)
   }
-  if (filters?.minSpend) conditions.push(`Total_Spend_to_Date__c >= ${validateNumber(filters.minSpend, 'minSpend')}`)
-  if (filters?.maxSpend) conditions.push(`Total_Spend_to_Date__c <= ${validateNumber(filters.maxSpend, 'maxSpend')}`)
+  if (filters?.minSpend && hasObjectField(contactFields, 'Total_Spend_to_Date__c')) {
+    conditions.push(`Total_Spend_to_Date__c >= ${validateNumber(filters.minSpend, 'minSpend')}`)
+  }
+  if (filters?.maxSpend && hasObjectField(contactFields, 'Total_Spend_to_Date__c')) {
+    conditions.push(`Total_Spend_to_Date__c <= ${validateNumber(filters.maxSpend, 'maxSpend')}`)
+  }
 
   const soql = `
-    SELECT ${CONTACT_SELECT_FIELDS}
+    SELECT ${buildContactSelectFields(contactFields)}
     FROM Contact
     WHERE ${conditions.join(' AND ')}
     ORDER BY LastActivityDate ASC NULLS FIRST

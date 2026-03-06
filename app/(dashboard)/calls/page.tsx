@@ -26,7 +26,6 @@ import {
   Briefcase,
   CalendarCheck,
   UserPlus,
-  CurrencyGbp,
   Confetti,
 } from "@phosphor-icons/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -791,6 +790,7 @@ export default function CallsPage() {
   const [period, setPeriod] = useState<CallPeriod>("today");
   const [callData, setCallData] = useState<CallDataResponse | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [periodLoading, setPeriodLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -804,6 +804,7 @@ export default function CallsPage() {
   // Digest tab state
   const [digest, setDigest] = useState<DailyDigest | null>(null);
   const [digestLoading, setDigestLoading] = useState(false);
+  const [digestError, setDigestError] = useState<string | null>(null);
 
   // Event recap state
   const [eventRecap, setEventRecap] = useState<EventRecapData | null>(null);
@@ -821,6 +822,7 @@ export default function CallsPage() {
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hasFetchedOnce = useRef(false);
+  const previousPeriodRef = useRef<CallPeriod | null>(null);
 
   useEffect(() => {
     if (!loading && !user) router.push("/auth/signin");
@@ -867,6 +869,7 @@ export default function CallsPage() {
           setError("Failed to load call data. Check Aircall connection.");
       } finally {
         setInitialLoading(false);
+        setPeriodLoading(false);
         setIsRefreshing(false);
       }
     },
@@ -874,8 +877,18 @@ export default function CallsPage() {
   );
 
   useEffect(() => {
-    if (user) fetchCallData(hasFetchedOnce.current);
-  }, [user, fetchCallData]);
+    if (!user) return;
+
+    const isPeriodChange =
+      previousPeriodRef.current !== null && previousPeriodRef.current !== period;
+
+    if (isPeriodChange) {
+      setPeriodLoading(true);
+    }
+
+    previousPeriodRef.current = period;
+    fetchCallData(hasFetchedOnce.current);
+  }, [user, period, fetchCallData]);
 
   useEffect(() => {
     if (!user) return;
@@ -918,6 +931,7 @@ export default function CallsPage() {
 
   const generateDigest = async (forceRefresh = false) => {
     setDigestLoading(true);
+    setDigestError(null);
 
     try {
       const response = await fetch("/api/calls/digest", {
@@ -930,9 +944,11 @@ export default function CallsPage() {
         setDigest(result.data);
       } else {
         console.error("Digest generation failed:", result.error);
+        setDigestError(result.error || "Failed to generate digest.");
       }
     } catch (err) {
       console.error("Error generating digest:", err);
+      setDigestError("Failed to generate digest.");
     } finally {
       setDigestLoading(false);
     }
@@ -1120,7 +1136,12 @@ export default function CallsPage() {
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  {p.label}
+                  <span className="flex items-center gap-2">
+                    {period === p.key && periodLoading && (
+                      <SpinnerGap className="size-3.5 animate-spin" />
+                    )}
+                    {p.label}
+                  </span>
                 </button>
               ))}
             </div>
@@ -1186,6 +1207,17 @@ export default function CallsPage() {
               <button onClick={() => fetchCallData()} className="ml-2 underline hover:opacity-80">
                 Try again
               </button>
+            </motion.div>
+          )}
+
+          {periodLoading && callData && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="px-4 py-3 rounded-xl bg-foreground/[0.03] border border-foreground/[0.06] text-sm text-muted-foreground flex items-center gap-2"
+            >
+              <SpinnerGap className="size-4 animate-spin" />
+              Loading {periodLabel(period)} call data...
             </motion.div>
           )}
 
@@ -1522,7 +1554,7 @@ export default function CallsPage() {
                     <p className="text-sm text-muted-foreground mt-1">
                       {digest
                         ? `Generated ${new Date(digest.generated_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`
-                        : "Analyse all meaningful calls and generate team-wide insights"}
+                        : "Build a digest from cached call activity, today's recap, and stored transcripts"}
                     </p>
                   </div>
                   <button
@@ -1539,6 +1571,16 @@ export default function CallsPage() {
                   </button>
                 </motion.div>
 
+                {digestError && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-600 dark:text-red-300"
+                  >
+                    {digestError}
+                  </motion.div>
+                )}
+
                 {digestLoading && !digest ? (
                   <motion.div
                     initial={{ opacity: 0 }}
@@ -1548,7 +1590,7 @@ export default function CallsPage() {
                     <MagicWand className="size-12 text-primary mx-auto mb-4 animate-pulse" />
                     <p className="text-lg font-semibold mb-2">Generating AI Digest</p>
                     <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                      Analysing call transcripts, detecting patterns, and generating team-wide insights. This may take 30-60 seconds...
+                      Building a digest from cached call activity, today&apos;s recap, and any stored transcripts.
                     </p>
                   </motion.div>
                 ) : digest ? (
@@ -1806,7 +1848,7 @@ export default function CallsPage() {
                     <MagicWand className="size-12 mx-auto mb-4 opacity-20" />
                     <p className="text-lg font-semibold mb-1">No digest generated yet</p>
                     <p className="text-sm mb-4">
-                      Click Generate to create an AI digest of {periodLabel(period)}&apos;s calls
+                      Click Generate to create a digest of {periodLabel(period)} call activity and today&apos;s sales recap
                     </p>
                     <button
                       onClick={() => generateDigest()}

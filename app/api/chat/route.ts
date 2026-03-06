@@ -20,18 +20,15 @@ import {
   getAccountFinancials,
   getPaymentPlanProgress,
   getCreditAccounts,
-  getDealsClosedToday,
-  getLeadsCreatedToday,
   getUpcomingEvents,
   updateLead,
   updateOpportunityStage,
   createNote,
   type SalesPeriod,
 } from '@/lib/salesforce'
+import { getCallDashboardData } from '@/lib/call-dashboard'
+import { generateEventRecap } from '@/lib/event-recap'
 import {
-  getCallsForPeriod,
-  computeCallStats,
-  computeRepStats,
   listUsers,
 } from '@/lib/aircall'
 
@@ -271,10 +268,15 @@ export async function POST(req: Request) {
         }),
         execute: async ({ period }) => {
           try {
-            const calls = await getCallsForPeriod(period)
-            const stats = computeCallStats(calls)
-            const repStats = computeRepStats(calls)
-            return { period, stats, repStats: repStats.slice(0, 15) }
+            const { data, cached, stale } = await getCallDashboardData(period)
+            return {
+              period,
+              stats: data.stats,
+              repStats: data.repStats.slice(0, 15),
+              recentCalls: data.recentCalls.slice(0, 10),
+              cached,
+              stale,
+            }
           } catch (error) {
             return { error: `Failed to fetch call data: ${error instanceof Error ? error.message : 'Unknown error'}` }
           }
@@ -329,19 +331,19 @@ export async function POST(req: Request) {
         }),
         execute: async ({ upcomingDays }) => {
           try {
-            const [closedToday, newLeadsToday, upcomingEvents] = await Promise.all([
-              getDealsClosedToday(),
-              getLeadsCreatedToday(),
-              getUpcomingEvents(upcomingDays || 7),
-            ])
+            const recap = await generateEventRecap(false)
+            const upcomingEvents = upcomingDays && upcomingDays !== 7
+              ? await getUpcomingEvents(upcomingDays)
+              : recap.upcomingEvents
             return {
               closedToday: {
-                count: closedToday.length,
-                totalValue: closedToday.reduce((s, d) => s + (d.Gross_Amount__c || d.Amount || 0), 0),
-                deals: closedToday,
+                count: recap.dealsClosedToday.length,
+                totalValue: recap.totalDealValue,
+                deals: recap.dealsClosedToday,
               },
-              newLeadsToday,
+              newLeadsToday: recap.leadsCreatedToday,
               upcomingEvents: { count: upcomingEvents.length, events: upcomingEvents },
+              callStats: recap.callStats,
             }
           } catch (error) {
             return { error: `Failed to fetch daily recap: ${error instanceof Error ? error.message : 'Unknown error'}` }

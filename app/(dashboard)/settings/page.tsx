@@ -455,11 +455,13 @@ function NotifToggle({
         aria-checked={checked}
         onClick={onChange}
         className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ml-4 ${
-          checked ? "bg-primary" : "bg-muted"
+          checked ? "bg-white border border-foreground/15" : "bg-muted"
         }`}
       >
         <span
-          className={`inline-block size-4 transform rounded-full bg-white shadow-sm transition-transform ${
+          className={`inline-block size-4 transform rounded-full shadow-sm transition-transform ${
+            checked ? "bg-black" : "bg-white"
+          } ${
             checked ? "translate-x-6" : "translate-x-1"
           }`}
         />

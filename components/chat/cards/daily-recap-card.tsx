@@ -36,14 +36,19 @@ export function DailyRecapCard({ data }: { data: any }) {
                 <span className="text-sm text-muted-foreground">deals worth {formatCurrency(closedToday.totalValue)}</span>
               </div>
               <div className="space-y-1">
-                {closedToday.deals?.slice(0, 5).map((deal: any) => (
-                  <div key={deal.Id} className="flex items-center justify-between text-sm">
-                    <span className="text-foreground truncate mr-2">{deal.Name}</span>
-                    <span className="text-muted-foreground tabular-nums font-medium">
-                      {formatCurrency(deal.Gross_Amount__c || deal.Amount || 0)}
-                    </span>
-                  </div>
-                ))}
+                {closedToday.deals?.slice(0, 5).map((deal: any, index: number) => {
+                  const key = deal.Id || `${deal.name || deal.Name}-${index}`
+                  const name = deal.Name || deal.name || 'Deal'
+                  const amount = deal.Gross_Amount__c || deal.Amount || deal.amount || 0
+                  return (
+                    <div key={key} className="flex items-center justify-between text-sm">
+                      <span className="text-foreground truncate mr-2">{name}</span>
+                      <span className="text-muted-foreground tabular-nums font-medium">
+                        {formatCurrency(amount)}
+                      </span>
+                    </div>
+                  )
+                })}
               </div>
             </>
           ) : (
@@ -70,16 +75,20 @@ export function DailyRecapCard({ data }: { data: any }) {
               </p>
             </div>
             <div className="space-y-1">
-              {upcomingEvents.events?.slice(0, 5).map((event: any) => (
-                <div key={event.Id} className="flex items-center justify-between text-sm">
-                  <span className="text-foreground truncate mr-2">{event.Name}</span>
-                  {event.Start_Date__c && (
+              {upcomingEvents.events?.slice(0, 5).map((event: any, index: number) => {
+                const key = event.Id || `${event.name || event.Name}-${index}`
+                const name = event.Name || event.name || 'Event'
+                const startDate = event.Start_Date__c || event.startDate
+                return (
+                <div key={key} className="flex items-center justify-between text-sm">
+                  <span className="text-foreground truncate mr-2">{name}</span>
+                  {startDate && (
                     <span className="text-xs text-muted-foreground whitespace-nowrap">
-                      {new Date(event.Start_Date__c).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                      {new Date(startDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
                     </span>
                   )}
                 </div>
-              ))}
+              )})}
             </div>
           </div>
         )}

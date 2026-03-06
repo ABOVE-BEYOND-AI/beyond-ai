@@ -1,15 +1,54 @@
 import { NextRequest, NextResponse } from 'next/server'
-import {
-  getCallsForPeriod,
-  getCall,
-} from '@/lib/aircall'
-import { analyseCall, generateDailyDigest, type CallAnalysis } from '@/lib/call-analysis'
 import { Redis } from '@upstash/redis'
-import OpenAI from 'openai'
+import { getCallDashboardData, type CallPeriod } from '@/lib/call-dashboard'
+import { generateEventRecap } from '@/lib/event-recap'
+import { getRecentTranscripts } from '@/lib/transcript-store'
 import { apiErrorResponse, requireApiUser } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 300 // 5 minutes — digest analyses multiple calls
+export const maxDuration = 60
+
+interface DigestPayload {
+  period: string
+  generated_at: string
+  total_calls_analysed: number
+  team_summary: string
+  top_objections: {
+    objection: string
+    frequency: number
+    suggested_response: string
+  }[]
+  winning_pitches: {
+    description: string
+    rep: string
+    context: string
+  }[]
+  event_demand: {
+    event: string
+    mentions: number
+    sentiment: string
+  }[]
+  competitor_intelligence: {
+    competitor: string
+    mentions: number
+    context: string
+  }[]
+  follow_up_gaps: {
+    rep: string
+    description: string
+  }[]
+  coaching_highlights: {
+    rep: string
+    type: 'strength' | 'improvement'
+    description: string
+  }[]
+  key_deals: {
+    contact: string
+    rep: string
+    status: string
+    next_steps: string
+  }[]
+}
 
 function getRedis(): Redis | null {
   const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL
@@ -18,190 +57,207 @@ function getRedis(): Redis | null {
   return new Redis({ url, token })
 }
 
-function getOpenAI(): OpenAI {
-  if (!process.env.OPENAI_API_KEY) throw new Error('Missing OPENAI_API_KEY')
-  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+function periodLabel(period: CallPeriod): string {
+  if (period === 'today') return 'Today'
+  if (period === 'week') return 'This Week'
+  return 'This Month'
 }
 
-const ANALYSIS_KEY = (callId: number) => `call_analysis:${callId}`
-const DIGEST_KEY = (date: string, period: string) => `daily_digest:${date}:${period}`
-const CACHE_TTL = 60 * 60 * 2 // 2 hours
-
-async function transcribeRecording(recordingUrl: string, agentName: string, contactName: string): Promise<string> {
-  const response = await fetch(recordingUrl)
-  if (!response.ok) throw new Error(`Failed to download recording: ${response.status}`)
-
-  const arrayBuffer = await response.arrayBuffer()
-  const blob = new Blob([arrayBuffer], { type: 'audio/mpeg' })
-  const file = new File([blob], 'recording.mp3', { type: 'audio/mpeg' })
-
-  const openai = getOpenAI()
-  const transcription = await openai.audio.transcriptions.create({
-    model: 'whisper-1',
-    file,
-    language: 'en',
-    response_format: 'verbose_json',
-    prompt: `Sales call between ${agentName} and ${contactName} at Above and Beyond luxury hospitality company.`,
-  })
-
-  if ('segments' in transcription && Array.isArray(transcription.segments)) {
-    return transcription.segments
-      .map((seg: { start: number; text: string }) => {
-        const mins = Math.floor(seg.start / 60)
-        const secs = Math.floor(seg.start % 60)
-        return `[${mins}:${secs.toString().padStart(2, '0')}] ${seg.text.trim()}`
-      })
-      .join('\n')
+function periodStartTimestamp(period: CallPeriod): number {
+  const now = new Date()
+  if (period === 'today') {
+    return Math.floor(new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 1000)
   }
-  return transcription.text
+  if (period === 'week') {
+    const day = now.getDay()
+    return Math.floor(
+      new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((day + 6) % 7)).getTime() / 1000
+    )
+  }
+  return Math.floor(new Date(now.getFullYear(), now.getMonth(), 1).getTime() / 1000)
+}
+
+const DIGEST_KEY = (date: string, period: CallPeriod) => `daily_digest:${date}:${period}`
+const CACHE_TTL = 60 * 15
+
+function buildTeamSummary(input: {
+  period: CallPeriod
+  totalCalls: number
+  answeredCalls: number
+  meaningfulCalls: number
+  topRepName: string | null
+  topRepCalls: number
+  topRepAnswerRate: number | null
+  dealsClosedToday: number
+  dealValueToday: number
+  transcriptCount: number
+}): string {
+  const lines: string[] = []
+  const answerRate = input.totalCalls > 0
+    ? Math.round((input.answeredCalls / input.totalCalls) * 100)
+    : 0
+
+  lines.push(
+    `${periodLabel(input.period)} logged ${input.totalCalls} calls with ${input.answeredCalls} answered (${answerRate}% answer rate) and ${input.meaningfulCalls} meaningful conversations over three minutes.`
+  )
+
+  if (input.topRepName && input.topRepCalls > 0) {
+    const repAnswerRate = input.topRepAnswerRate === null ? '' : `, ${Math.round(input.topRepAnswerRate * 100)}% answered`
+    lines.push(`${input.topRepName} led call volume with ${input.topRepCalls} calls${repAnswerRate}.`)
+  }
+
+  if (input.dealsClosedToday > 0) {
+    lines.push(
+      `Sales closed ${input.dealsClosedToday} deal${input.dealsClosedToday === 1 ? '' : 's'} today worth £${Math.round(input.dealValueToday).toLocaleString()}.`
+    )
+  }
+
+  if (input.transcriptCount === 0) {
+    lines.push('Transcript-level AI insights are limited because no stored transcripts are available yet, so this digest is based on cached call activity and the live sales recap.')
+  } else {
+    lines.push(`${input.transcriptCount} stored transcript${input.transcriptCount === 1 ? '' : 's'} from this period are available for deeper follow-up and objection review.`)
+  }
+
+  return lines.join(' ')
+}
+
+function buildFollowUpGaps(repStats: Awaited<ReturnType<typeof getCallDashboardData>>['data']['repStats']) {
+  return repStats
+    .filter((rep) => rep.total_calls >= 4)
+    .map((rep) => ({
+      rep: rep.name,
+      answeredRate: rep.total_calls > 0 ? rep.answered_calls / rep.total_calls : 0,
+      outboundShare: rep.total_calls > 0 ? rep.outbound_calls / rep.total_calls : 0,
+    }))
+    .filter((rep) => rep.answeredRate < 0.45 || rep.outboundShare > 0.8)
+    .slice(0, 3)
+    .map((rep) => ({
+      rep: rep.rep,
+      description:
+        rep.answeredRate < 0.45
+          ? 'Low answer rate this period. Review callback timing and prioritise warm follow-ups before pushing new outbound volume.'
+          : 'Heavy outbound skew. Check whether callbacks and same-day follow-ups are being closed out after first contact.',
+    }))
+}
+
+function buildCoachingHighlights(repStats: Awaited<ReturnType<typeof getCallDashboardData>>['data']['repStats']) {
+  const highlights: DigestPayload['coaching_highlights'] = []
+  const topRep = repStats[0]
+
+  if (topRep && topRep.total_calls > 0) {
+    highlights.push({
+      rep: topRep.name,
+      type: 'strength',
+      description: `Led the team on call volume with ${topRep.total_calls} calls and an average duration of ${Math.round(topRep.avg_duration / 60)} minutes.`,
+    })
+  }
+
+  for (const rep of repStats) {
+    if (highlights.length >= 3) break
+    const answerRate = rep.total_calls > 0 ? rep.answered_calls / rep.total_calls : 0
+    if (rep.total_calls >= 4 && answerRate < 0.45) {
+      highlights.push({
+        rep: rep.name,
+        type: 'improvement',
+        description: 'Answer rate is lagging behind team pace. Tighten call windows and prioritise contacts with recent engagement.',
+      })
+    }
+  }
+
+  return highlights
+}
+
+function buildEventDemand(recap: Awaited<ReturnType<typeof generateEventRecap>>) {
+  const dealsByEvent = new Map<string, number>()
+  for (const deal of recap.dealsClosedToday) {
+    dealsByEvent.set(deal.event, (dealsByEvent.get(deal.event) || 0) + 1)
+  }
+
+  return recap.upcomingEvents
+    .map((event) => ({
+      event: event.name,
+      mentions: dealsByEvent.get(event.name) || 0,
+      sentiment:
+        event.percentageToTarget !== null && event.percentageToTarget < 50
+          ? 'Upcoming event is still behind target and needs sales attention.'
+          : 'Upcoming event is tracking steadily based on current booked revenue.',
+    }))
+    .filter((event) => event.mentions > 0)
+    .slice(0, 5)
+}
+
+function buildKeyDeals(recap: Awaited<ReturnType<typeof generateEventRecap>>): DigestPayload['key_deals'] {
+  return recap.dealsClosedToday.slice(0, 5).map((deal) => ({
+    contact: deal.name,
+    rep: deal.owner,
+    status: `Closed today for £${Math.round(deal.amount).toLocaleString()}`,
+    next_steps: `Confirm fulfilment handoff for ${deal.event}.`,
+  }))
 }
 
 export async function POST(request: NextRequest) {
   try {
     await requireApiUser(request)
     const body = await request.json()
-    const period = (body.period || 'today') as 'today' | 'week' | 'month'
+    const period = (body.period || 'today') as CallPeriod
     const forceRefresh = body.force_refresh === true
 
     const redis = getRedis()
     const today = new Date().toISOString().split('T')[0]
 
-    // Check digest cache
     if (!forceRefresh && redis) {
       try {
-        const cachedDigest = await redis.get(DIGEST_KEY(today, period))
+        const cachedDigest = await redis.get<DigestPayload>(DIGEST_KEY(today, period))
         if (cachedDigest) {
           return NextResponse.json({ success: true, data: cachedDigest, cached: true })
         }
-      } catch (cacheErr) {
-        console.warn('Redis digest cache read failed:', cacheErr)
+      } catch (error) {
+        console.warn('Redis digest cache read failed:', error)
       }
     }
 
-    // Fetch all calls for the period
-    const calls = await getCallsForPeriod(period)
+    const [{ data: callData }, recap, recentTranscripts] = await Promise.all([
+      getCallDashboardData(period),
+      generateEventRecap(false),
+      getRecentTranscripts(50),
+    ])
 
-    // Filter to meaningful calls (3+ minutes, answered)
-    const meaningfulCalls = calls.filter(
-      c => c.duration >= 180 && (c.status === 'answered' || c.answered_at)
-    )
+    const startTimestamp = periodStartTimestamp(period)
+    const transcriptsInPeriod = recentTranscripts.filter((transcript) => transcript.startedAt >= startTimestamp)
+    const topRep = callData.repStats[0]
+    const topRepAnswerRate = topRep && topRep.total_calls > 0
+      ? topRep.answered_calls / topRep.total_calls
+      : null
 
-    if (meaningfulCalls.length === 0) {
-      return NextResponse.json({
-        success: true,
-        data: {
-          period: period === 'today' ? 'Today' : period === 'week' ? 'This Week' : 'This Month',
-          generated_at: new Date().toISOString(),
-          total_calls_analysed: 0,
-          team_summary: 'No meaningful calls (2+ minutes) recorded in this period yet.',
-          top_objections: [],
-          winning_pitches: [],
-          event_demand: [],
-          competitor_intelligence: [],
-          follow_up_gaps: [],
-          coaching_highlights: [],
-          key_deals: [],
-        },
-        cached: false,
-      })
+    const digest: DigestPayload = {
+      period: periodLabel(period),
+      generated_at: new Date().toISOString(),
+      total_calls_analysed: callData.meaningfulCallCount,
+      team_summary: buildTeamSummary({
+        period,
+        totalCalls: callData.stats.total_calls,
+        answeredCalls: callData.stats.answered_calls,
+        meaningfulCalls: callData.meaningfulCallCount,
+        topRepName: topRep?.name || null,
+        topRepCalls: topRep?.total_calls || 0,
+        topRepAnswerRate,
+        dealsClosedToday: recap.dealsClosedToday.length,
+        dealValueToday: recap.totalDealValue,
+        transcriptCount: transcriptsInPeriod.length,
+      }),
+      top_objections: [],
+      winning_pitches: [],
+      event_demand: buildEventDemand(recap),
+      competitor_intelligence: [],
+      follow_up_gaps: buildFollowUpGaps(callData.repStats),
+      coaching_highlights: buildCoachingHighlights(callData.repStats),
+      key_deals: buildKeyDeals(recap),
     }
 
-    // Limit to most recent 10 for digest (each needs recording download + Whisper + Claude)
-    const callsToAnalyse = meaningfulCalls.slice(0, 10)
-    const analyses: CallAnalysis[] = []
-
-    for (const call of callsToAnalyse) {
-      try {
-        // Check cache
-        if (redis) {
-          try {
-            const cached = await redis.get<CallAnalysis>(ANALYSIS_KEY(call.id))
-            if (cached) {
-              analyses.push(cached)
-              continue
-            }
-          } catch {
-            // Skip cache
-          }
-        }
-
-        // Fetch fresh call details (for recording URL)
-        const fullCall = await getCall(call.id)
-        if (!fullCall.recording) {
-          console.warn(`No recording for call ${call.id}, skipping`)
-          continue
-        }
-
-        const contactName = fullCall.contact
-          ? [fullCall.contact.first_name, fullCall.contact.last_name].filter(Boolean).join(' ') || 'Contact'
-          : 'Contact'
-        const agentName = fullCall.user?.name || 'Agent'
-
-        console.log(`🎙️ Digest: transcribing call ${call.id} (${call.duration}s) - ${agentName}`)
-
-        // Transcribe recording with Whisper
-        const transcript = await transcribeRecording(fullCall.recording, agentName, contactName)
-        if (transcript.length < 50) continue
-
-        // Analyse with Claude
-        const analysis = await analyseCall({
-          transcript,
-          agentName,
-          contactName,
-          duration: fullCall.duration,
-          direction: fullCall.direction,
-          callId: fullCall.id,
-        })
-
-        analyses.push(analysis)
-
-        // Cache individual analysis (non-blocking)
-        if (redis) {
-          redis.set(ANALYSIS_KEY(call.id), analysis, { ex: 60 * 60 * 24 * 7 }).catch(() => {})
-        }
-      } catch (err) {
-        console.error(`Failed to analyse call ${call.id}:`, err)
-        // Continue with other calls
-      }
-    }
-
-    if (analyses.length === 0) {
-      return NextResponse.json({
-        success: true,
-        data: {
-          period: period === 'today' ? 'Today' : period === 'week' ? 'This Week' : 'This Month',
-          generated_at: new Date().toISOString(),
-          total_calls_analysed: 0,
-          team_summary: 'Calls were found but no recordings were available for analysis. Recording URLs expire after 10 minutes — try again to fetch fresh URLs.',
-          top_objections: [],
-          winning_pitches: [],
-          event_demand: [],
-          competitor_intelligence: [],
-          follow_up_gaps: [],
-          coaching_highlights: [],
-          key_deals: [],
-        },
-        cached: false,
-      })
-    }
-
-    // Get unique rep names
-    const repNames = [...new Set(analyses.map(a => {
-      const matchingCall = callsToAnalyse.find(c => c.id === a.call_id)
-      return matchingCall?.user?.name || 'Unknown'
-    }).filter(n => n !== 'Unknown'))]
-
-    // Generate the team digest
-    const periodLabel = period === 'today' ? 'Today' : period === 'week' ? 'This Week' : 'This Month'
-    const digest = await generateDailyDigest({
-      analyses,
-      repNames,
-      period: periodLabel,
-    })
-
-    // Cache the digest (non-blocking)
     if (redis) {
-      redis.set(DIGEST_KEY(today, period), digest, { ex: CACHE_TTL }).catch(() => {})
+      redis.set(DIGEST_KEY(today, period), digest, { ex: CACHE_TTL }).catch((error) => {
+        console.warn('Redis digest cache write failed:', error)
+      })
     }
 
     return NextResponse.json({ success: true, data: digest, cached: false })

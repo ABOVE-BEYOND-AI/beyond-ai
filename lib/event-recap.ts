@@ -2,7 +2,7 @@
 // Aggregates deals, calls, leads, and upcoming events for end-of-day summary
 
 import { getDealsClosedToday, getLeadsCreatedToday, getUpcomingEvents } from './salesforce'
-import { getTodayCalls, computeCallStats } from './aircall'
+import { getCallDashboardData } from './call-dashboard'
 import { Redis } from '@upstash/redis'
 import type { SalesforceOpportunityFull } from './salesforce-types'
 import type { SalesforceEvent as SalesforceEventRecord } from './salesforce-types'
@@ -106,7 +106,7 @@ export async function generateEventRecap(forceRefresh = false): Promise<EventRec
     getDealsClosedToday(),
     getLeadsCreatedToday(),
     getUpcomingEvents(7),
-    getTodayCalls(),
+    getCallDashboardData('today'),
   ])
 
   // Extract settled values with safe fallbacks
@@ -120,7 +120,7 @@ export async function generateEventRecap(forceRefresh = false): Promise<EventRec
   // Build call stats (optional — Aircall may be unavailable)
   let callStats: EventRecapCallStats | null = null
   if (callsResult.status === 'fulfilled') {
-    const stats = computeCallStats(callsResult.value)
+    const stats = callsResult.value.data.stats
     callStats = {
       total: stats.total_calls,
       inbound: stats.inbound_calls,
