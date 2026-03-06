@@ -535,6 +535,47 @@ function buildContactSearchClause(search: string, fieldNames: Set<string> | null
   return `(${searchTerms.join(' OR ')})`
 }
 
+function buildContactBaseWhereClause(filters: ClientFilters | undefined, contactFields: Set<string> | null): string {
+  let whereClause = 'Id != null'
+
+  if (filters?.search) {
+    whereClause += ` AND ${buildContactSearchClause(filters.search, contactFields)}`
+  }
+  if (filters?.ownerId) {
+    validateSalesforceId(filters.ownerId, 'ownerId')
+    whereClause += ` AND OwnerId = '${filters.ownerId}'`
+  }
+  if (filters?.minSpend && hasObjectField(contactFields, 'Total_Spend_to_Date__c')) {
+    whereClause += ` AND Total_Spend_to_Date__c >= ${validateNumber(filters.minSpend, 'minSpend')}`
+  }
+  if (filters?.maxSpend && hasObjectField(contactFields, 'Total_Spend_to_Date__c')) {
+    whereClause += ` AND Total_Spend_to_Date__c <= ${validateNumber(filters.maxSpend, 'maxSpend')}`
+  }
+  if (filters?.view === 'personal') {
+    whereClause += ` AND Account.IsPersonAccount = true`
+  } else if (filters?.view === 'business') {
+    whereClause += ` AND Account.IsPersonAccount = false`
+  }
+  if (filters?.interests && hasObjectField(contactFields, 'Interests__c')) {
+    const interestTerms = filters.interests.split(',').map((interest) => interest.trim()).filter(Boolean)
+    for (const term of interestTerms) {
+      const escapedTerm = sanitizeSoqlValue(term)
+      whereClause += ` AND Interests__c LIKE '%${escapedTerm}%'`
+    }
+  }
+
+  return whereClause
+}
+
+function buildContactOrderBy(filters: ClientFilters | undefined, contactFields: Set<string> | null): string {
+  if (filters?.sortBy === 'spend' && hasObjectField(contactFields, 'Total_Spend_to_Date__c')) {
+    return 'Total_Spend_to_Date__c DESC NULLS LAST'
+  }
+  if (filters?.sortBy === 'name') return 'Name ASC'
+  if (filters?.sortBy === 'created') return 'CreatedDate DESC'
+  return 'LastActivityDate DESC NULLS LAST'
+}
+
 // ──────────────────────────────────────────────
 // LEADS
 // ──────────────────────────────────────────────
@@ -735,45 +776,11 @@ export async function getEventOpportunities(eventId: string): Promise<Salesforce
 export async function getContacts(filters?: ClientFilters): Promise<SalesforceContact[]> {
   const contactFields = await getObjectFieldNames('Contact')
   const selectFields = buildContactSelectFields(contactFields)
-  let whereClause = 'Id != null'
-
-  if (filters?.search) {
-    whereClause += ` AND ${buildContactSearchClause(filters.search, contactFields)}`
-  }
-  if (filters?.ownerId) {
-    validateSalesforceId(filters.ownerId, 'ownerId')
-    whereClause += ` AND OwnerId = '${filters.ownerId}'`
-  }
-  if (filters?.minSpend && hasObjectField(contactFields, 'Total_Spend_to_Date__c')) {
-    whereClause += ` AND Total_Spend_to_Date__c >= ${validateNumber(filters.minSpend, 'minSpend')}`
-  }
-  if (filters?.maxSpend && hasObjectField(contactFields, 'Total_Spend_to_Date__c')) {
-    whereClause += ` AND Total_Spend_to_Date__c <= ${validateNumber(filters.maxSpend, 'maxSpend')}`
-  }
-  if (filters?.view === 'personal') {
-    whereClause += ` AND Account.IsPersonAccount = true`
-  } else if (filters?.view === 'business') {
-    whereClause += ` AND Account.IsPersonAccount = false`
-  }
-  if (filters?.interests && hasObjectField(contactFields, 'Interests__c')) {
-    const interestTerms = filters.interests.split(',').map(i => i.trim()).filter(Boolean)
-    for (const term of interestTerms) {
-      const it = sanitizeSoqlValue(term)
-      whereClause += ` AND Interests__c LIKE '%${it}%'`
-    }
-  }
-
-  // Determine ORDER BY based on sortBy
-  let orderBy = 'LastActivityDate DESC NULLS LAST'
-  if (filters?.sortBy === 'spend' && hasObjectField(contactFields, 'Total_Spend_to_Date__c')) {
-    orderBy = 'Total_Spend_to_Date__c DESC NULLS LAST'
-  } else if (filters?.sortBy === 'name') {
-    orderBy = 'Name ASC'
-  } else if (filters?.sortBy === 'created') {
-    orderBy = 'CreatedDate DESC'
-  }
+  let whereClause = buildContactBaseWhereClause(filters, contactFields)
+  let orderBy = buildContactOrderBy(filters, contactFields)
 
   // If noteKeyword filter, find matching contact IDs from notes first
+  let noteContactFilter = ''
   if (filters?.noteKeyword) {
     try {
       const nk = sanitizeSoqlValue(filters.noteKeyword)
@@ -785,7 +792,8 @@ export async function getContacts(filters?: ClientFilters): Promise<SalesforceCo
       const noteContactIds = [...new Set(noteResult.records.map(n => n.Contact__c))]
       if (noteContactIds.length === 0) return []
       // noteContactIds come from Salesforce query results, so they are already valid IDs
-      whereClause += ` AND Id IN ('${noteContactIds.join("','")}')`
+      noteContactFilter = ` AND Id IN ('${noteContactIds.join("','")}')`
+      whereClause += noteContactFilter
     } catch {
       // Notes query failed, continue without note filter
     }
@@ -805,11 +813,14 @@ export async function getContacts(filters?: ClientFilters): Promise<SalesforceCo
   } catch (err) {
     // Fallback: retry with only standard Contact fields
     console.warn('Contacts query failed, retrying with standard fields only:', err)
+    describeFieldCache.delete('Contact')
+    whereClause = buildContactBaseWhereClause(filters, null) + noteContactFilter
+    orderBy = buildContactOrderBy(filters, null)
       const fallbackSoql = `
         SELECT ${CONTACT_STANDARD_FIELDS.join(',\n        ')}
       FROM Contact
       WHERE ${whereClause}
-      ORDER BY ${orderBy.includes('Total_Spend_to_Date__c') ? 'LastActivityDate DESC NULLS LAST' : orderBy}
+      ORDER BY ${orderBy}
       LIMIT 200
     `.trim()
     result = await query<SalesforceContact>(fallbackSoql)
@@ -1515,8 +1526,8 @@ export async function getDealsClosedToday(): Promise<SalesforceOpportunityFull[]
  * Get leads generated today
  */
 export async function getLeadsCreatedToday(): Promise<number> {
-  const soql = `SELECT COUNT() total FROM Lead WHERE CreatedDate = TODAY`
-  const result = await query<{ total: number }>(soql)
+  const soql = `SELECT COUNT() FROM Lead WHERE CreatedDate = TODAY`
+  const result = await query<Record<string, never>>(soql)
   return result.totalSize
 }
 
