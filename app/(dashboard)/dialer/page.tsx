@@ -11,7 +11,6 @@ import {
   Funnel,
   CaretLeft,
   CaretRight,
-  X,
   SpinnerGap,
   Play,
   SkipForward,
@@ -195,14 +194,18 @@ export default function DialerPage() {
       const res = await fetch("/api/dialer/call", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: 0, phoneNumber }),
+        body: JSON.stringify({ phoneNumber }),
       });
       const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to initiate call");
+      }
       if (data.success && data.data?.id) {
         setActiveCallId(data.data.id);
       }
-    } catch {
-      // Call initiation is best-effort; the rep can still log outcome
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to initiate call");
+      setCallInProgress(false);
     }
   };
 

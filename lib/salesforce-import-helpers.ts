@@ -55,13 +55,20 @@ async function authenticate(): Promise<{ access_token: string; instance_url: str
  */
 export async function getContactsByEmails(
   emails: string[]
-): Promise<{ Id: string; Name: string; Email: string | null }[]> {
+): Promise<{ Id: string; Name: string; Email: string | null; Work_Email__c?: string | null; Secondary_Email__c?: string | null }[]> {
   if (emails.length === 0) return []
 
   const { access_token, instance_url } = await authenticate()
 
   const emailList = emails.map(e => `'${e.replace(/'/g, "\\'")}'`).join(', ')
-  const soql = `SELECT Id, Name, Email FROM Contact WHERE Email IN (${emailList}) LIMIT 200`
+  const soql = `
+    SELECT Id, Name, Email, Work_Email__c, Secondary_Email__c
+    FROM Contact
+    WHERE Email IN (${emailList})
+      OR Work_Email__c IN (${emailList})
+      OR Secondary_Email__c IN (${emailList})
+    LIMIT 200
+  `.trim()
 
   const response = await fetch(
     `${instance_url}/services/data/v59.0/query?q=${encodeURIComponent(soql)}`,

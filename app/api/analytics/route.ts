@@ -1,10 +1,12 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getChannelAttribution, getRepPerformance, getEventPerformance } from '@/lib/salesforce'
+import { apiErrorResponse, requireApiUser } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    await requireApiUser(request)
     const [channelAttribution, repPerformance, eventPerformance] = await Promise.all([
       getChannelAttribution(),
       getRepPerformance(),
@@ -23,9 +25,6 @@ export async function GET() {
     })
   } catch (error) {
     console.error('Analytics API error:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch analytics', details: process.env.NODE_ENV === 'development' ? String(error) : undefined },
-      { status: 500 },
-    )
+    return apiErrorResponse(error, 'Failed to fetch analytics')
   }
 }

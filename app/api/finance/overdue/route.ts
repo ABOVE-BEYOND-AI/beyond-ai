@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAccountFinancials } from '@/lib/salesforce'
+import { apiErrorResponse, requireApiUser } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    // weeksLimit is accepted as a param but since we query account-level rollups
-    // (not individual invoices), we can't filter by date range on the rollup field.
-    // It's kept for API compatibility if invoice-level filtering is added later.
-    const _weeksLimit = Number(searchParams.get('weeksLimit')) || 16
+    await requireApiUser(request)
+    // weeksLimit remains accepted for backwards compatibility, but the rollups
+    // used here are not date-scoped, so the value is intentionally ignored.
+    new URL(request.url).searchParams.get('weeksLimit')
 
     const accounts = await getAccountFinancials()
 
@@ -28,9 +28,6 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('Overdue API error:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch overdue accounts', details: process.env.NODE_ENV === 'development' ? String(error) : undefined },
-      { status: 500 },
-    )
+    return apiErrorResponse(error, 'Failed to fetch overdue accounts')
   }
 }

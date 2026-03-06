@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runAllGenerators } from '@/lib/notification-generators'
 import { getAllUsers } from '@/lib/redis-database'
+import { apiErrorResponse, requireApiAdmin } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -8,6 +9,14 @@ export const dynamic = 'force-dynamic'
 // Body: { email: string } to run for one user, or empty to run for all users
 export async function POST(req: NextRequest) {
   try {
+    const cronSecret = process.env.CRON_SECRET
+    const authHeader = req.headers.get('authorization')
+    const isCronRequest = !!cronSecret && authHeader === `Bearer ${cronSecret}`
+
+    if (!isCronRequest) {
+      await requireApiAdmin(req)
+    }
+
     const body = await req.json().catch(() => ({})) as { email?: string }
 
     if (body.email) {
@@ -21,7 +30,7 @@ export async function POST(req: NextRequest) {
 
     // Run for all users
     const users = await getAllUsers()
-    const results: Array<{ email: string; staleDeals: number; overduePayments: number; newLeads: number }> = []
+    const results: Array<{ email: string; staleDeals: number; overduePayments: number; newLeads: number; dailyRecap: number }> = []
 
     for (const user of users) {
       const result = await runAllGenerators(user.email)
@@ -34,9 +43,6 @@ export async function POST(req: NextRequest) {
     })
   } catch (error) {
     console.error('Generate notifications error:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to generate notifications' },
-      { status: 500 }
-    )
+    return apiErrorResponse(error, 'Failed to generate notifications')
   }
 }

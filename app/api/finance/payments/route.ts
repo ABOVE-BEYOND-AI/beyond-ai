@@ -1,10 +1,12 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getPaymentPlanProgress } from '@/lib/salesforce'
+import { apiErrorResponse, requireApiUser } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    await requireApiUser(request)
     const paymentPlans = await getPaymentPlanProgress()
 
     return NextResponse.json({
@@ -15,9 +17,6 @@ export async function GET() {
     })
   } catch (error) {
     console.error('Payments API error:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch payment plans', details: process.env.NODE_ENV === 'development' ? String(error) : undefined },
-      { status: 500 },
-    )
+    return apiErrorResponse(error, 'Failed to fetch payment plans')
   }
 }

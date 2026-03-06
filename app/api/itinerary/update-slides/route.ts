@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { updateItinerary } from '@/lib/redis-database';
+import { apiErrorResponse, requireItineraryAccess } from '@/lib/api-auth'
 
 interface UpdateSlidesRequest {
   itineraryId: string;
@@ -32,6 +33,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('🔄 Server: Updating itinerary with slides data:', itineraryId);
+    await requireItineraryAccess(request, itineraryId)
     
     // Update the itinerary with slides information
     const updatedItinerary = await updateItinerary(itineraryId, {
@@ -49,20 +51,6 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ Server: Error updating itinerary with slides data:', error);
-    
-    if (error instanceof Error && error.message === 'Itinerary not found') {
-      return NextResponse.json(
-        { error: 'Itinerary not found' },
-        { status: 404 }
-      );
-    }
-    
-    return NextResponse.json(
-      { 
-        error: 'Failed to update itinerary with slides data',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    );
+    return apiErrorResponse(error, 'Failed to update itinerary with slides data');
   }
 }

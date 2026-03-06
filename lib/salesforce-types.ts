@@ -345,6 +345,7 @@ export interface DialerListItem {
   totalSpend?: number | null
   recentNote?: string | null
   owner?: string | null
+  tags?: string[]
 }
 
 // ── Notification types ──

@@ -38,7 +38,7 @@ function ItinerariesPageContent() {
       try {
         console.log('🗄️ Client: Fetching itineraries for user:', user.email);
         
-        const response = await fetch(`/api/itineraries?userEmail=${encodeURIComponent(user.email)}`);
+        const response = await fetch('/api/itineraries');
         const result = await response.json();
         
         if (response.ok) {

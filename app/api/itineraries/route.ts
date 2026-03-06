@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getItineraries } from '@/lib/redis-database';
+import { apiErrorResponse, getScopedUserEmail, requireApiUser } from '@/lib/api-auth'
 
 export async function GET(request: NextRequest) {
   try {
+    const context = await requireApiUser(request)
     const { searchParams } = new URL(request.url);
-    const userEmail = searchParams.get('userEmail');
+    const userEmail = getScopedUserEmail(searchParams.get('userEmail'), context)
     const limitStr = searchParams.get('limit');
     const offsetStr = searchParams.get('offset');
-
-    if (!userEmail) {
-      return NextResponse.json({ error: 'User email is required' }, { status: 400 });
-    }
 
     // Parse pagination parameters with safe defaults
     const limit = limitStr ? Math.min(parseInt(limitStr, 10), 100) : 50; // Max 100 per request
@@ -23,9 +21,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: true, itineraries, pagination: { limit, offset } });
   } catch (error) {
     console.error('❌ Server: Error fetching itineraries:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch itineraries', details: error instanceof Error ? error.message : String(error) },
-      { status: 500 }
-    );
+    return apiErrorResponse(error, 'Failed to fetch itineraries');
   }
 }

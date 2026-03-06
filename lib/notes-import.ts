@@ -152,7 +152,7 @@ export async function importNotesFromCSV(csvContent: string): Promise<ImportResu
 
     const name = columns.nameCol ? row[columns.nameCol] : undefined
     const email = columns.emailCol ? row[columns.emailCol] : undefined
-    const date = columns.dateCol ? row[columns.dateCol] : undefined
+      const date = columns.dateCol ? row[columns.dateCol] : undefined
 
     if (email) contactIdentifiers.add(email.toLowerCase())
     if (name) contactIdentifiers.add(name.toLowerCase())
@@ -174,7 +174,6 @@ export async function importNotesFromCSV(csvContent: string): Promise<ImportResu
       // Batch in groups of 50 for SOQL IN clause limits
       for (let i = 0; i < emails.length; i += 50) {
         const batch = emails.slice(i, i + 50)
-        const emailList = batch.map(e => `'${e.replace(/'/g, "\\'")}'`).join(', ')
 
         // We need to import query from salesforce - but it's not exported. Use the Salesforce REST API directly.
         // For now, use a simpler approach: use the getContactsForPicker for each
@@ -185,6 +184,8 @@ export async function importNotesFromCSV(csvContent: string): Promise<ImportResu
           const contacts = await getContactsByEmails(batch)
           for (const contact of contacts) {
             if (contact.Email) contactMap.set(contact.Email.toLowerCase(), contact.Id)
+            if (contact.Work_Email__c) contactMap.set(contact.Work_Email__c.toLowerCase(), contact.Id)
+            if (contact.Secondary_Email__c) contactMap.set(contact.Secondary_Email__c.toLowerCase(), contact.Id)
             contactMap.set(contact.Name.toLowerCase(), contact.Id)
           }
         } catch {
@@ -214,8 +215,13 @@ export async function importNotesFromCSV(csvContent: string): Promise<ImportResu
       unmatchedContacts.push(noteRow.contactEmail || noteRow.contactName || 'Unknown')
     }
 
+    const importedAt = noteRow.createdDate?.trim()
+    const body = importedAt
+      ? `[Imported from Freshsales - ${importedAt}]\n${noteRow.noteBody}`
+      : `[Imported from Freshsales]\n${noteRow.noteBody}`
+
     const record: Record<string, unknown> = {
-      Body__c: noteRow.noteBody,
+      Body__c: body,
     }
     if (contactId) record.Contact__c = contactId
 

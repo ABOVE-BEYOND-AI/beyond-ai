@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAllNotes, searchNotes, createNote, getContactsForPicker } from '@/lib/salesforce'
 import type { NoteFilters } from '@/lib/salesforce-types'
+import { apiErrorResponse, requireApiUser } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   try {
+    await requireApiUser(request)
     const { searchParams } = new URL(request.url)
 
     // Contact picker mode
@@ -37,15 +39,13 @@ export async function GET(request: NextRequest) {
     )
   } catch (error) {
     console.error('Notes API error:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch notes', details: process.env.NODE_ENV === 'development' ? String(error) : undefined },
-      { status: 500 }
-    )
+    return apiErrorResponse(error, 'Failed to fetch notes')
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
+    await requireApiUser(request)
     const body = await request.json()
     const { contactId, content } = body
 
@@ -61,9 +61,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, data: { id: noteId } }, { status: 201 })
   } catch (error) {
     console.error('Create note error:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to create note', details: process.env.NODE_ENV === 'development' ? String(error) : undefined },
-      { status: 500 }
-    )
+    return apiErrorResponse(error, 'Failed to create note')
   }
 }

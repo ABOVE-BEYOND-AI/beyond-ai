@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getLeads, updateLead } from '@/lib/salesforce'
 import type { LeadFilters } from '@/lib/salesforce-types'
+import { apiErrorResponse, requireApiUser } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   try {
+    await requireApiUser(request)
     const { searchParams } = new URL(request.url)
 
     const filters: LeadFilters = {}
@@ -23,15 +25,13 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('Leads API error:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch leads', details: process.env.NODE_ENV === 'development' ? String(error) : undefined },
-      { status: 500 },
-    )
+    return apiErrorResponse(error, 'Failed to fetch leads')
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
+    await requireApiUser(request)
     const body = await request.json()
     const { id, fields } = body
 
@@ -44,9 +44,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Lead update error:', error)
-    return NextResponse.json(
-      { error: 'Failed to update lead', details: process.env.NODE_ENV === 'development' ? String(error) : undefined },
-      { status: 500 },
-    )
+    return apiErrorResponse(error, 'Failed to update lead')
   }
 }

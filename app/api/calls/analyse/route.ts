@@ -4,6 +4,7 @@ import { analyseCall, type CallAnalysis } from '@/lib/call-analysis'
 import { storeTranscript } from '@/lib/transcript-store'
 import { Redis } from '@upstash/redis'
 import OpenAI from 'openai'
+import { apiErrorResponse, requireApiUser } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120 // Allow up to 2 minutes for transcription + analysis
@@ -97,6 +98,7 @@ function isTranscriptMeaningful(transcript: string): { valid: boolean; reason?: 
 
 export async function POST(request: NextRequest) {
   try {
+    await requireApiUser(request)
     const body = await request.json()
     const callId = body.call_id as number
 
@@ -188,9 +190,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, data: analysis, cached: false })
   } catch (error) {
     console.error('Error analysing call:', error)
-    return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Failed to analyse call' },
-      { status: 500 }
-    )
+    return apiErrorResponse(error, 'Failed to analyse call')
   }
 }

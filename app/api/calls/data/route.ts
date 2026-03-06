@@ -6,6 +6,7 @@ import {
   type AircallCall,
 } from '@/lib/aircall'
 import { Redis } from '@upstash/redis'
+import { apiErrorResponse, requireApiUser } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -101,6 +102,7 @@ function buildResponseData(period: string, calls: AircallCall[]) {
 
 export async function GET(request: NextRequest) {
   try {
+    await requireApiUser(request)
     const { searchParams } = new URL(request.url)
     const period = (searchParams.get('period') || 'today') as 'today' | 'week' | 'month'
 
@@ -202,9 +204,6 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Failed to fetch call data' },
-      { status: 500 }
-    )
+    return apiErrorResponse(error, 'Failed to fetch call data')
   }
 }

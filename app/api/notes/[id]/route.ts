@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getNoteById, updateNote, deleteNote } from '@/lib/salesforce'
+import { apiErrorResponse, requireApiUser } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -8,14 +9,13 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await requireApiUser(request)
     const { id } = await params
     const note = await getNoteById(id)
     return NextResponse.json({ success: true, data: note })
   } catch (error) {
     console.error('Get note error:', error)
-    const message = error instanceof Error ? error.message : 'Failed to fetch note'
-    const status = message.includes('not found') ? 404 : 500
-    return NextResponse.json({ success: false, error: message }, { status })
+    return apiErrorResponse(error, 'Failed to fetch note')
   }
 }
 
@@ -24,6 +24,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await requireApiUser(request)
     const { id } = await params
     const body = await request.json()
     const { content } = body
@@ -39,10 +40,7 @@ export async function PATCH(
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Update note error:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to update note', details: process.env.NODE_ENV === 'development' ? String(error) : undefined },
-      { status: 500 }
-    )
+    return apiErrorResponse(error, 'Failed to update note')
   }
 }
 
@@ -51,14 +49,12 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await requireApiUser(request)
     const { id } = await params
     await deleteNote(id)
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Delete note error:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to delete note', details: process.env.NODE_ENV === 'development' ? String(error) : undefined },
-      { status: 500 }
-    )
+    return apiErrorResponse(error, 'Failed to delete note')
   }
 }

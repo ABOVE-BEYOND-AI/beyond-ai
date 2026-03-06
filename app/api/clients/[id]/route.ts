@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getContactDetail, getContactOpportunities, getContactNotes } from '@/lib/salesforce'
+import { apiErrorResponse, requireApiUser } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -8,6 +9,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await requireApiUser(request)
     const { id } = await params
 
     const [contact, opportunities, notes] = await Promise.all([
@@ -44,9 +46,6 @@ export async function GET(
     })
   } catch (error) {
     console.error('Client detail API error:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch client details', details: process.env.NODE_ENV === 'development' ? String(error) : undefined },
-      { status: 500 },
-    )
+    return apiErrorResponse(error, 'Failed to fetch client details')
   }
 }

@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { addTagToCall, addCommentToCall } from '@/lib/aircall'
-import { updateRecord } from '@/lib/salesforce'
+import { createNote, updateRecord } from '@/lib/salesforce'
+import { apiErrorResponse, requireApiUser } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
   try {
+    await requireApiUser(request)
     const body = await request.json()
     const { callId, objectType, recordId, disposition, notes, tagName } = body
 
@@ -33,22 +35,21 @@ export async function POST(request: NextRequest) {
       ? `[${timestamp}] ${disposition}: ${notes}`
       : `[${timestamp}] ${disposition}`
 
-    const sfUpdate = updateRecord(objectType, recordId, {
+    const sfOps: Promise<unknown>[] = [updateRecord(objectType, recordId, {
       Recent_Note__c: noteContent,
-    })
+    })]
+
+    // Preserve a searchable note history for Contacts instead of overwriting the latest note only.
+    if (objectType === 'Contact') {
+      sfOps.push(createNote(recordId, noteContent))
+    }
 
     // Wait for all operations to complete
-    await Promise.all([...aircallOps, sfUpdate])
+    await Promise.all([...aircallOps, ...sfOps])
 
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Dialer disposition API error:', error)
-    return NextResponse.json(
-      {
-        error: 'Failed to log disposition',
-        details: process.env.NODE_ENV === 'development' ? String(error) : undefined,
-      },
-      { status: 500 }
-    )
+    return apiErrorResponse(error, 'Failed to log disposition')
   }
 }

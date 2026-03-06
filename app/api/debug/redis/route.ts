@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Redis } from '@upstash/redis'
+import { apiErrorResponse, requireApiAdmin } from '@/lib/api-auth'
 
 function getRedisClient(): Redis {
   const redisUrl = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL || process.env.KV_URL;
@@ -17,6 +18,7 @@ function getRedisClient(): Redis {
 
 export async function GET(request: NextRequest) {
   try {
+    await requireApiAdmin(request)
     const { searchParams } = new URL(request.url);
     const userEmail = searchParams.get('userEmail');
     const action = searchParams.get('action');
@@ -89,9 +91,6 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ Debug API Error:', error);
-    return NextResponse.json(
-      { error: 'Debug operation failed', details: error instanceof Error ? error.message : String(error) },
-      { status: 500 }
-    );
+    return apiErrorResponse(error, 'Debug operation failed');
   }
 }

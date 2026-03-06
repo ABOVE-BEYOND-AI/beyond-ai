@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { searchTranscripts, getRecentTranscripts, getStoredTranscriptCount } from '@/lib/transcript-store'
+import { apiErrorResponse, requireApiUser } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   try {
+    await requireApiUser(request)
     const { searchParams } = new URL(request.url)
     const keyword = searchParams.get('keyword') || searchParams.get('q') || searchParams.get('search')
     const fromDate = searchParams.get('fromDate') || searchParams.get('from') || undefined
@@ -58,9 +60,6 @@ export async function GET(request: NextRequest) {
     }
   } catch (error) {
     console.error('Transcript search error:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to search transcripts', details: process.env.NODE_ENV === 'development' ? String(error) : undefined },
-      { status: 500 }
-    )
+    return apiErrorResponse(error, 'Failed to search transcripts')
   }
 }

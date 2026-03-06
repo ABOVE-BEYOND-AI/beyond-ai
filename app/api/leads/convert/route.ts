@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { convertLead } from '@/lib/salesforce'
+import { apiErrorResponse, requireApiUser } from '@/lib/api-auth'
 
 export async function POST(request: NextRequest) {
   try {
+    await requireApiUser(request)
     const body = await request.json()
     const { leadId } = body
 
@@ -15,9 +17,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, data: result })
   } catch (error) {
     console.error('Lead conversion error:', error)
-    return NextResponse.json(
-      { error: 'Failed to convert lead', details: process.env.NODE_ENV === 'development' ? String(error) : undefined },
-      { status: 500 },
-    )
+    return apiErrorResponse(error, 'Failed to convert lead')
   }
 }

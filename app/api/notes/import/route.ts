@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { importNotesFromCSV } from '@/lib/notes-import'
+import { apiErrorResponse, requireApiUser } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120 // Allow up to 2 minutes for large imports
 
 export async function POST(request: NextRequest) {
   try {
+    await requireApiUser(request)
     const contentType = request.headers.get('content-type') || ''
 
     let csvContent: string
@@ -47,13 +49,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, data: result })
   } catch (error) {
     console.error('Notes import error:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Import failed',
-        details: process.env.NODE_ENV === 'development' ? String(error) : undefined,
-      },
-      { status: 500 }
-    )
+    return apiErrorResponse(error, 'Import failed')
   }
 }

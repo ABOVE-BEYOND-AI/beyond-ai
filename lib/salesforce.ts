@@ -448,6 +448,10 @@ const CONTACT_SELECT_FIELDS = `
   Id, Name, FirstName, LastName, Email, Phone, MobilePhone,
   AccountId, Account.Name, Account.Type, Account.Industry,
   Title, LeadSource,
+  LinkedIn__c, Facebook__c, Twitter__c,
+  Total_Spend_to_Date__c, Total_Won_Opportunities__c,
+  Tags__c, Interests__c, Recent_Note__c, Score__c,
+  Work_Email__c, Secondary_Email__c,
   OwnerId, Owner.Name,
   CreatedDate, LastActivityDate
 `.trim()
@@ -651,7 +655,7 @@ export async function getContacts(filters?: ClientFilters): Promise<SalesforceCo
 
   if (filters?.search) {
     const s = sanitizeSoqlValue(filters.search)
-    whereClause += ` AND (Name LIKE '%${s}%' OR Email LIKE '%${s}%' OR Account.Name LIKE '%${s}%')`
+    whereClause += ` AND (Name LIKE '%${s}%' OR Email LIKE '%${s}%' OR Work_Email__c LIKE '%${s}%' OR Secondary_Email__c LIKE '%${s}%' OR Account.Name LIKE '%${s}%')`
   }
   if (filters?.ownerId) {
     validateSalesforceId(filters.ownerId, 'ownerId')
@@ -714,9 +718,12 @@ export async function getContacts(filters?: ClientFilters): Promise<SalesforceCo
   } catch (err) {
     // Fallback: retry with only standard Contact fields
     console.warn('Contacts query failed, retrying with standard fields only:', err)
-    const fallbackSoql = `
-      SELECT Id, Name, FirstName, LastName, Email, Phone, MobilePhone,
+      const fallbackSoql = `
+        SELECT Id, Name, FirstName, LastName, Email, Phone, MobilePhone,
         AccountId, Account.Name, Title,
+        Total_Spend_to_Date__c, Total_Won_Opportunities__c,
+        Tags__c, Interests__c, Recent_Note__c, Score__c,
+        LinkedIn__c,
         OwnerId, Owner.Name,
         CreatedDate, LastActivityDate
       FROM Contact
@@ -1250,7 +1257,7 @@ export async function getContactsForPicker(search?: string): Promise<{ Id: strin
   let whereClause = 'Id != null'
   if (search) {
     const s = sanitizeSoqlValue(search)
-    whereClause += ` AND (Name LIKE '%${s}%' OR Email LIKE '%${s}%')`
+    whereClause += ` AND (Name LIKE '%${s}%' OR Email LIKE '%${s}%' OR Work_Email__c LIKE '%${s}%' OR Secondary_Email__c LIKE '%${s}%')`
   }
 
   const soql = `

@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getOpenOpportunities, updateOpportunityStage } from '@/lib/salesforce'
 import type { PipelineFilters } from '@/lib/salesforce-types'
+import { apiErrorResponse, requireApiUser } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   try {
+    await requireApiUser(request)
     const { searchParams } = new URL(request.url)
 
     const filters: PipelineFilters = {}
@@ -23,15 +25,13 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('Pipeline API error:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch pipeline', details: process.env.NODE_ENV === 'development' ? String(error) : undefined },
-      { status: 500 },
-    )
+    return apiErrorResponse(error, 'Failed to fetch pipeline')
   }
 }
 
 export async function PATCH(request: NextRequest) {
   try {
+    await requireApiUser(request)
     const body = await request.json()
     const { id, stage } = body
 
@@ -44,9 +44,6 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Pipeline update error:', error)
-    return NextResponse.json(
-      { error: 'Failed to update opportunity', details: process.env.NODE_ENV === 'development' ? String(error) : undefined },
-      { status: 500 },
-    )
+    return apiErrorResponse(error, 'Failed to update opportunity')
   }
 }

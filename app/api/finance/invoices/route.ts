@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { describeObject, query } from '@/lib/salesforce'
+import { apiErrorResponse, requireApiUser } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,6 +24,7 @@ async function discoverInvoiceFields(): Promise<{ name: string; label: string; t
 
 export async function GET(request: NextRequest) {
   try {
+    await requireApiUser(request)
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
     const accountId = searchParams.get('accountId')
@@ -108,14 +110,6 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('Invoices API error:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to fetch invoices',
-        details: process.env.NODE_ENV === 'development' ? String(error) : undefined,
-        hint: 'This endpoint dynamically discovers Breadwinner invoice fields. If fields have changed, clear the server cache by redeploying.',
-      },
-      { status: 500 },
-    )
+    return apiErrorResponse(error, 'Failed to fetch invoices')
   }
 }

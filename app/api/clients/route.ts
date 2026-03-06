@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getContacts } from '@/lib/salesforce'
 import type { ClientFilters } from '@/lib/salesforce-types'
+import { apiErrorResponse, requireApiUser } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   try {
+    await requireApiUser(request)
     const { searchParams } = new URL(request.url)
 
     const filters: ClientFilters = {}
@@ -25,9 +27,6 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('Clients API error:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch clients', details: process.env.NODE_ENV === 'development' ? String(error) : undefined },
-      { status: 500 },
-    )
+    return apiErrorResponse(error, 'Failed to fetch clients')
   }
 }

@@ -6,6 +6,7 @@ import {
 import { analyseCall, generateDailyDigest, type CallAnalysis } from '@/lib/call-analysis'
 import { Redis } from '@upstash/redis'
 import OpenAI from 'openai'
+import { apiErrorResponse, requireApiUser } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300 // 5 minutes — digest analyses multiple calls
@@ -57,6 +58,7 @@ async function transcribeRecording(recordingUrl: string, agentName: string, cont
 
 export async function POST(request: NextRequest) {
   try {
+    await requireApiUser(request)
     const body = await request.json()
     const period = (body.period || 'today') as 'today' | 'week' | 'month'
     const forceRefresh = body.force_refresh === true
@@ -205,9 +207,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, data: digest, cached: false })
   } catch (error) {
     console.error('Error generating digest:', error)
-    return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Failed to generate digest' },
-      { status: 500 }
-    )
+    return apiErrorResponse(error, 'Failed to generate digest')
   }
 }

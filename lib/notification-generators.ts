@@ -2,8 +2,8 @@
 // Each generator respects user preferences before firing
 
 import { query } from './salesforce'
-import { createNotification, getPreferences } from './notifications'
-import type { NotificationPreferences } from './salesforce-types'
+import { createNotification, getAllNotifications, getPreferences } from './notifications'
+import { generateEventRecap } from './event-recap'
 
 interface SFOpportunityRow {
   Id: string
@@ -14,12 +14,11 @@ interface SFOpportunityRow {
   Owner: { Email: string } | null
 }
 
-interface SFInvoiceRow {
+interface SFOverdueAccountRow {
   Id: string
   Name: string
-  Breadwinner__Due_Date__c: string | null
-  Breadwinner__Balance_Due__c: number | null
-  Breadwinner__Account__r: { Name: string } | null
+  Bread_Winner__Total_Amount_Overdue__c: number | null
+  Bread_Winner__Total_Amount_Due__c: number | null
 }
 
 interface SFLeadRow {
@@ -61,7 +60,7 @@ export async function checkStaleDeals(email: string): Promise<number> {
       await createNotification(email, {
         type: 'stale_deal',
         title: `Stale deal: ${opp.Name}`,
-        body: `No activity for ${daysSince} days. Stage: ${opp.StageName}. Amount: ${opp.Amount ? `$${opp.Amount.toLocaleString()}` : 'N/A'}.`,
+        body: `No activity for ${daysSince} days. Stage: ${opp.StageName}. Amount: ${opp.Amount ? `£${opp.Amount.toLocaleString()}` : 'N/A'}.`,
         link: `/pipeline`,
       })
       created++
@@ -78,20 +77,16 @@ export async function checkStaleDeals(email: string): Promise<number> {
  * This runs globally (not per-user) so we pass results to relevant users.
  */
 export async function checkOverduePayments(): Promise<number> {
-  const today = new Date().toISOString().split('T')[0]
-
   const soql = `
-    SELECT Id, Name, Breadwinner__Due_Date__c, Breadwinner__Balance_Due__c,
-           Breadwinner__Account__r.Name
-    FROM Breadwinner__Billing__c
-    WHERE Breadwinner__Due_Date__c < ${today}
-      AND Breadwinner__Balance_Due__c > 0
-    ORDER BY Breadwinner__Due_Date__c ASC
+    SELECT Id, Name, Bread_Winner__Total_Amount_Overdue__c, Bread_Winner__Total_Amount_Due__c
+    FROM Account
+    WHERE Bread_Winner__Total_Amount_Overdue__c > 0
+    ORDER BY Bread_Winner__Total_Amount_Overdue__c DESC
     LIMIT 20
   `
 
   try {
-    const result = await query<SFInvoiceRow>(soql)
+    const result = await query<SFOverdueAccountRow>(soql)
     // For overdue payments, notify all users who have this pref enabled
     // In practice, this would target finance team members
     // For now, we return the count for the caller to handle
@@ -109,29 +104,25 @@ export async function notifyOverduePayments(email: string): Promise<number> {
   const prefs = await getPreferences(email)
   if (!prefs.payment_overdue) return 0
 
-  const today = new Date().toISOString().split('T')[0]
-
   const soql = `
-    SELECT Id, Name, Breadwinner__Due_Date__c, Breadwinner__Balance_Due__c,
-           Breadwinner__Account__r.Name
-    FROM Breadwinner__Billing__c
-    WHERE Breadwinner__Due_Date__c < ${today}
-      AND Breadwinner__Balance_Due__c > 0
-    ORDER BY Breadwinner__Due_Date__c ASC
+    SELECT Id, Name, Bread_Winner__Total_Amount_Overdue__c, Bread_Winner__Total_Amount_Due__c
+    FROM Account
+    WHERE Bread_Winner__Total_Amount_Overdue__c > 0
+    ORDER BY Bread_Winner__Total_Amount_Overdue__c DESC
     LIMIT 10
   `
 
   try {
-    const result = await query<SFInvoiceRow>(soql)
+    const result = await query<SFOverdueAccountRow>(soql)
     let created = 0
 
-    for (const inv of result.records) {
-      const accountName = inv.Breadwinner__Account__r?.Name || 'Unknown'
-      const balance = inv.Breadwinner__Balance_Due__c || 0
+    for (const account of result.records) {
+      const overdue = account.Bread_Winner__Total_Amount_Overdue__c || 0
+      const totalDue = account.Bread_Winner__Total_Amount_Due__c || 0
       await createNotification(email, {
         type: 'payment_overdue',
-        title: `Overdue payment: ${accountName}`,
-        body: `Invoice ${inv.Name} has $${balance.toLocaleString()} overdue since ${inv.Breadwinner__Due_Date__c || 'unknown'}.`,
+        title: `Overdue payment: ${account.Name}`,
+        body: `£${overdue.toLocaleString()} is overdue. Total due on account: £${totalDue.toLocaleString()}.`,
         link: `/finance`,
       })
       created++
@@ -149,8 +140,6 @@ export async function notifyOverduePayments(email: string): Promise<number> {
 export async function checkNewLeads(email: string): Promise<number> {
   const prefs = await getPreferences(email)
   if (!prefs.new_leads) return 0
-
-  const today = new Date().toISOString().split('T')[0]
 
   const soql = `
     SELECT Id, Name, Company, CreatedDate, Owner.Email
@@ -182,14 +171,62 @@ export async function checkNewLeads(email: string): Promise<number> {
 }
 
 /**
+ * Send a single daily recap notification if enabled.
+ */
+export async function sendDailyRecap(email: string): Promise<number> {
+  const prefs = await getPreferences(email)
+  if (!prefs.daily_recap) return 0
+
+  try {
+    const today = new Date().toISOString().split('T')[0]
+    const existingNotifications = await getAllNotifications(email, 50)
+    const alreadySent = existingNotifications.some(
+      (notification) => notification.type === 'daily_recap' && notification.createdAt.startsWith(today)
+    )
+
+    if (alreadySent) {
+      return 0
+    }
+
+    const recap = await generateEventRecap()
+    const upcoming = recap.upcomingEvents.slice(0, 2).map((event) => event.name).join(', ')
+    const bodyParts = [
+      `${recap.dealCount} deal${recap.dealCount === 1 ? '' : 's'} closed today`,
+      `${recap.leadsCreatedToday} new lead${recap.leadsCreatedToday === 1 ? '' : 's'}`,
+    ]
+
+    if (recap.callStats) {
+      bodyParts.push(`${recap.callStats.total} call${recap.callStats.total === 1 ? '' : 's'} logged`)
+    }
+
+    if (upcoming) {
+      bodyParts.push(`Next events: ${upcoming}`)
+    }
+
+    await createNotification(email, {
+      type: 'daily_recap',
+      title: `Daily recap: ${recap.date}`,
+      body: bodyParts.join('. '),
+      link: '/calls',
+    })
+
+    return 1
+  } catch (error) {
+    console.error('sendDailyRecap error:', error)
+    return 0
+  }
+}
+
+/**
  * Run all generators for a given user.
  */
-export async function runAllGenerators(email: string): Promise<{ staleDeals: number; overduePayments: number; newLeads: number }> {
-  const [staleDeals, overduePayments, newLeads] = await Promise.all([
+export async function runAllGenerators(email: string): Promise<{ staleDeals: number; overduePayments: number; newLeads: number; dailyRecap: number }> {
+  const [staleDeals, overduePayments, newLeads, dailyRecap] = await Promise.all([
     checkStaleDeals(email),
     notifyOverduePayments(email),
     checkNewLeads(email),
+    sendDailyRecap(email),
   ])
 
-  return { staleDeals, overduePayments, newLeads }
+  return { staleDeals, overduePayments, newLeads, dailyRecap }
 }

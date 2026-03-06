@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getTranscript } from '@/lib/transcript-store'
+import { apiErrorResponse, requireApiUser } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -8,6 +9,7 @@ export async function GET(
   { params }: { params: Promise<{ callId: string }> }
 ) {
   try {
+    await requireApiUser(request)
     const { callId } = await params
     const numericId = Number(callId)
 
@@ -33,9 +35,6 @@ export async function GET(
     )
   } catch (error) {
     console.error('Get transcript error:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch transcript' },
-      { status: 500 }
-    )
+    return apiErrorResponse(error, 'Failed to fetch transcript')
   }
 }

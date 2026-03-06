@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCallableLeads, getCallableContacts } from '@/lib/salesforce'
 import type { DialerListItem, SalesforceLead, SalesforceContact } from '@/lib/salesforce-types'
 import type { DialerFilters } from '@/lib/salesforce'
+import { apiErrorResponse, requireApiUser } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,6 +20,7 @@ function leadToDialerItem(lead: SalesforceLead): DialerListItem {
     totalSpend: null,
     recentNote: lead.Recent_Note__c,
     owner: lead.Owner?.Name ?? null,
+    tags: lead.Tags__c ? lead.Tags__c.split(';').map((tag) => tag.trim()).filter(Boolean) : [],
   }
 }
 
@@ -36,11 +38,13 @@ function contactToDialerItem(contact: SalesforceContact): DialerListItem {
     totalSpend: contact.Total_Spend_to_Date__c ?? null,
     recentNote: contact.Recent_Note__c ?? null,
     owner: contact.Owner?.Name ?? null,
+    tags: contact.Tags__c ? contact.Tags__c.split(';').map((tag) => tag.trim()).filter(Boolean) : [],
   }
 }
 
 export async function GET(request: NextRequest) {
   try {
+    await requireApiUser(request)
     const { searchParams } = new URL(request.url)
 
     const source = searchParams.get('source') || 'leads'
@@ -78,9 +82,9 @@ export async function GET(request: NextRequest) {
     if (tags) {
       const tagList = tags.split(',').map((t) => t.trim().toLowerCase())
       items = items.filter((item) => {
-        // Tags are not directly on DialerListItem but we can check the name/company
-        // For leads, Tags__c was available but not mapped; for now pass through
-        return tagList.length === 0 || true
+        if (tagList.length === 0) return true
+        const itemTags = item.tags?.map((tag) => tag.toLowerCase()) || []
+        return tagList.some((tag) => itemTags.includes(tag))
       })
     }
 
@@ -90,12 +94,6 @@ export async function GET(request: NextRequest) {
     )
   } catch (error) {
     console.error('Dialer lists API error:', error)
-    return NextResponse.json(
-      {
-        error: 'Failed to build calling list',
-        details: process.env.NODE_ENV === 'development' ? String(error) : undefined,
-      },
-      { status: 500 }
-    )
+    return apiErrorResponse(error, 'Failed to build calling list')
   }
 }

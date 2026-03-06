@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateEventRecap } from '@/lib/event-recap'
+import { apiErrorResponse, requireApiUser } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -7,8 +8,9 @@ export const dynamic = 'force-dynamic'
  * GET /api/calls/event-recap
  * Returns today's event recap (cached or freshly generated).
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    await requireApiUser(request)
     const recap = await generateEventRecap(false)
 
     return NextResponse.json(
@@ -21,13 +23,7 @@ export async function GET() {
     )
   } catch (error) {
     console.error('Error generating event recap:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to generate event recap',
-      },
-      { status: 500 }
-    )
+    return apiErrorResponse(error, 'Failed to generate event recap')
   }
 }
 
@@ -37,6 +33,7 @@ export async function GET() {
  */
 export async function POST(request: NextRequest) {
   try {
+    await requireApiUser(request)
     const body = await request.json()
     const forceRefresh = body.force_refresh === true
 
@@ -52,12 +49,6 @@ export async function POST(request: NextRequest) {
     )
   } catch (error) {
     console.error('Error generating event recap:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to generate event recap',
-      },
-      { status: 500 }
-    )
+    return apiErrorResponse(error, 'Failed to generate event recap')
   }
 }
