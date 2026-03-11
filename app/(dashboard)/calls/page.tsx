@@ -27,6 +27,12 @@ import {
   CalendarCheck,
   UserPlus,
   Confetti,
+  Copy,
+  CheckCircle,
+  Clock,
+  CaretDown,
+  CaretUp,
+  Eye,
 } from "@phosphor-icons/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faLightbulb, faTrophy } from "@fortawesome/free-solid-svg-icons";
@@ -110,7 +116,7 @@ interface CallAnalysis {
     estimated_value?: string;
   }[];
   competitor_mentions: string[];
-  events_mentioned: string[];
+  events_mentioned: (string | { event: string; context: string })[];
   talk_to_listen_ratio: { agent_pct: number; contact_pct: number };
   coaching_notes: string | null;
   draft_follow_up: string | null;
@@ -492,11 +498,43 @@ function FullscreenModal({
 
 function AnalysisPanel({
   analysis,
+  transcript,
   onClose,
+  onTopicClick,
 }: {
   analysis: CallAnalysis;
+  transcript: string | null;
   onClose: () => void;
+  onTopicClick?: (topic: string) => void;
 }) {
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [showTranscript, setShowTranscript] = useState(false);
+
+  const copyText = (text: string, field: string) => {
+    navigator.clipboard.writeText(text).catch(() => {});
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const sentimentStyles = {
+    negative: "bg-red-500/10 text-red-500 border-red-500/20",
+    mixed: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+    positive: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+    neutral: "bg-foreground/[0.06] text-muted-foreground border-foreground/[0.08]",
+  };
+
+  const riskSignals = analysis.opportunity_signals.filter(
+    (o) => o.type === "at_risk" || o.type === "closed_lost"
+  );
+
+  const agentPct = analysis.talk_to_listen_ratio.agent_pct;
+  const ratioNote =
+    agentPct < 30
+      ? "Client-dominated conversation — active listening mode"
+      : agentPct > 70
+        ? "Agent-dominated — consider asking more open questions"
+        : null;
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
@@ -510,7 +548,7 @@ function AnalysisPanel({
           <div className="flex items-center gap-3">
             <Brain className="size-5 text-primary" />
             <h2 className="text-lg font-semibold">Call Analysis</h2>
-            <span className="text-xs px-2 py-0.5 rounded-full border capitalize bg-foreground/[0.06] border-foreground/[0.08]">
+            <span className={`text-xs px-2 py-0.5 rounded-full border capitalize font-medium ${sentimentStyles[analysis.sentiment]}`}>
               {analysis.sentiment} · {analysis.sentiment_score}/100
             </span>
           </div>
@@ -522,6 +560,38 @@ function AnalysisPanel({
             <X className="size-5" />
           </button>
         </div>
+
+        {/* Risk Alert Banner */}
+        {riskSignals.length > 0 && (
+          <div className="mb-6 space-y-2">
+            {riskSignals.map((signal, i) => (
+              <div
+                key={i}
+                className={`p-3 rounded-lg border flex items-start gap-3 ${
+                  signal.type === "closed_lost"
+                    ? "bg-red-500/10 border-red-500/20"
+                    : "bg-amber-500/10 border-amber-500/20"
+                }`}
+              >
+                <Warning
+                  weight="fill"
+                  className={`size-4 shrink-0 mt-0.5 ${
+                    signal.type === "closed_lost" ? "text-red-500" : "text-amber-500"
+                  }`}
+                />
+                <div>
+                  <p className={`text-sm font-bold uppercase ${
+                    signal.type === "closed_lost" ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400"
+                  }`}>
+                    {signal.type === "closed_lost" ? "LOST" : "AT RISK"}
+                    {signal.estimated_value && ` · ${signal.estimated_value}`}
+                  </p>
+                  <p className="text-sm mt-0.5">{signal.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Summary */}
         <div className="mb-6">
@@ -535,12 +605,14 @@ function AnalysisPanel({
             <h3 className="text-sm font-semibold text-muted-foreground mb-2">Key Topics</h3>
             <div className="flex flex-wrap gap-2">
               {analysis.key_topics.map((topic, i) => (
-                <span
+                <button
                   key={i}
-                  className="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/20"
+                  onClick={() => onTopicClick?.(topic)}
+                  className="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors cursor-pointer"
+                  title="Search transcripts for this topic"
                 >
                   {topic}
-                </span>
+                </button>
               ))}
             </div>
           </div>
@@ -565,51 +637,74 @@ function AnalysisPanel({
         {/* Action Items */}
         {analysis.action_items.length > 0 && (
           <div className="mb-6">
-            <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
-              <Target className="size-3.5 text-muted-foreground" /> Action Items
-            </h3>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <Target className="size-3.5 text-muted-foreground" /> Action Items
+              </h3>
+              <button
+                onClick={() => {
+                  const text = analysis.action_items
+                    .map((item) => `☐ [${item.priority.toUpperCase()}] ${item.description} — ${item.assignee}`)
+                    .join("\n");
+                  copyText(text, "actions");
+                }}
+                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+              >
+                {copiedField === "actions" ? <CheckCircle className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
+                {copiedField === "actions" ? "Copied" : "Copy all"}
+              </button>
+            </div>
             <div className="space-y-2">
-              {analysis.action_items.map((item, i) => (
-                <div
-                  key={i}
-                  className="flex items-start gap-3 text-sm p-3 rounded-lg bg-foreground/[0.03] border border-foreground/[0.06]"
-                >
-                  <span className="text-[10px] px-1.5 py-0.5 rounded border shrink-0 mt-0.5 uppercase font-bold bg-foreground/[0.06] text-muted-foreground border-foreground/[0.08]">
-                    {item.priority}
-                  </span>
-                  <div>
-                    <p>{item.description}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">→ {item.assignee}</p>
+              {analysis.action_items.map((item, i) => {
+                const priorityStyles = {
+                  high: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20",
+                  medium: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+                  low: "bg-foreground/[0.06] text-muted-foreground border-foreground/[0.08]",
+                };
+                return (
+                  <div
+                    key={i}
+                    className="flex items-start gap-3 text-sm p-3 rounded-lg bg-foreground/[0.03] border border-foreground/[0.06]"
+                  >
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded border shrink-0 mt-0.5 uppercase font-bold ${priorityStyles[item.priority]}`}>
+                      {item.priority}
+                    </span>
+                    <div>
+                      <p>{item.description}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">→ {item.assignee}</p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
 
-        {/* Opportunity Signals */}
-        {analysis.opportunity_signals.length > 0 && (
+        {/* Opportunity Signals (excluding risk signals shown above) */}
+        {analysis.opportunity_signals.filter((o) => o.type !== "at_risk" && o.type !== "closed_lost").length > 0 && (
           <div className="mb-6">
             <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
               <TrendUp className="size-3.5 text-muted-foreground" /> Opportunities
             </h3>
             <div className="space-y-2">
-              {analysis.opportunity_signals.map((opp, i) => (
-                <div
-                  key={i}
-                  className="text-sm p-3 rounded-lg bg-foreground/[0.02] border border-foreground/[0.06]"
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-foreground/[0.06] text-muted-foreground border border-foreground/[0.08] uppercase font-bold">
-                      {opp.type.replace("_", " ")}
-                    </span>
-                    {opp.estimated_value && (
-                      <span className="text-xs text-foreground font-semibold">{opp.estimated_value}</span>
-                    )}
+              {analysis.opportunity_signals
+                .filter((o) => o.type !== "at_risk" && o.type !== "closed_lost")
+                .map((opp, i) => (
+                  <div
+                    key={i}
+                    className="text-sm p-3 rounded-lg bg-foreground/[0.02] border border-foreground/[0.06]"
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 uppercase font-bold">
+                        {opp.type.replace("_", " ")}
+                      </span>
+                      {opp.estimated_value && (
+                        <span className="text-xs text-foreground font-semibold">{opp.estimated_value}</span>
+                      )}
+                    </div>
+                    <p>{opp.description}</p>
                   </div>
-                  <p>{opp.description}</p>
-                </div>
-              ))}
+                ))}
             </div>
           </div>
         )}
@@ -618,15 +713,19 @@ function AnalysisPanel({
         {analysis.events_mentioned.length > 0 && (
           <div className="mb-6">
             <h3 className="text-sm font-semibold text-muted-foreground mb-2">Events Mentioned</h3>
-            <div className="flex flex-wrap gap-2">
-              {analysis.events_mentioned.map((event, i) => (
-                <span
-                  key={i}
-                  className="text-xs px-2.5 py-1 rounded-full bg-foreground/[0.06] border border-foreground/[0.08]"
-                >
-                  {event}
-                </span>
-              ))}
+            <div className="space-y-2">
+              {analysis.events_mentioned.map((event, i) => {
+                const eventName = typeof event === "string" ? event : event.event;
+                const eventContext = typeof event === "string" ? null : event.context;
+                return (
+                  <div key={i} className="p-2.5 rounded-lg bg-foreground/[0.03] border border-foreground/[0.06]">
+                    <p className="text-sm font-medium">{eventName}</p>
+                    {eventContext && (
+                      <p className="text-xs text-muted-foreground mt-0.5">{eventContext}</p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -634,24 +733,27 @@ function AnalysisPanel({
         {/* Talk-to-Listen Ratio */}
         <div className="mb-6">
           <h3 className="text-sm font-semibold text-muted-foreground mb-2">Talk-to-Listen Ratio</h3>
-          <div className="flex items-center gap-1 h-3 rounded-full overflow-hidden">
+          <div className="flex items-center gap-0.5 h-4 rounded-full overflow-hidden bg-foreground/[0.04]">
             <div
-              className="bg-foreground/30 h-full rounded-l-full"
-              style={{ width: `${analysis.talk_to_listen_ratio.agent_pct}%` }}
+              className="bg-primary h-full rounded-l-full transition-all"
+              style={{ width: `${agentPct}%` }}
             />
             <div
-              className="bg-foreground/10 h-full rounded-r-full"
+              className="bg-foreground/15 h-full rounded-r-full transition-all"
               style={{ width: `${analysis.talk_to_listen_ratio.contact_pct}%` }}
             />
           </div>
-          <div className="flex justify-between mt-1">
-            <span className="text-xs text-muted-foreground tabular-nums">
-              Agent {analysis.talk_to_listen_ratio.agent_pct}%
+          <div className="flex justify-between mt-1.5">
+            <span className="text-xs font-medium text-primary tabular-nums">
+              Agent {agentPct}%
             </span>
             <span className="text-xs text-muted-foreground tabular-nums">
               Contact {analysis.talk_to_listen_ratio.contact_pct}%
             </span>
           </div>
+          {ratioNote && (
+            <p className="text-xs text-amber-600 dark:text-amber-400 mt-1.5 italic">{ratioNote}</p>
+          )}
         </div>
 
         {/* Coaching Notes */}
@@ -669,12 +771,42 @@ function AnalysisPanel({
         {/* Draft Follow-up */}
         {analysis.draft_follow_up && (
           <div className="mb-6">
-            <h3 className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-2">
-              <ChatText className="size-3.5" /> Suggested Follow-up
-            </h3>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                <ChatText className="size-3.5" /> Suggested Follow-up
+              </h3>
+              <button
+                onClick={() => copyText(analysis.draft_follow_up!, "followup")}
+                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+              >
+                {copiedField === "followup" ? <CheckCircle className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
+                {copiedField === "followup" ? "Copied" : "Copy"}
+              </button>
+            </div>
             <div className="text-sm p-4 rounded-lg bg-foreground/[0.03] border border-foreground/[0.06] whitespace-pre-line italic">
               {analysis.draft_follow_up}
             </div>
+          </div>
+        )}
+
+        {/* Transcript Preview */}
+        {transcript && (
+          <div className="mb-6">
+            <button
+              onClick={() => setShowTranscript(!showTranscript)}
+              className="flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors w-full"
+            >
+              <Eye className="size-3.5" />
+              <span>View Transcript</span>
+              {showTranscript ? <CaretUp className="size-3.5 ml-auto" /> : <CaretDown className="size-3.5 ml-auto" />}
+            </button>
+            {showTranscript && (
+              <div className="mt-2 p-4 rounded-lg bg-foreground/[0.02] border border-foreground/[0.06] max-h-96 overflow-y-auto">
+                <pre className="text-xs leading-relaxed whitespace-pre-wrap font-mono text-foreground/80">
+                  {transcript}
+                </pre>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -708,6 +840,112 @@ function DigestSection({
       </div>
       <div className="p-5">{children}</div>
     </motion.div>
+  );
+}
+
+// ── Digest Copy Button ──
+
+function DigestCopyButton({ digest, eventRecap }: { digest: DailyDigest; eventRecap: EventRecapData | null }) {
+  const [copied, setCopied] = useState(false);
+
+  const formatDigestText = () => {
+    const lines: string[] = [];
+    lines.push(`📊 AI SALES DIGEST — ${digest.period}`);
+    lines.push(`Generated: ${new Date(digest.generated_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })} · ${digest.total_calls_analysed} calls analysed`);
+    lines.push("");
+
+    if (eventRecap) {
+      lines.push("━━━ TODAY'S RECAP ━━━");
+      if (eventRecap.totalDealValue > 0) lines.push(`💰 Deals Closed: £${Math.round(eventRecap.totalDealValue).toLocaleString()}`);
+      if (eventRecap.dealsClosedToday.length > 0) lines.push(`📋 Bookings: ${eventRecap.dealsClosedToday.length}`);
+      if (eventRecap.leadsCreatedToday > 0) lines.push(`👤 New Leads: ${eventRecap.leadsCreatedToday}`);
+      if (eventRecap.callStats) lines.push(`📞 Calls: ${eventRecap.callStats.total}`);
+      lines.push("");
+    }
+
+    lines.push("━━━ TEAM SUMMARY ━━━");
+    lines.push(digest.team_summary);
+    lines.push("");
+
+    if (digest.top_objections.length > 0) {
+      lines.push("━━━ OBJECTION RADAR ━━━");
+      digest.top_objections.forEach((obj) => {
+        lines.push(`• ${obj.objection} (${obj.frequency}x)`);
+        lines.push(`  → ${obj.suggested_response}`);
+      });
+      lines.push("");
+    }
+
+    if (digest.winning_pitches.length > 0) {
+      lines.push("━━━ WHAT'S WORKING ━━━");
+      digest.winning_pitches.forEach((p) => {
+        lines.push(`• ${p.description} — ${p.rep}`);
+      });
+      lines.push("");
+    }
+
+    if (digest.event_demand.length > 0) {
+      lines.push("━━━ EVENT DEMAND ━━━");
+      digest.event_demand.forEach((e) => {
+        lines.push(`• ${e.event}: ${e.mentions} mentions — ${e.sentiment}`);
+      });
+      lines.push("");
+    }
+
+    if (digest.competitor_intelligence.length > 0) {
+      lines.push("━━━ COMPETITOR INTEL ━━━");
+      digest.competitor_intelligence.forEach((c) => {
+        lines.push(`• ${c.competitor} (${c.mentions}x) — ${c.context}`);
+      });
+      lines.push("");
+    }
+
+    if (digest.coaching_highlights.length > 0) {
+      lines.push("━━━ COACHING INSIGHTS ━━━");
+      const strengths = digest.coaching_highlights.filter(h => h.type === "strength");
+      const improvements = digest.coaching_highlights.filter(h => h.type === "improvement");
+      if (strengths.length > 0) {
+        lines.push("Strengths:");
+        strengths.forEach((h) => lines.push(`  ✅ ${h.rep}: ${h.description}`));
+      }
+      if (improvements.length > 0) {
+        lines.push("Areas for Improvement:");
+        improvements.forEach((h) => lines.push(`  💡 ${h.rep}: ${h.description}`));
+      }
+      lines.push("");
+    }
+
+    if (digest.key_deals.length > 0) {
+      lines.push("━━━ KEY DEALS ━━━");
+      digest.key_deals.forEach((d) => {
+        lines.push(`• ${d.contact} (${d.rep}): ${d.status}`);
+        lines.push(`  → ${d.next_steps}`);
+      });
+      lines.push("");
+    }
+
+    if (digest.follow_up_gaps.length > 0) {
+      lines.push("━━━ FOLLOW-UP GAPS ━━━");
+      digest.follow_up_gaps.forEach((g) => {
+        lines.push(`• ${g.rep}: ${g.description}`);
+      });
+    }
+
+    return lines.join("\n");
+  };
+
+  return (
+    <button
+      onClick={() => {
+        navigator.clipboard.writeText(formatDigestText()).catch(() => {});
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }}
+      className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-border/50 bg-card hover:bg-muted/50 transition-colors text-sm font-medium text-muted-foreground hover:text-foreground"
+    >
+      {copied ? <CheckCircle className="size-4 text-emerald-500" /> : <Copy className="size-4" />}
+      {copied ? "Copied!" : "Copy"}
+    </button>
   );
 }
 
@@ -800,6 +1038,7 @@ export default function CallsPage() {
   const [selectedCallId, setSelectedCallId] = useState<number | null>(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [callAnalysis, setCallAnalysis] = useState<CallAnalysis | null>(null);
+  const [callTranscript, setCallTranscript] = useState<string | null>(null);
 
   // Digest tab state — restore from sessionStorage if available
   const [digest, setDigest] = useState<DailyDigest | null>(() => {
@@ -919,7 +1158,9 @@ export default function CallsPage() {
     try {
       const cached = sessionStorage.getItem(`call_analysis_${callId}`);
       if (cached) {
-        setCallAnalysis(JSON.parse(cached));
+        const parsed = JSON.parse(cached);
+        setCallAnalysis(parsed.analysis || parsed);
+        setCallTranscript(parsed.transcript || null);
         setAnalysisLoading(false);
         return;
       }
@@ -927,6 +1168,7 @@ export default function CallsPage() {
 
     setAnalysisLoading(true);
     setCallAnalysis(null);
+    setCallTranscript(null);
 
     try {
       const response = await fetch("/api/calls/analyse", {
@@ -937,7 +1179,8 @@ export default function CallsPage() {
       const result = await response.json();
       if (result.success) {
         setCallAnalysis(result.data);
-        try { sessionStorage.setItem(`call_analysis_${callId}`, JSON.stringify(result.data)); } catch {}
+        setCallTranscript(result.transcript || null);
+        try { sessionStorage.setItem(`call_analysis_${callId}`, JSON.stringify({ analysis: result.data, transcript: result.transcript || null })); } catch {}
       } else {
         console.error("Analysis failed:", result.error);
         alert(result.error || "Failed to analyse call. It may not have a transcript.");
@@ -1119,9 +1362,39 @@ export default function CallsPage() {
             ) : callAnalysis ? (
               <AnalysisPanel
                 analysis={callAnalysis}
+                transcript={callTranscript}
                 onClose={() => {
                   setSelectedCallId(null);
                   setCallAnalysis(null);
+                  setCallTranscript(null);
+                }}
+                onTopicClick={(topic) => {
+                  setSelectedCallId(null);
+                  setCallAnalysis(null);
+                  setCallTranscript(null);
+                  setActiveTab("transcripts");
+                  setTranscriptQuery(topic);
+                  // Trigger search after state update
+                  setTimeout(() => {
+                    const params = new URLSearchParams({ keyword: topic.trim() });
+                    if (transcriptFromDate) params.set("fromDate", transcriptFromDate);
+                    if (transcriptToDate) params.set("toDate", transcriptToDate);
+                    if (transcriptDirection) params.set("direction", transcriptDirection);
+                    setTranscriptLoading(true);
+                    setHasSearched(true);
+                    fetch(`/api/calls/transcripts?${params}`)
+                      .then((r) => r.json())
+                      .then((result) => {
+                        if (result.success) {
+                          setTranscriptResults(result.data.results || []);
+                          if (result.data.totalStored !== undefined) {
+                            setTranscriptCount(result.data.totalStored);
+                          }
+                        }
+                      })
+                      .catch(console.error)
+                      .finally(() => setTranscriptLoading(false));
+                  }, 50);
                 }}
               />
             ) : null}
@@ -1578,18 +1851,23 @@ export default function CallsPage() {
                         : "AI analyses call transcripts, deals, and team activity to generate actionable insights"}
                     </p>
                   </div>
-                  <button
-                    onClick={() => generateDigest(true)}
-                    disabled={digestLoading}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm font-medium disabled:opacity-50 shadow-lg"
-                  >
-                    {digestLoading ? (
-                      <SpinnerGap className="size-4 animate-spin" />
-                    ) : (
-                      <ArrowsClockwise className="size-4" />
+                  <div className="flex items-center gap-2">
+                    {digest && (
+                      <DigestCopyButton digest={digest} eventRecap={eventRecap} />
                     )}
-                    {digestLoading ? "Generating..." : "Generate"}
-                  </button>
+                    <button
+                      onClick={() => generateDigest(true)}
+                      disabled={digestLoading}
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm font-medium disabled:opacity-50 shadow-lg"
+                    >
+                      {digestLoading ? (
+                        <SpinnerGap className="size-4 animate-spin" />
+                      ) : (
+                        <ArrowsClockwise className="size-4" />
+                      )}
+                      {digestLoading ? "Generating..." : "Generate"}
+                    </button>
+                  </div>
                 </motion.div>
 
                 {digestError && (
@@ -1640,38 +1918,49 @@ export default function CallsPage() {
                           </button>
                         </div>
                         <div className="p-5">
-                          {/* Recap metric cards */}
+                          {/* Recap metric cards — only show cards with meaningful data */}
                           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-                            <div className="rounded-xl bg-foreground/[0.03] border border-foreground/[0.06] p-3 text-center">
-                              <Briefcase className="size-5 text-emerald-500 mx-auto mb-1.5" />
-                              <p className="text-xl font-bold tabular-nums text-emerald-500">
-                                £{Math.round(eventRecap.totalDealValue).toLocaleString()}
-                              </p>
-                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
-                                Deals Closed
-                              </p>
-                            </div>
-                            <div className="rounded-xl bg-foreground/[0.03] border border-foreground/[0.06] p-3 text-center">
-                              <CalendarCheck className="size-5 text-blue-500 mx-auto mb-1.5" />
-                              <p className="text-xl font-bold tabular-nums">{eventRecap.dealsClosedToday.length}</p>
-                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
-                                Bookings Today
-                              </p>
-                            </div>
-                            <div className="rounded-xl bg-foreground/[0.03] border border-foreground/[0.06] p-3 text-center">
-                              <UserPlus className="size-5 text-violet-500 mx-auto mb-1.5" />
-                              <p className="text-xl font-bold tabular-nums">{eventRecap.leadsCreatedToday}</p>
-                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
-                                New Leads
-                              </p>
-                            </div>
+                            {eventRecap.totalDealValue > 0 && (
+                              <div className="rounded-xl bg-emerald-500/5 border border-emerald-500/10 p-3 text-center">
+                                <Briefcase className="size-5 text-emerald-500 mx-auto mb-1.5" />
+                                <p className="text-xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+                                  £{Math.round(eventRecap.totalDealValue).toLocaleString()}
+                                </p>
+                                <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
+                                  Deals Closed
+                                </p>
+                              </div>
+                            )}
+                            {eventRecap.dealsClosedToday.length > 0 && (
+                              <div className="rounded-xl bg-foreground/[0.03] border border-foreground/[0.06] p-3 text-center">
+                                <CalendarCheck className="size-5 text-blue-500 mx-auto mb-1.5" />
+                                <p className="text-xl font-bold tabular-nums">{eventRecap.dealsClosedToday.length}</p>
+                                <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
+                                  Bookings Today
+                                </p>
+                              </div>
+                            )}
+                            {eventRecap.leadsCreatedToday > 0 && (
+                              <div className="rounded-xl bg-foreground/[0.03] border border-foreground/[0.06] p-3 text-center">
+                                <UserPlus className="size-5 text-violet-500 mx-auto mb-1.5" />
+                                <p className="text-xl font-bold tabular-nums">{eventRecap.leadsCreatedToday}</p>
+                                <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
+                                  New Leads
+                                </p>
+                              </div>
+                            )}
                             {eventRecap.callStats && (
                               <div className="rounded-xl bg-foreground/[0.03] border border-foreground/[0.06] p-3 text-center">
                                 <Phone className="size-5 text-amber-500 mx-auto mb-1.5" />
                                 <p className="text-xl font-bold tabular-nums">{eventRecap.callStats.total}</p>
                                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
-                                  Calls Made
+                                  Calls Today
                                 </p>
+                                {eventRecap.callStats.total > 0 && (
+                                  <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5">
+                                    {Math.round((eventRecap.callStats.answered / eventRecap.callStats.total) * 100)}% answered
+                                  </p>
+                                )}
                               </div>
                             )}
                           </div>
@@ -1744,19 +2033,37 @@ export default function CallsPage() {
                     </motion.div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                      {/* Follow-up Gaps — URGENT, shown first */}
+                      {digest.follow_up_gaps.length > 0 && (
+                        <DigestSection title="Follow-up Gaps" icon={Clock} delay={0.1}>
+                          <div className="space-y-2">
+                            {digest.follow_up_gaps.map((gap, i) => (
+                              <div key={i} className="flex items-start gap-3 text-sm p-3 rounded-lg border-l-2 border-l-red-500 bg-red-500/5 border border-red-500/10">
+                                <Clock className="size-3.5 text-red-500 shrink-0 mt-0.5" weight="fill" />
+                                <div className="min-w-0">
+                                  <span className="text-xs font-bold text-foreground">{gap.rep}</span>
+                                  <p className="text-xs text-muted-foreground mt-0.5">{gap.description}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </DigestSection>
+                      )}
+
+                      {/* Objection Radar */}
                       {digest.top_objections.length > 0 && (
-                        <DigestSection title="Objection Radar" icon={Warning} delay={0.1}>
+                        <DigestSection title="Objection Radar" icon={Warning} delay={0.15}>
                           <div className="space-y-4">
                             {digest.top_objections.map((obj, i) => (
                               <div key={i}>
                                 <div className="flex items-center justify-between mb-1">
                                   <p className="text-sm font-semibold">{obj.objection}</p>
-                                  <span className="text-xs px-2 py-0.5 rounded-full bg-foreground/[0.06] text-muted-foreground tabular-nums">
+                                  <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 tabular-nums font-medium">
                                     {obj.frequency}x
                                   </span>
                                 </div>
                                 <p className="text-xs text-muted-foreground leading-relaxed">
-                                  💡 {obj.suggested_response}
+                                  → {obj.suggested_response}
                                 </p>
                               </div>
                             ))}
@@ -1764,11 +2071,30 @@ export default function CallsPage() {
                         </DigestSection>
                       )}
 
+                      {/* Key Deals */}
+                      {digest.key_deals.length > 0 && (
+                        <DigestSection title="Key Deals" icon={Briefcase} delay={0.2}>
+                          <div className="space-y-3">
+                            {digest.key_deals.map((deal, i) => (
+                              <div key={i} className="p-3 rounded-lg bg-foreground/[0.03] border border-foreground/[0.06]">
+                                <div className="flex items-center justify-between mb-1">
+                                  <p className="text-sm font-semibold">{deal.contact}</p>
+                                  <span className="text-xs text-muted-foreground font-medium">{deal.rep}</span>
+                                </div>
+                                <p className="text-xs text-muted-foreground mb-1">{deal.status}</p>
+                                <p className="text-xs text-foreground font-medium">→ {deal.next_steps}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </DigestSection>
+                      )}
+
+                      {/* What's Working */}
                       {digest.winning_pitches.length > 0 && (
-                        <DigestSection title="What&apos;s Working" icon={Trophy} delay={0.15}>
+                        <DigestSection title="What&apos;s Working" icon={Trophy} delay={0.25}>
                           <div className="space-y-3">
                             {digest.winning_pitches.map((pitch, i) => (
-                              <div key={i} className="p-3 rounded-lg bg-foreground/[0.02] border border-foreground/[0.06]">
+                              <div key={i} className="p-3 rounded-lg border-l-2 border-l-emerald-500 bg-emerald-500/5 border border-emerald-500/10">
                                 <p className="text-sm">{pitch.description}</p>
                                 <p className="text-xs text-muted-foreground mt-1">
                                   {pitch.rep} — {pitch.context}
@@ -1779,84 +2105,102 @@ export default function CallsPage() {
                         </DigestSection>
                       )}
 
+                      {/* Event Demand */}
                       {digest.event_demand.length > 0 && (
-                        <DigestSection title="Event Demand" icon={TrendUp} delay={0.2}>
+                        <DigestSection title="Event Demand" icon={TrendUp} delay={0.3}>
                           <div className="space-y-3">
-                            {digest.event_demand.map((event, i) => (
-                              <div key={i} className="flex items-center justify-between">
-                                <div>
-                                  <p className="text-sm font-semibold">{event.event}</p>
-                                  <p className="text-xs text-muted-foreground">{event.sentiment}</p>
+                            {digest.event_demand.map((event, i) => {
+                              const sentLower = event.sentiment.toLowerCase();
+                              const sentimentTag = sentLower.includes("hot") || sentLower.includes("high")
+                                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                                : sentLower.includes("caution") || sentLower.includes("mixed")
+                                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+                                  : sentLower.includes("critical") || sentLower.includes("cold")
+                                    ? "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20"
+                                    : sentLower.includes("warm")
+                                      ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20"
+                                      : "bg-foreground/[0.06] text-muted-foreground border-foreground/[0.08]";
+                              const sentParts = event.sentiment.split("—").map(s => s.trim());
+                              const sentLabel = sentParts[0] || event.sentiment;
+                              const sentDetail = sentParts[1] || null;
+                              return (
+                                <div key={i} className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-2 mb-0.5">
+                                      <p className="text-sm font-semibold">{event.event}</p>
+                                      <span className={`text-[10px] px-1.5 py-0.5 rounded border uppercase font-bold shrink-0 ${sentimentTag}`}>
+                                        {sentLabel}
+                                      </span>
+                                    </div>
+                                    {sentDetail && (
+                                      <p className="text-xs text-muted-foreground">{sentDetail}</p>
+                                    )}
+                                  </div>
+                                  <span className="text-sm font-bold text-foreground tabular-nums shrink-0">
+                                    {event.mentions}x
+                                  </span>
                                 </div>
-                                <span className="text-sm font-bold text-foreground tabular-nums">
-                                  {event.mentions} mentions
-                                </span>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </DigestSection>
                       )}
 
+                      {/* Coaching Insights */}
+                      {digest.coaching_highlights.length > 0 && (
+                        <DigestSection title="Coaching Insights" icon={Lightning} delay={0.35}>
+                          <div className="space-y-4">
+                            {digest.coaching_highlights.filter(h => h.type === "strength").length > 0 && (
+                              <div>
+                                <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                  <Trophy className="size-3" /> Strengths
+                                </p>
+                                <div className="space-y-2">
+                                  {digest.coaching_highlights
+                                    .filter(h => h.type === "strength")
+                                    .map((highlight, i) => (
+                                      <div key={i} className="p-3 rounded-lg border-l-2 border-emerald-500 bg-emerald-500/5 border border-emerald-500/10 border-l-emerald-500">
+                                        <span className="text-xs font-bold">{highlight.rep}</span>
+                                        <p className="text-xs text-muted-foreground mt-0.5">{highlight.description}</p>
+                                      </div>
+                                    ))}
+                                </div>
+                              </div>
+                            )}
+                            {digest.coaching_highlights.filter(h => h.type === "improvement").length > 0 && (
+                              <div>
+                                <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                  <FontAwesomeIcon icon={faLightbulb} className="h-3 w-3" /> Areas to Improve
+                                </p>
+                                <div className="space-y-2">
+                                  {digest.coaching_highlights
+                                    .filter(h => h.type === "improvement")
+                                    .map((highlight, i) => (
+                                      <div key={i} className="p-3 rounded-lg border-l-2 border-amber-500 bg-amber-500/5 border border-amber-500/10 border-l-amber-500">
+                                        <span className="text-xs font-bold">{highlight.rep}</span>
+                                        <p className="text-xs text-muted-foreground mt-0.5">{highlight.description}</p>
+                                      </div>
+                                    ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </DigestSection>
+                      )}
+
+                      {/* Competitor Intel — only show if data exists */}
                       {digest.competitor_intelligence.length > 0 && (
-                        <DigestSection title="Competitor Intel" icon={Target} delay={0.25}>
+                        <DigestSection title="Competitor Intel" icon={Target} delay={0.4}>
                           <div className="space-y-3">
                             {digest.competitor_intelligence.map((comp, i) => (
                               <div key={i}>
                                 <div className="flex items-center justify-between mb-0.5">
                                   <p className="text-sm font-semibold">{comp.competitor}</p>
-                                  <span className="text-xs text-muted-foreground tabular-nums">
-                                    {comp.mentions}x mentioned
+                                  <span className="text-xs px-2 py-0.5 rounded-full bg-foreground/[0.06] text-muted-foreground tabular-nums font-medium">
+                                    {comp.mentions}x
                                   </span>
                                 </div>
                                 <p className="text-xs text-muted-foreground">{comp.context}</p>
-                              </div>
-                            ))}
-                          </div>
-                        </DigestSection>
-                      )}
-
-                      {digest.coaching_highlights.length > 0 && (
-                        <DigestSection title="Coaching Insights" icon={Lightning} delay={0.3}>
-                          <div className="space-y-3">
-                            {digest.coaching_highlights.map((highlight, i) => (
-                              <div key={i} className="p-3 rounded-lg border bg-foreground/[0.02] border-foreground/[0.06]">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="text-xs font-bold uppercase">{highlight.rep}</span>
-                                  <span className="text-[10px] px-1.5 py-0.5 rounded border uppercase bg-foreground/[0.06] text-muted-foreground border-foreground/[0.08]">
-                                    {highlight.type}
-                                  </span>
-                                </div>
-                                <p className="text-xs text-muted-foreground">{highlight.description}</p>
-                              </div>
-                            ))}
-                          </div>
-                        </DigestSection>
-                      )}
-
-                      {digest.key_deals.length > 0 && (
-                        <DigestSection title="Key Deals" icon={Target} delay={0.35}>
-                          <div className="space-y-3">
-                            {digest.key_deals.map((deal, i) => (
-                              <div key={i} className="p-3 rounded-lg bg-foreground/[0.03] border border-foreground/[0.06]">
-                                <div className="flex items-center justify-between mb-1">
-                                  <p className="text-sm font-semibold">{deal.contact}</p>
-                                  <span className="text-xs text-muted-foreground">{deal.rep}</span>
-                                </div>
-                                <p className="text-xs text-muted-foreground mb-1">Status: {deal.status}</p>
-                                <p className="text-xs text-foreground">→ {deal.next_steps}</p>
-                              </div>
-                            ))}
-                          </div>
-                        </DigestSection>
-                      )}
-
-                      {digest.follow_up_gaps.length > 0 && (
-                        <DigestSection title="Follow-up Gaps" icon={Warning} delay={0.4}>
-                          <div className="space-y-2">
-                            {digest.follow_up_gaps.map((gap, i) => (
-                              <div key={i} className="flex items-start gap-3 text-sm p-3 rounded-lg bg-foreground/[0.02] border border-foreground/[0.06]">
-                                <span className="text-xs font-bold text-foreground shrink-0">{gap.rep}</span>
-                                <p className="text-xs text-muted-foreground">{gap.description}</p>
                               </div>
                             ))}
                           </div>

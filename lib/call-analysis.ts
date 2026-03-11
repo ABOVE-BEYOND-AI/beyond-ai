@@ -37,7 +37,7 @@ export interface CallAnalysis {
     estimated_value?: string
   }[]
   competitor_mentions: string[]
-  events_mentioned: string[]
+  events_mentioned: (string | { event: string; context: string })[]
   talk_to_listen_ratio: {
     agent_pct: number
     contact_pct: number
@@ -131,7 +131,7 @@ Return a JSON object with this exact structure:
     { "type": "new_deal|upsell|follow_up|at_risk|closed_lost", "description": "what the opportunity is", "estimated_value": "optional £ estimate" }
   ],
   "competitor_mentions": ["any competitors or alternative providers mentioned"],
-  "events_mentioned": ["specific events discussed — e.g. 'The Open St Andrews 2027', 'Madrid Grand Prix 2026'"],
+  "events_mentioned": [{ "event": "The Open St Andrews 2027", "context": "Client interested in 4-person hospitality package" }],
   "talk_to_listen_ratio": { "agent_pct": 60, "contact_pct": 40 },
   "coaching_notes": "brief coaching observation for the sales rep if applicable — what they did well or could improve. null if nothing notable",
   "draft_follow_up": "a brief professional follow-up email the rep could send after this call. null if not appropriate"

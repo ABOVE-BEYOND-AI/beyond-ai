@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCall, getTranscription, formatTranscriptForAI } from '@/lib/aircall'
 import { analyseCall, type CallAnalysis } from '@/lib/call-analysis'
-import { storeTranscript } from '@/lib/transcript-store'
+import { storeTranscript, getTranscript } from '@/lib/transcript-store'
 import { transcribeFromUrl } from '@/lib/deepgram'
 import { Redis } from '@upstash/redis'
 import { apiErrorResponse, requireApiUser } from '@/lib/api-auth'
@@ -59,7 +59,8 @@ export async function POST(request: NextRequest) {
       try {
         const cached = await redis.get<CallAnalysis>(CACHE_KEY(callId))
         if (cached) {
-          return NextResponse.json({ success: true, data: cached, cached: true })
+          const storedTranscript = await getTranscript(callId)
+          return NextResponse.json({ success: true, data: cached, transcript: storedTranscript?.transcript || null, cached: true })
         }
       } catch (cacheErr) {
         console.warn('Redis cache read failed, proceeding without cache:', cacheErr)
@@ -157,7 +158,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    return NextResponse.json({ success: true, data: analysis, cached: false })
+    return NextResponse.json({ success: true, data: analysis, transcript, cached: false })
   } catch (error) {
     console.error('Error analysing call:', error)
     return apiErrorResponse(error, 'Failed to analyse call')

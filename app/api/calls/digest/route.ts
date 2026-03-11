@@ -194,13 +194,13 @@ Generate a comprehensive team intelligence digest as JSON. Return ONLY valid JSO
 {
   "team_summary": "3-5 sentence executive summary. Cover: total call volume, answer rate, meaningful conversations, top performers, deal momentum, ${hasDeepData ? 'key themes from conversations, ' : ''}energy/pace. Be specific with actual numbers and names.",
   "top_objections": [
-    { "objection": "specific objection pattern", "frequency": 2, "suggested_response": "practical response for luxury hospitality" }
+    { "objection": "specific objection pattern", "frequency": 2, "suggested_response": "1-2 punchy sentences MAX — this is displayed on a sales floor screen, not a manual" }
   ],
   "winning_pitches": [
     { "description": "what worked", "rep": "who", "context": "brief context" }
   ],
   "event_demand": [
-    { "event": "event name", "mentions": 3, "sentiment": "demand signal" }
+    { "event": "event name", "mentions": 3, "sentiment": "HOT/WARM/MIXED/CAUTION/CRITICAL — then a brief note" }
   ],
   "competitor_intelligence": [
     { "competitor": "name", "mentions": 1, "context": "what was said" }
