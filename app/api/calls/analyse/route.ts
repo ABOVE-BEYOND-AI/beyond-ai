@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCall, getTranscription, formatTranscriptForAI } from '@/lib/aircall'
 import { analyseCall, type CallAnalysis } from '@/lib/call-analysis'
 import { storeTranscript } from '@/lib/transcript-store'
+import { transcribeFromUrl } from '@/lib/deepgram'
 import { Redis } from '@upstash/redis'
-import OpenAI from 'openai'
 import { apiErrorResponse, requireApiUser } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
@@ -17,91 +17,8 @@ function getRedis(): Redis | null {
   return new Redis({ url, token })
 }
 
-function getOpenAI(): OpenAI {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error('Missing OPENAI_API_KEY for transcription')
-  }
-  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-}
-
 const CACHE_KEY = (callId: number) => `call_analysis:${callId}`
 const CACHE_TTL = 60 * 60 * 24 * 7 // 7 days
-
-/**
- * Download an Aircall recording and transcribe it with OpenAI Whisper.
- * Retries up to 2 times on connection errors (ECONNRESET, timeouts).
- * Recording URLs expire in 10 minutes, so we fetch fresh from the API.
- */
-async function transcribeRecording(recordingUrl: string, agentName: string, contactName: string): Promise<string> {
-  // Download the MP3
-  const response = await fetch(recordingUrl)
-  if (!response.ok) {
-    throw new Error(`Failed to download recording: ${response.status}`)
-  }
-
-  const arrayBuffer = await response.arrayBuffer()
-  const fileSizeKB = Math.round(arrayBuffer.byteLength / 1024)
-  console.log(`Downloaded recording: ${fileSizeKB}KB`)
-
-  const blob = new Blob([arrayBuffer], { type: 'audio/mpeg' })
-  const file = new File([blob], 'recording.mp3', { type: 'audio/mpeg' })
-
-  const openai = getOpenAI()
-
-  // Retry logic for transient connection errors
-  const MAX_RETRIES = 2
-  let lastError: Error | null = null
-
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      if (attempt > 0) {
-        const delay = attempt * 3000
-        console.log(`Whisper retry ${attempt}/${MAX_RETRIES} after ${delay}ms...`)
-        await new Promise(resolve => setTimeout(resolve, delay))
-      }
-
-      const transcription = await openai.audio.transcriptions.create({
-        model: 'whisper-1',
-        file,
-        language: 'en',
-        response_format: 'verbose_json',
-        prompt: `This is a British sales call between ${agentName} (sales rep at Above and Beyond, a luxury hospitality company) and ${contactName} (client/prospect). They discuss premium event hospitality packages for sporting events like Formula 1 Grand Prix, The Open Championship, Wimbledon, Six Nations rugby, Cheltenham, and the Ryder Cup. British English accents.`,
-      })
-
-      // Format as readable transcript with timestamps
-      if ('segments' in transcription && Array.isArray(transcription.segments)) {
-        return transcription.segments
-          .map((seg: { start: number; text: string }) => {
-            const mins = Math.floor(seg.start / 60)
-            const secs = Math.floor(seg.start % 60)
-            return `[${mins}:${secs.toString().padStart(2, '0')}] ${seg.text.trim()}`
-          })
-          .filter(line => {
-            const textPart = line.replace(/^\[\d+:\d+\]\s*/, '')
-            return textPart.length > 2
-          })
-          .join('\n')
-      }
-
-      return transcription.text
-    } catch (err) {
-      lastError = err as Error
-      const errMsg = lastError.message || ''
-      const isRetryable = errMsg.includes('ECONNRESET') ||
-        errMsg.includes('Connection error') ||
-        errMsg.includes('timeout') ||
-        errMsg.includes('ETIMEDOUT') ||
-        errMsg.includes('socket hang up')
-
-      if (!isRetryable || attempt === MAX_RETRIES) {
-        throw lastError
-      }
-      console.warn(`Whisper connection error (attempt ${attempt + 1}): ${errMsg}`)
-    }
-  }
-
-  throw lastError || new Error('Whisper transcription failed')
-}
 
 /**
  * Validate that a transcript has enough meaningful content for analysis.
@@ -116,7 +33,7 @@ function isTranscriptMeaningful(transcript: string): { valid: boolean; reason?: 
     return { valid: false, reason: `Transcript only contains ${words.length} words — likely silence, hold music, or voicemail. Need at least 20 words of conversation.` }
   }
 
-  // Check for repeated patterns (Whisper sometimes hallucinates repetitive content)
+  // Check for repeated patterns (transcription sometimes hallucinates repetitive content)
   const uniqueWords = new Set(words.map(w => w.toLowerCase()))
   const uniqueRatio = uniqueWords.size / words.length
   if (uniqueRatio < 0.15 && words.length > 50) {
@@ -174,7 +91,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`Transcribing call ${callId} (${call.duration}s) - ${agentName} <> ${contactName}`)
 
-    // Step 1: Try Aircall's native transcription first (free), fall back to Whisper
+    // Step 1: Try Aircall's native transcription first (free), fall back to Deepgram Nova-3
     let transcript: string | null = null
 
     try {
@@ -184,12 +101,14 @@ export async function POST(request: NextRequest) {
         console.log(`Got Aircall transcription for call ${callId} (${transcript.length} chars)`)
       }
     } catch {
-      console.log(`Aircall transcription not available for ${callId}, trying Whisper...`)
+      console.log(`Aircall transcription not available for ${callId}, trying Deepgram...`)
     }
 
-    if (!transcript && call.recording) {
-      transcript = await transcribeRecording(call.recording, agentName, contactName)
-      console.log(`Whisper transcript ready for call ${callId} (${transcript.length} chars)`)
+    if (!transcript && (call.recording || call.asset)) {
+      const recordingUrl = call.recording || call.asset!
+      const result = await transcribeFromUrl(recordingUrl, agentName, contactName, call.direction)
+      transcript = result.transcript
+      console.log(`Deepgram transcript ready for call ${callId} (${transcript.length} chars, ${result.speakerCount} speakers)`)
     }
 
     if (!transcript) {

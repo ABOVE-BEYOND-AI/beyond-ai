@@ -1090,7 +1090,7 @@ export default function CallsPage() {
                   <Brain className="size-10 text-primary mx-auto mb-4 animate-pulse" />
                   <p className="text-lg font-semibold mb-1">Analysing Call</p>
                   <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                    Downloading recording → Transcribing with Whisper → Analysing with Claude...
+                    Transcribing with Deepgram Nova-3 → Analysing with Claude...
                   </p>
                   <p className="text-xs text-muted-foreground/50 mt-2">This may take 15-30 seconds</p>
                 </div>

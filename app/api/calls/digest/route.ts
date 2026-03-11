@@ -4,8 +4,10 @@ import { google } from '@ai-sdk/google'
 import { generateText } from 'ai'
 import { getCallDashboardData, type CallPeriod, type CallListItem } from '@/lib/call-dashboard'
 import { generateEventRecap } from '@/lib/event-recap'
-import { getRecentTranscripts } from '@/lib/transcript-store'
+import { getRecentTranscripts, storeTranscript } from '@/lib/transcript-store'
 import { type CallAnalysis } from '@/lib/call-analysis'
+import { getCall } from '@/lib/aircall'
+import { transcribeFromUrl } from '@/lib/deepgram'
 import { apiErrorResponse, requireApiUser } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
@@ -295,7 +297,68 @@ export async function POST(request: NextRequest) {
       transcript: t.transcript,
     }))
 
-    console.log(`Digest: ${cachedAnalyses.length} cached analyses, ${transcriptsInPeriod.length} stored transcripts, ${callData.analysableCalls.length} meaningful calls, ${callData.stats.total_calls} total calls`)
+    // Identify meaningful calls that have neither cached analysis nor stored transcript
+    const analysedCallIds = new Set(cachedAnalyses.map(a => a.call_id))
+    const storedTranscriptIds = new Set(transcriptsInPeriod.map(t => t.callId))
+    const callsNeedingTranscription = callData.analysableCalls.filter(
+      c => !analysedCallIds.has(c.id) && !storedTranscriptIds.has(c.id) && c.has_recording
+    )
+
+    // Batch transcribe up to 10 calls with Deepgram (in parallel)
+    if (callsNeedingTranscription.length > 0) {
+      const batchSize = Math.min(callsNeedingTranscription.length, 10)
+      const batch = callsNeedingTranscription.slice(0, batchSize)
+      console.log(`Digest: batch transcribing ${batchSize} calls with Deepgram...`)
+
+      const transcriptionResults = await Promise.allSettled(
+        batch.map(async (c) => {
+          try {
+            const call = await getCall(c.id)
+            const recordingUrl = call.recording || call.asset
+            if (!recordingUrl) return null
+
+            const contactName = call.contact
+              ? [call.contact.first_name, call.contact.last_name].filter(Boolean).join(' ') || 'Contact'
+              : 'Contact'
+            const agentName = call.user?.name || 'Agent'
+
+            const result = await transcribeFromUrl(recordingUrl, agentName, contactName, call.direction)
+
+            // Store in Redis for future use (non-blocking)
+            storeTranscript(c.id, {
+              agentName,
+              contactName,
+              duration: call.duration,
+              direction: call.direction,
+              startedAt: call.started_at,
+            }, result.transcript).catch(err => console.warn(`Failed to store transcript for ${c.id}:`, err))
+
+            return {
+              callId: c.id,
+              agent: agentName,
+              contact: contactName,
+              direction: call.direction,
+              duration: call.duration,
+              transcript: result.transcript,
+            }
+          } catch (err) {
+            console.warn(`Failed to transcribe call ${c.id} for digest:`, (err as Error).message)
+            return null
+          }
+        })
+      )
+
+      let newTranscripts = 0
+      for (const result of transcriptionResults) {
+        if (result.status === 'fulfilled' && result.value) {
+          transcriptData.push(result.value)
+          newTranscripts++
+        }
+      }
+      console.log(`Digest: batch transcription complete — ${newTranscripts}/${batchSize} succeeded`)
+    }
+
+    console.log(`Digest: ${cachedAnalyses.length} cached analyses, ${transcriptData.length} transcripts, ${callData.analysableCalls.length} meaningful calls, ${callData.stats.total_calls} total calls`)
 
     // Always generate AI insights — works with stats even without transcripts
     const aiInsights = await generateAIDigestInsights({
