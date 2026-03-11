@@ -29,6 +29,7 @@ const CACHE_TTL = 60 * 60 * 24 * 7 // 7 days
 
 /**
  * Download an Aircall recording and transcribe it with OpenAI Whisper.
+ * Retries up to 2 times on connection errors (ECONNRESET, timeouts).
  * Recording URLs expire in 10 minutes, so we fetch fresh from the API.
  */
 async function transcribeRecording(recordingUrl: string, agentName: string, contactName: string): Promise<string> {
@@ -39,38 +40,67 @@ async function transcribeRecording(recordingUrl: string, agentName: string, cont
   }
 
   const arrayBuffer = await response.arrayBuffer()
-  const blob = new Blob([arrayBuffer], { type: 'audio/mpeg' })
+  const fileSizeKB = Math.round(arrayBuffer.byteLength / 1024)
+  console.log(`Downloaded recording: ${fileSizeKB}KB`)
 
-  // Create a File object for the OpenAI API
+  const blob = new Blob([arrayBuffer], { type: 'audio/mpeg' })
   const file = new File([blob], 'recording.mp3', { type: 'audio/mpeg' })
 
-  // Transcribe with Whisper
   const openai = getOpenAI()
-  const transcription = await openai.audio.transcriptions.create({
-    model: 'whisper-1',
-    file,
-    language: 'en',
-    response_format: 'verbose_json',
-    prompt: `This is a British sales call between ${agentName} (sales rep at Above and Beyond, a luxury hospitality company) and ${contactName} (client/prospect). They discuss premium event hospitality packages for sporting events like Formula 1 Grand Prix, The Open Championship, Wimbledon, Six Nations rugby, Cheltenham, and the Ryder Cup. British English accents.`,
-  })
 
-  // Format as readable transcript with timestamps
-  if ('segments' in transcription && Array.isArray(transcription.segments)) {
-    return transcription.segments
-      .map((seg: { start: number; text: string }) => {
-        const mins = Math.floor(seg.start / 60)
-        const secs = Math.floor(seg.start % 60)
-        return `[${mins}:${secs.toString().padStart(2, '0')}] ${seg.text.trim()}`
+  // Retry logic for transient connection errors
+  const MAX_RETRIES = 2
+  let lastError: Error | null = null
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      if (attempt > 0) {
+        const delay = attempt * 3000
+        console.log(`Whisper retry ${attempt}/${MAX_RETRIES} after ${delay}ms...`)
+        await new Promise(resolve => setTimeout(resolve, delay))
+      }
+
+      const transcription = await openai.audio.transcriptions.create({
+        model: 'whisper-1',
+        file,
+        language: 'en',
+        response_format: 'verbose_json',
+        prompt: `This is a British sales call between ${agentName} (sales rep at Above and Beyond, a luxury hospitality company) and ${contactName} (client/prospect). They discuss premium event hospitality packages for sporting events like Formula 1 Grand Prix, The Open Championship, Wimbledon, Six Nations rugby, Cheltenham, and the Ryder Cup. British English accents.`,
       })
-      .filter(line => {
-        // Filter out empty or near-empty segments
-        const textPart = line.replace(/^\[\d+:\d+\]\s*/, '')
-        return textPart.length > 2
-      })
-      .join('\n')
+
+      // Format as readable transcript with timestamps
+      if ('segments' in transcription && Array.isArray(transcription.segments)) {
+        return transcription.segments
+          .map((seg: { start: number; text: string }) => {
+            const mins = Math.floor(seg.start / 60)
+            const secs = Math.floor(seg.start % 60)
+            return `[${mins}:${secs.toString().padStart(2, '0')}] ${seg.text.trim()}`
+          })
+          .filter(line => {
+            const textPart = line.replace(/^\[\d+:\d+\]\s*/, '')
+            return textPart.length > 2
+          })
+          .join('\n')
+      }
+
+      return transcription.text
+    } catch (err) {
+      lastError = err as Error
+      const errMsg = lastError.message || ''
+      const isRetryable = errMsg.includes('ECONNRESET') ||
+        errMsg.includes('Connection error') ||
+        errMsg.includes('timeout') ||
+        errMsg.includes('ETIMEDOUT') ||
+        errMsg.includes('socket hang up')
+
+      if (!isRetryable || attempt === MAX_RETRIES) {
+        throw lastError
+      }
+      console.warn(`Whisper connection error (attempt ${attempt + 1}): ${errMsg}`)
+    }
   }
 
-  return transcription.text
+  throw lastError || new Error('Whisper transcription failed')
 }
 
 /**
@@ -142,7 +172,7 @@ export async function POST(request: NextRequest) {
       : 'Contact'
     const agentName = call.user?.name || 'Agent'
 
-    console.log(`🎙️ Transcribing call ${callId} (${call.duration}s) - ${agentName} <> ${contactName}`)
+    console.log(`Transcribing call ${callId} (${call.duration}s) - ${agentName} <> ${contactName}`)
 
     // Step 1: Try Aircall's native transcription first (free), fall back to Whisper
     let transcript: string | null = null
@@ -151,15 +181,15 @@ export async function POST(request: NextRequest) {
       const aircallTranscript = await getTranscription(callId)
       if (aircallTranscript?.content?.utterances?.length) {
         transcript = formatTranscriptForAI(aircallTranscript, call)
-        console.log(`📝 Got Aircall transcription for call ${callId} (${transcript.length} chars)`)
+        console.log(`Got Aircall transcription for call ${callId} (${transcript.length} chars)`)
       }
-    } catch (err) {
+    } catch {
       console.log(`Aircall transcription not available for ${callId}, trying Whisper...`)
     }
 
     if (!transcript && call.recording) {
       transcript = await transcribeRecording(call.recording, agentName, contactName)
-      console.log(`📝 Whisper transcript ready for call ${callId} (${transcript.length} chars)`)
+      console.log(`Whisper transcript ready for call ${callId} (${transcript.length} chars)`)
     }
 
     if (!transcript) {
@@ -189,7 +219,7 @@ export async function POST(request: NextRequest) {
     }, transcript).catch(err => console.warn('Failed to store transcript:', err))
 
     // Step 3: Analyse with Claude
-    console.log(`🤖 Analysing call ${callId} with Claude...`)
+    console.log(`Analysing call ${callId} with Claude...`)
     const analysis = await analyseCall({
       transcript,
       agentName,

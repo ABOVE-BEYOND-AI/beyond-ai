@@ -2,10 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Redis } from '@upstash/redis'
 import { google } from '@ai-sdk/google'
 import { generateText } from 'ai'
-import { getCallDashboardData, type CallPeriod } from '@/lib/call-dashboard'
+import { getCallDashboardData, type CallPeriod, type CallListItem } from '@/lib/call-dashboard'
 import { generateEventRecap } from '@/lib/event-recap'
-import { getRecentTranscripts, storeTranscript } from '@/lib/transcript-store'
-import { getTranscription, formatTranscriptForAI, type AircallCall } from '@/lib/aircall'
+import { getRecentTranscripts } from '@/lib/transcript-store'
 import { type CallAnalysis } from '@/lib/call-analysis'
 import { apiErrorResponse, requireApiUser } from '@/lib/api-auth'
 
@@ -86,89 +85,12 @@ const ANALYSIS_KEY = (callId: number) => `call_analysis:${callId}`
 const CACHE_TTL = 60 * 15
 
 /**
- * Batch-fetch Aircall transcriptions for meaningful calls and store them.
- * Returns transcript summaries for AI analysis.
- */
-async function batchFetchTranscripts(
-  calls: { id: number; direction: string; duration: number; started_at: number; agent_name: string; contact_name: string }[],
-  redis: Redis | null,
-  existingTranscriptCallIds: Set<number>
-): Promise<{ callId: number; agent: string; contact: string; direction: string; duration: number; transcript: string }[]> {
-  const results: { callId: number; agent: string; contact: string; direction: string; duration: number; transcript: string }[] = []
-
-  // Limit to 30 calls max to stay within time budget
-  const callsToProcess = calls.slice(0, 30)
-
-  // Process in batches of 5 concurrent requests
-  for (let i = 0; i < callsToProcess.length; i += 5) {
-    const batch = callsToProcess.slice(i, i + 5)
-    const batchResults = await Promise.allSettled(
-      batch.map(async (call) => {
-        // Skip if we already have this transcript stored
-        if (existingTranscriptCallIds.has(call.id)) {
-          return null
-        }
-
-        try {
-          const aircallTranscript = await getTranscription(call.id)
-          if (!aircallTranscript?.content?.utterances?.length) {
-            return null
-          }
-
-          // Build transcript text from Aircall's native transcription
-          const agentName = call.agent_name || 'Agent'
-          const contactName = call.contact_name || 'Contact'
-          const fakeCall = {
-            user: { name: agentName } as AircallCall['user'],
-            contact: { first_name: contactName, last_name: null } as unknown as AircallCall['contact'],
-          } as AircallCall
-          const transcriptText = formatTranscriptForAI(aircallTranscript, fakeCall)
-
-          if (!transcriptText || transcriptText.split(/\s+/).length < 20) {
-            return null
-          }
-
-          // Store for future search (non-blocking)
-          storeTranscript(call.id, {
-            agentName,
-            contactName,
-            duration: call.duration,
-            direction: call.direction as 'inbound' | 'outbound',
-            startedAt: call.started_at,
-          }, transcriptText).catch(() => {})
-
-          return {
-            callId: call.id,
-            agent: agentName,
-            contact: contactName,
-            direction: call.direction,
-            duration: call.duration,
-            transcript: transcriptText,
-          }
-        } catch {
-          return null
-        }
-      })
-    )
-
-    for (const result of batchResults) {
-      if (result.status === 'fulfilled' && result.value) {
-        results.push(result.value)
-      }
-    }
-  }
-
-  return results
-}
-
-/**
  * Fetch cached individual call analyses from Redis.
  */
 async function getCachedAnalyses(callIds: number[], redis: Redis): Promise<CallAnalysis[]> {
   if (callIds.length === 0) return []
 
   const analyses: CallAnalysis[] = []
-  // Batch fetch in groups of 20
   for (let i = 0; i < callIds.length; i += 20) {
     const batch = callIds.slice(i, i + 20)
     const results = await Promise.allSettled(
@@ -186,23 +108,56 @@ async function getCachedAnalyses(callIds: number[], redis: Redis): Promise<CallA
 
 /**
  * Generate AI-powered digest insights using Gemini 2.5 Flash.
- * Extremely cost-effective: ~$0.003 per digest.
+ * Works with whatever data is available: transcripts, cached analyses, or just call stats.
+ * Cost: ~$0.003 per digest.
  */
 async function generateAIDigestInsights(input: {
   transcripts: { callId: number; agent: string; contact: string; direction: string; duration: number; transcript: string }[]
   analyses: CallAnalysis[]
-  repStats: { name: string; total_calls: number; answered_calls: number; outbound_calls: number; avg_duration: number }[]
+  repStats: { name: string; total_calls: number; answered_calls: number; outbound_calls: number; inbound_calls: number; avg_duration: number; longest_call: number }[]
+  meaningfulCalls: CallListItem[]
+  totalCalls: number
+  answeredCalls: number
   dealsToday: { name: string; amount: number; owner: string; event: string }[]
-  upcomingEvents: { name: string; category: string | null }[]
+  upcomingEvents: { name: string; category: string | null; percentageToTarget: number | null }[]
   period: string
 }): Promise<Partial<DigestPayload>> {
-  // Build context from both stored analyses and raw transcripts
-  const callSummaries: string[] = []
+  const sections: string[] = []
 
-  // Use existing analyses (high quality, already processed by Claude)
-  for (const a of input.analyses) {
-    callSummaries.push(
-      `[Analysed] Agent: ${a.call_id ? 'Rep' : 'Unknown'} | Sentiment: ${a.sentiment} (${a.sentiment_score}/100)\n` +
+  // Section 1: Rep stats (always available)
+  sections.push(`TEAM REP STATS (${input.repStats.length} reps):
+${input.repStats.map(r => {
+  const answerRate = r.total_calls > 0 ? Math.round((r.answered_calls / r.total_calls) * 100) : 0
+  const outboundPct = r.total_calls > 0 ? Math.round((r.outbound_calls / r.total_calls) * 100) : 0
+  return `- ${r.name}: ${r.total_calls} calls (${answerRate}% answered, ${outboundPct}% outbound), avg ${Math.round(r.avg_duration / 60)}min, longest ${Math.round(r.longest_call / 60)}min`
+}).join('\n')}`)
+
+  // Section 2: Call activity overview
+  const answerRate = input.totalCalls > 0 ? Math.round((input.answeredCalls / input.totalCalls) * 100) : 0
+  sections.push(`CALL ACTIVITY:
+- Total calls: ${input.totalCalls} (${input.answeredCalls} answered, ${answerRate}% answer rate)
+- Meaningful calls (3+ min): ${input.meaningfulCalls.length}
+- Meaningful call breakdown: ${input.meaningfulCalls.map(c => `${c.agent_name} <> ${c.contact_name} (${c.direction}, ${Math.round(c.duration / 60)}min)`).slice(0, 20).join('; ')}`)
+
+  // Section 3: Deals (if any)
+  if (input.dealsToday.length > 0) {
+    sections.push(`DEALS CLOSED TODAY:
+${input.dealsToday.map(d => `- ${d.name}: £${Math.round(d.amount).toLocaleString()} by ${d.owner} (${d.event})`).join('\n')}`)
+  }
+
+  // Section 4: Upcoming events
+  if (input.upcomingEvents.length > 0) {
+    sections.push(`UPCOMING EVENTS:
+${input.upcomingEvents.slice(0, 12).map(e => {
+  const target = e.percentageToTarget !== null ? ` (${Math.round(e.percentageToTarget)}% to target)` : ''
+  return `- ${e.name}${e.category ? ` (${e.category})` : ''}${target}`
+}).join('\n')}`)
+  }
+
+  // Section 5: Cached analyses (high quality, already processed by Claude)
+  if (input.analyses.length > 0) {
+    const analysisSummaries = input.analyses.map(a =>
+      `[Analysed Call] Sentiment: ${a.sentiment} (${a.sentiment_score}/100)\n` +
       `Summary: ${a.summary}\n` +
       `Objections: ${a.objections.length > 0 ? a.objections.join('; ') : 'None'}\n` +
       `Events: ${a.events_mentioned.length > 0 ? a.events_mentioned.join(', ') : 'None'}\n` +
@@ -210,72 +165,60 @@ async function generateAIDigestInsights(input: {
       `Opportunities: ${a.opportunity_signals.map(o => `${o.type}: ${o.description}`).join('; ') || 'None'}\n` +
       `Coaching: ${a.coaching_notes || 'None'}`
     )
+    sections.push(`AI-ANALYSED CALL DETAILS (${input.analyses.length} calls):\n\n${analysisSummaries.join('\n\n---\n\n')}`)
   }
 
-  // Add raw transcripts (truncated to save tokens) for calls without individual analysis
+  // Section 6: Raw transcripts (for calls without individual analysis)
   const analysedCallIds = new Set(input.analyses.map(a => a.call_id))
-  for (const t of input.transcripts) {
-    // Skip transcripts for calls that already have a cached analysis to avoid redundancy
-    if (analysedCallIds.has(t.callId)) continue
-    // Truncate each transcript to ~500 words to keep costs down
-    const words = t.transcript.split(/\s+/)
-    const truncated = words.length > 500 ? words.slice(0, 500).join(' ') + '...' : t.transcript
-    callSummaries.push(
-      `[Transcript] ${t.agent} <> ${t.contact} (${t.direction}, ${Math.round(t.duration / 60)}min)\n${truncated}`
-    )
+  const unanalysedTranscripts = input.transcripts.filter(t => !analysedCallIds.has(t.callId))
+  if (unanalysedTranscripts.length > 0) {
+    const transcriptSummaries = unanalysedTranscripts.map(t => {
+      const words = t.transcript.split(/\s+/)
+      const truncated = words.length > 500 ? words.slice(0, 500).join(' ') + '...' : t.transcript
+      return `[Transcript] ${t.agent} <> ${t.contact} (${t.direction}, ${Math.round(t.duration / 60)}min)\n${truncated}`
+    })
+    sections.push(`RAW TRANSCRIPTS (${unanalysedTranscripts.length} calls):\n\n${transcriptSummaries.join('\n\n---\n\n')}`)
   }
 
-  if (callSummaries.length === 0) {
-    return {}
-  }
+  const hasDeepData = input.analyses.length > 0 || input.transcripts.length > 0
 
   const model = google('gemini-2.5-flash')
 
-  const prompt = `You are the AI sales intelligence engine for Above + Beyond, a luxury hospitality company selling premium event packages (Formula 1, The Open, Wimbledon, Six Nations, Cheltenham, Ryder Cup, etc.). You're generating the ${input.period} team digest for the whole company — this will be shown at lunch and end of day.
+  const prompt = `You are the AI sales intelligence engine for Above + Beyond, a luxury hospitality company selling premium event packages (Formula 1, The Open, Wimbledon, Six Nations, Cheltenham, Ryder Cup, etc.). You're generating the ${input.period} team digest — shown to the whole company at lunch and end of day.
 
-TEAM REP STATS:
-${input.repStats.map(r => `- ${r.name}: ${r.total_calls} calls, ${r.answered_calls} answered, ${r.outbound_calls} outbound, avg ${Math.round(r.avg_duration / 60)}min`).join('\n')}
-
-${input.dealsToday.length > 0 ? `DEALS CLOSED TODAY:\n${input.dealsToday.map(d => `- ${d.name}: £${Math.round(d.amount).toLocaleString()} by ${d.owner} (${d.event})`).join('\n')}` : ''}
-
-${input.upcomingEvents.length > 0 ? `UPCOMING EVENTS:\n${input.upcomingEvents.slice(0, 10).map(e => `- ${e.name}${e.category ? ` (${e.category})` : ''}`).join('\n')}` : ''}
-
-CALL DATA (${callSummaries.length} calls with transcripts/analyses):
-
-${callSummaries.join('\n\n---\n\n')}
+${sections.join('\n\n')}
 
 Generate a comprehensive team intelligence digest as JSON. Return ONLY valid JSON, no markdown, no explanation:
 {
-  "team_summary": "3-5 sentence executive summary of the period's activity — call volume, answer rates, deal momentum, key themes from conversations, overall energy and sentiment of the team. Be specific with numbers.",
+  "team_summary": "3-5 sentence executive summary. Cover: total call volume, answer rate, meaningful conversations, top performers, deal momentum, ${hasDeepData ? 'key themes from conversations, ' : ''}energy/pace. Be specific with actual numbers and names.",
   "top_objections": [
-    { "objection": "the specific objection pattern seen across calls", "frequency": 2, "suggested_response": "practical handle the team should use — specific to luxury hospitality" }
+    { "objection": "specific objection pattern", "frequency": 2, "suggested_response": "practical response for luxury hospitality" }
   ],
   "winning_pitches": [
-    { "description": "what pitch or approach worked — be specific about the technique", "rep": "who did it", "context": "brief context" }
+    { "description": "what worked", "rep": "who", "context": "brief context" }
   ],
   "event_demand": [
-    { "event": "event name", "mentions": 3, "sentiment": "brief demand signal — hot/warm/cooling" }
+    { "event": "event name", "mentions": 3, "sentiment": "demand signal" }
   ],
   "competitor_intelligence": [
-    { "competitor": "company name", "mentions": 1, "context": "what was said and how to counter" }
+    { "competitor": "name", "mentions": 1, "context": "what was said" }
   ],
   "coaching_highlights": [
-    { "rep": "name", "type": "strength", "description": "specific observation from their calls — what they did well or should improve" }
+    { "rep": "name", "type": "strength", "description": "specific observation" }
   ],
   "follow_up_gaps": [
-    { "rep": "name", "description": "specific gap — e.g. prospect expressed interest but no follow-up scheduled" }
+    { "rep": "name", "description": "specific gap" }
   ]
 }
 
-CRITICAL GUIDELINES:
-- Be SPECIFIC — reference actual client names, events, amounts, and techniques from the calls
-- Aggregate patterns across calls, don't just list individual calls
-- For objections, give PRACTICAL suggested responses tailored to luxury hospitality
-- For coaching, reference specific things said or done in calls
-- For winning pitches, explain WHY it worked
-- If there aren't enough calls for a category, return an empty array for that field
-- Every insight should tell the team what to DO about it
-- This is for a sales floor — keep it punchy, actionable, not corporate`
+GUIDELINES:
+- Be SPECIFIC — use actual names, numbers, events from the data${hasDeepData ? '\n- For objections/winning pitches/competitors: pull from transcript and analysis data' : '\n- Without transcript data: focus coaching on call patterns (answer rates, outbound/inbound balance, call durations, volume)'}
+- coaching_highlights: analyse each rep — who has strong answer rates, who has long meaningful calls, who needs to improve. Reference specific numbers.
+- follow_up_gaps: identify reps with heavy outbound but low answer rates, or reps whose call durations suggest they are not having deep conversations
+- event_demand: if deals were closed for specific events, note which events are hot. Use upcoming event target percentages to flag which events need attention.
+- Every insight should tell the team what to DO
+- Keep it punchy, actionable, not corporate — this is for a sales floor
+- Return empty arrays for categories with insufficient data`
 
   try {
     const result = await generateText({
@@ -294,71 +237,6 @@ CRITICAL GUIDELINES:
     console.error('AI digest generation failed:', err)
     return {}
   }
-}
-
-function buildFollowUpGaps(repStats: Awaited<ReturnType<typeof getCallDashboardData>>['data']['repStats']) {
-  return repStats
-    .filter((rep) => rep.total_calls >= 4)
-    .map((rep) => ({
-      rep: rep.name,
-      answeredRate: rep.total_calls > 0 ? rep.answered_calls / rep.total_calls : 0,
-      outboundShare: rep.total_calls > 0 ? rep.outbound_calls / rep.total_calls : 0,
-    }))
-    .filter((rep) => rep.answeredRate < 0.45 || rep.outboundShare > 0.8)
-    .slice(0, 5)
-    .map((rep) => ({
-      rep: rep.rep,
-      description:
-        rep.answeredRate < 0.45
-          ? 'Low answer rate this period. Review callback timing and prioritise warm follow-ups before pushing new outbound volume.'
-          : 'Heavy outbound skew. Check whether callbacks and same-day follow-ups are being closed out after first contact.',
-    }))
-}
-
-function buildCoachingHighlights(repStats: Awaited<ReturnType<typeof getCallDashboardData>>['data']['repStats']) {
-  const highlights: DigestPayload['coaching_highlights'] = []
-  const topRep = repStats[0]
-
-  if (topRep && topRep.total_calls > 0) {
-    highlights.push({
-      rep: topRep.name,
-      type: 'strength',
-      description: `Led the team on call volume with ${topRep.total_calls} calls and an average duration of ${Math.round(topRep.avg_duration / 60)} minutes.`,
-    })
-  }
-
-  for (const rep of repStats) {
-    if (highlights.length >= 5) break
-    const answerRate = rep.total_calls > 0 ? rep.answered_calls / rep.total_calls : 0
-    if (rep.total_calls >= 4 && answerRate < 0.45) {
-      highlights.push({
-        rep: rep.name,
-        type: 'improvement',
-        description: 'Answer rate is lagging behind team pace. Tighten call windows and prioritise contacts with recent engagement.',
-      })
-    }
-  }
-
-  return highlights
-}
-
-function buildEventDemand(recap: Awaited<ReturnType<typeof generateEventRecap>>) {
-  const dealsByEvent = new Map<string, number>()
-  for (const deal of recap.dealsClosedToday) {
-    dealsByEvent.set(deal.event, (dealsByEvent.get(deal.event) || 0) + 1)
-  }
-
-  return recap.upcomingEvents
-    .map((event) => ({
-      event: event.name,
-      mentions: dealsByEvent.get(event.name) || 0,
-      sentiment:
-        event.percentageToTarget !== null && event.percentageToTarget < 50
-          ? 'Behind target — needs sales push.'
-          : 'Tracking steadily on revenue target.',
-    }))
-    .filter((event) => event.mentions > 0)
-    .slice(0, 8)
 }
 
 function buildKeyDeals(recap: Awaited<ReturnType<typeof generateEventRecap>>): DigestPayload['key_deals'] {
@@ -399,9 +277,6 @@ export async function POST(request: NextRequest) {
     ])
 
     const startTimestamp = periodStartTimestamp(period)
-    const existingTranscriptCallIds = new Set(
-      recentTranscripts.filter(t => t.startedAt >= startTimestamp).map(t => t.callId)
-    )
     const transcriptsInPeriod = recentTranscripts.filter(t => t.startedAt >= startTimestamp)
 
     // Fetch cached analyses for meaningful calls
@@ -411,100 +286,58 @@ export async function POST(request: NextRequest) {
       cachedAnalyses = await getCachedAnalyses(meaningfulCallIds, redis)
     }
 
-    // Batch-fetch Aircall transcriptions for calls we don't have yet
-    console.log(`Digest: ${cachedAnalyses.length} cached analyses, ${transcriptsInPeriod.length} stored transcripts, ${callData.analysableCalls.length} meaningful calls`)
-    const newTranscripts = await batchFetchTranscripts(callData.analysableCalls, redis, existingTranscriptCallIds)
-    console.log(`Digest: fetched ${newTranscripts.length} new Aircall transcriptions`)
+    const transcriptData = transcriptsInPeriod.map(t => ({
+      callId: t.callId,
+      agent: t.agentName,
+      contact: t.contactName,
+      direction: t.direction,
+      duration: t.duration,
+      transcript: t.transcript,
+    }))
 
-    // Combine existing stored transcripts with newly fetched ones
-    const allTranscripts = [
-      ...transcriptsInPeriod.map(t => ({
-        callId: t.callId,
-        agent: t.agentName,
-        contact: t.contactName,
-        direction: t.direction,
-        duration: t.duration,
-        transcript: t.transcript,
+    console.log(`Digest: ${cachedAnalyses.length} cached analyses, ${transcriptsInPeriod.length} stored transcripts, ${callData.analysableCalls.length} meaningful calls, ${callData.stats.total_calls} total calls`)
+
+    // Always generate AI insights — works with stats even without transcripts
+    const aiInsights = await generateAIDigestInsights({
+      transcripts: transcriptData,
+      analyses: cachedAnalyses,
+      repStats: callData.repStats.map(r => ({
+        name: r.name,
+        total_calls: r.total_calls,
+        answered_calls: r.answered_calls,
+        outbound_calls: r.outbound_calls,
+        inbound_calls: r.inbound_calls,
+        avg_duration: r.avg_duration,
+        longest_call: r.longest_call,
       })),
-      ...newTranscripts,
-    ]
-
-    // Deduplicate by callId
-    const seenCallIds = new Set<number>()
-    const uniqueTranscripts = allTranscripts.filter(t => {
-      if (seenCallIds.has(t.callId)) return false
-      seenCallIds.add(t.callId)
-      return true
+      meaningfulCalls: callData.analysableCalls,
+      totalCalls: callData.stats.total_calls,
+      answeredCalls: callData.stats.answered_calls,
+      dealsToday: recap.dealsClosedToday.map(d => ({
+        name: d.name,
+        amount: d.amount,
+        owner: d.owner,
+        event: d.event,
+      })),
+      upcomingEvents: recap.upcomingEvents.map(e => ({
+        name: e.name,
+        category: e.category,
+        percentageToTarget: e.percentageToTarget,
+      })),
+      period: periodLabel(period),
     })
-
-    // Generate AI insights if we have any transcript/analysis data
-    // Count unique calls (some may appear in both transcripts and analyses)
-    const allCallIds = new Set([
-      ...uniqueTranscripts.map(t => t.callId),
-      ...cachedAnalyses.map(a => a.call_id),
-    ])
-    const totalAnalysable = allCallIds.size
-    let aiInsights: Partial<DigestPayload> = {}
-
-    if (totalAnalysable > 0) {
-      aiInsights = await generateAIDigestInsights({
-        transcripts: uniqueTranscripts,
-        analyses: cachedAnalyses,
-        repStats: callData.repStats.map(r => ({
-          name: r.name,
-          total_calls: r.total_calls,
-          answered_calls: r.answered_calls,
-          outbound_calls: r.outbound_calls,
-          avg_duration: r.avg_duration,
-        })),
-        dealsToday: recap.dealsClosedToday.map(d => ({
-          name: d.name,
-          amount: d.amount,
-          owner: d.owner,
-          event: d.event,
-        })),
-        upcomingEvents: recap.upcomingEvents.map(e => ({
-          name: e.name,
-          category: e.category,
-        })),
-        period: periodLabel(period),
-      })
-    }
-
-    const topRep = callData.repStats[0]
-    const topRepAnswerRate = topRep && topRep.total_calls > 0
-      ? topRep.answered_calls / topRep.total_calls
-      : null
-    const answerRate = callData.stats.total_calls > 0
-      ? Math.round((callData.stats.answered_calls / callData.stats.total_calls) * 100)
-      : 0
-
-    // Build team summary — use AI if available, otherwise fall back to stats
-    const teamSummary = aiInsights.team_summary || [
-      `${periodLabel(period)} logged ${callData.stats.total_calls} calls with ${callData.stats.answered_calls} answered (${answerRate}% answer rate) and ${callData.meaningfulCallCount} meaningful conversations over three minutes.`,
-      topRep ? `${topRep.name} led call volume with ${topRep.total_calls} calls${topRepAnswerRate !== null ? `, ${Math.round(topRepAnswerRate * 100)}% answered` : ''}.` : '',
-      recap.dealsClosedToday.length > 0 ? `Sales closed ${recap.dealsClosedToday.length} deal${recap.dealsClosedToday.length === 1 ? '' : 's'} today worth £${Math.round(recap.totalDealValue).toLocaleString()}.` : '',
-      totalAnalysable > 0 ? `AI analysed ${totalAnalysable} call transcripts for this digest.` : 'No transcripts available for AI analysis — insights are based on call activity data.',
-    ].filter(Boolean).join(' ')
-
-    // Merge AI insights with stats-based fallbacks
-    const statsFollowUpGaps = buildFollowUpGaps(callData.repStats)
-    const statsCoaching = buildCoachingHighlights(callData.repStats)
-    const statsEventDemand = buildEventDemand(recap)
 
     const digest: DigestPayload = {
       period: periodLabel(period),
       generated_at: new Date().toISOString(),
-      total_calls_analysed: totalAnalysable,
-      team_summary: teamSummary,
+      total_calls_analysed: callData.meaningfulCallCount,
+      team_summary: aiInsights.team_summary || `${periodLabel(period)} logged ${callData.stats.total_calls} calls with ${callData.stats.answered_calls} answered and ${callData.meaningfulCallCount} meaningful conversations.`,
       top_objections: aiInsights.top_objections || [],
       winning_pitches: aiInsights.winning_pitches || [],
-      event_demand: aiInsights.event_demand?.length ? aiInsights.event_demand : statsEventDemand,
+      event_demand: aiInsights.event_demand || [],
       competitor_intelligence: aiInsights.competitor_intelligence || [],
-      follow_up_gaps: aiInsights.follow_up_gaps?.length ? aiInsights.follow_up_gaps : statsFollowUpGaps,
-      coaching_highlights: aiInsights.coaching_highlights?.length
-        ? aiInsights.coaching_highlights
-        : statsCoaching,
+      follow_up_gaps: aiInsights.follow_up_gaps || [],
+      coaching_highlights: aiInsights.coaching_highlights || [],
       key_deals: buildKeyDeals(recap),
     }
 
