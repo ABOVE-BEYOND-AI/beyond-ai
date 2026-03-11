@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getCall } from '@/lib/aircall'
+import { getCall, getTranscription, formatTranscriptForAI } from '@/lib/aircall'
 import { analyseCall, type CallAnalysis } from '@/lib/call-analysis'
 import { storeTranscript } from '@/lib/transcript-store'
 import { Redis } from '@upstash/redis'
@@ -78,12 +78,12 @@ async function transcribeRecording(recordingUrl: string, agentName: string, cont
  * Filters out transcripts that are mostly silence markers, hold music, or noise.
  */
 function isTranscriptMeaningful(transcript: string): { valid: boolean; reason?: string } {
-  // Count actual words (strip timestamps)
-  const textOnly = transcript.replace(/\[\d+:\d+\]/g, '').trim()
+  // Count actual words (strip timestamps and speaker labels)
+  const textOnly = transcript.replace(/\[\d+:\d+\]/g, '').replace(/^[A-Za-z\s]+:/gm, '').trim()
   const words = textOnly.split(/\s+/).filter(w => w.length > 1)
 
-  if (words.length < 30) {
-    return { valid: false, reason: `Transcript only contains ${words.length} words — likely silence, hold music, or voicemail. Need at least 30 words of conversation.` }
+  if (words.length < 20) {
+    return { valid: false, reason: `Transcript only contains ${words.length} words — likely silence, hold music, or voicemail. Need at least 20 words of conversation.` }
   }
 
   // Check for repeated patterns (Whisper sometimes hallucinates repetitive content)
@@ -122,16 +122,16 @@ export async function POST(request: NextRequest) {
     // Fetch call details (this gives us a fresh recording URL)
     const call = await getCall(callId)
 
-    if (!call.recording) {
+    if (!call.recording && !call.asset) {
       return NextResponse.json(
         { success: false, error: 'No recording available for this call. The recording may have expired or the call was not recorded.' },
         { status: 404 }
       )
     }
 
-    if (call.duration < 90) {
+    if (call.duration < 60) {
       return NextResponse.json(
-        { success: false, error: 'Call too short for meaningful analysis (need 90+ seconds)' },
+        { success: false, error: 'Call too short for meaningful analysis (need 60+ seconds)' },
         { status: 400 }
       )
     }
@@ -142,22 +142,42 @@ export async function POST(request: NextRequest) {
       : 'Contact'
     const agentName = call.user?.name || 'Agent'
 
-    console.log(`🎙️ Transcribing call ${callId} (${call.duration}s) - ${agentName} ↔ ${contactName}`)
+    console.log(`🎙️ Transcribing call ${callId} (${call.duration}s) - ${agentName} <> ${contactName}`)
 
-    // Step 1: Download recording and transcribe with Whisper
-    const transcript = await transcribeRecording(call.recording, agentName, contactName)
+    // Step 1: Try Aircall's native transcription first (free), fall back to Whisper
+    let transcript: string | null = null
+
+    try {
+      const aircallTranscript = await getTranscription(callId)
+      if (aircallTranscript?.content?.utterances?.length) {
+        transcript = formatTranscriptForAI(aircallTranscript, call)
+        console.log(`📝 Got Aircall transcription for call ${callId} (${transcript.length} chars)`)
+      }
+    } catch (err) {
+      console.log(`Aircall transcription not available for ${callId}, trying Whisper...`)
+    }
+
+    if (!transcript && call.recording) {
+      transcript = await transcribeRecording(call.recording, agentName, contactName)
+      console.log(`📝 Whisper transcript ready for call ${callId} (${transcript.length} chars)`)
+    }
+
+    if (!transcript) {
+      return NextResponse.json(
+        { success: false, error: 'Could not transcribe call — no Aircall transcription available and recording may have expired.' },
+        { status: 400 }
+      )
+    }
 
     // Step 2: Validate transcript quality
     const validation = isTranscriptMeaningful(transcript)
     if (!validation.valid) {
-      console.warn(`⚠️ Call ${callId} transcript rejected: ${validation.reason}`)
+      console.warn(`Call ${callId} transcript rejected: ${validation.reason}`)
       return NextResponse.json(
         { success: false, error: validation.reason },
         { status: 400 }
       )
     }
-
-    console.log(`📝 Transcript ready (${transcript.length} chars). Analysing with Claude...`)
 
     // Store transcript for search (non-blocking)
     storeTranscript(callId, {
@@ -169,6 +189,7 @@ export async function POST(request: NextRequest) {
     }, transcript).catch(err => console.warn('Failed to store transcript:', err))
 
     // Step 3: Analyse with Claude
+    console.log(`🤖 Analysing call ${callId} with Claude...`)
     const analysis = await analyseCall({
       transcript,
       agentName,
@@ -178,7 +199,7 @@ export async function POST(request: NextRequest) {
       callId: call.id,
     })
 
-    console.log(`✅ Analysis complete for call ${callId}`)
+    console.log(`Analysis complete for call ${callId}`)
 
     // Cache the result (non-blocking, skip on failure)
     if (redis) {

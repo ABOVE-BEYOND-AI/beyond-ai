@@ -98,5 +98,6 @@ export function apiErrorResponse(error: unknown, fallbackMessage = 'Internal ser
     return NextResponse.json({ error: error.message }, { status: 404 })
   }
 
-  return NextResponse.json({ error: fallbackMessage }, { status: 500 })
+  const message = error instanceof Error ? error.message : fallbackMessage
+  return NextResponse.json({ error: message }, { status: 500 })
 }

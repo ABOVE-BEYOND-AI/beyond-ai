@@ -1461,7 +1461,7 @@ export default function CallsPage() {
                       </span>
                     </div>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Click any call to transcribe and analyse with Whisper + Claude
+                      Click any call to transcribe and analyse with AI
                     </p>
                   </div>
                 </motion.div>
@@ -1554,7 +1554,7 @@ export default function CallsPage() {
                     <p className="text-sm text-muted-foreground mt-1">
                       {digest
                         ? `Generated ${new Date(digest.generated_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`
-                        : "Build a digest from cached call activity, today's recap, and stored transcripts"}
+                        : "AI analyses call transcripts, deals, and team activity to generate actionable insights"}
                     </p>
                   </div>
                   <button
@@ -1590,7 +1590,7 @@ export default function CallsPage() {
                     <MagicWand className="size-12 text-primary mx-auto mb-4 animate-pulse" />
                     <p className="text-lg font-semibold mb-2">Generating AI Digest</p>
                     <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                      Building a digest from cached call activity, today&apos;s recap, and any stored transcripts.
+                      Fetching call transcripts, analysing conversations with AI, and building your team intelligence report...
                     </p>
                   </motion.div>
                 ) : digest ? (
@@ -2074,7 +2074,7 @@ export default function CallsPage() {
                     <MagnifyingGlass className="size-12 mx-auto mb-4 opacity-20" />
                     <p className="text-lg font-semibold mb-1">Search call transcripts</p>
                     <p className="text-sm max-w-md mx-auto mb-2">
-                      Every call analysed with AI is automatically transcribed and stored. Search for keywords, objections, or phrases across all calls.
+                      Transcripts are auto-populated when you generate a digest or analyse individual calls. Search for keywords, objections, or phrases across all calls.
                     </p>
                     {transcriptCount !== null && transcriptCount > 0 && (
                       <p className="text-xs text-muted-foreground/60 mt-3">
