@@ -1985,36 +1985,35 @@ export default function CallsPage() {
                             </div>
                           )}
 
-                          {/* Upcoming events */}
+                          {/* Upcoming events — compact inline pills */}
                           {eventRecap.upcomingEvents.length > 0 && (
                             <div>
-                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Upcoming Events (Next 7 Days)</p>
-                              <div className="space-y-2">
+                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                                Selling This Week · {eventRecap.upcomingEvents.length} events
+                              </p>
+                              <div className="flex flex-wrap gap-1.5">
                                 {eventRecap.upcomingEvents.map((event, i) => (
-                                  <div key={i} className="flex items-center justify-between p-2.5 rounded-lg bg-foreground/[0.02] border border-foreground/[0.06]">
-                                    <div className="min-w-0">
-                                      <p className="text-sm font-medium truncate">{event.name}</p>
-                                      <p className="text-xs text-muted-foreground">
-                                        {new Date(event.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
-                                        {event.category && ` · ${event.category}`}
-                                      </p>
-                                    </div>
-                                    {event.revenueTarget && (
-                                      <div className="text-right shrink-0">
-                                        <p className="text-xs text-muted-foreground tabular-nums">
-                                          £{Math.round(event.closedWonGross || 0).toLocaleString()} / £{Math.round(event.revenueTarget).toLocaleString()}
-                                        </p>
-                                        {event.percentageToTarget !== null && (
-                                          <div className="w-20 h-1.5 bg-foreground/[0.06] rounded-full overflow-hidden mt-1">
-                                            <div
-                                              className="h-full bg-primary rounded-full"
-                                              style={{ width: `${Math.min(event.percentageToTarget, 100)}%` }}
-                                            />
-                                          </div>
-                                        )}
-                                      </div>
+                                  <span
+                                    key={i}
+                                    className="text-[11px] px-2.5 py-1 rounded-lg bg-foreground/[0.04] border border-foreground/[0.06] text-foreground/80 inline-flex items-center gap-1.5"
+                                    title={`${event.name}${event.revenueTarget ? ` — £${Math.round(event.closedWonGross || 0).toLocaleString()} / £${Math.round(event.revenueTarget).toLocaleString()}` : ""}`}
+                                  >
+                                    <span className="text-muted-foreground/50 tabular-nums">
+                                      {new Date(event.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                                    </span>
+                                    <span className="font-medium truncate max-w-[180px]">{event.name}</span>
+                                    {event.percentageToTarget !== null && event.percentageToTarget > 0 && (
+                                      <span className={`text-[10px] font-bold tabular-nums ${
+                                        event.percentageToTarget >= 100
+                                          ? "text-emerald-500"
+                                          : event.percentageToTarget >= 50
+                                            ? "text-foreground/60"
+                                            : "text-amber-500"
+                                      }`}>
+                                        {Math.round(event.percentageToTarget)}%
+                                      </span>
                                     )}
-                                  </div>
+                                  </span>
                                 ))}
                               </div>
                             </div>
@@ -2108,37 +2107,48 @@ export default function CallsPage() {
                       {/* Event Demand */}
                       {digest.event_demand.length > 0 && (
                         <DigestSection title="Event Demand" icon={TrendUp} delay={0.3}>
-                          <div className="space-y-3">
+                          <div className="space-y-2.5">
                             {digest.event_demand.map((event, i) => {
                               const sentLower = event.sentiment.toLowerCase();
-                              const sentimentTag = sentLower.includes("hot") || sentLower.includes("high")
-                                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                              // Parse sentiment: extract keyword + detail. Handles both "—" and " - "
+                              const sentSplit = event.sentiment.split(/\s*[-—–]\s*/);
+                              const sentKeyword = sentSplit[0]?.trim().toUpperCase() || "";
+                              const sentDetail = sentSplit.slice(1).join(" — ").trim() || null;
+                              // Colour by keyword
+                              const tagStyle = sentLower.includes("hot") || sentLower.includes("high")
+                                ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/25"
                                 : sentLower.includes("caution") || sentLower.includes("mixed")
-                                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+                                  ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/25"
                                   : sentLower.includes("critical") || sentLower.includes("cold")
-                                    ? "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20"
+                                    ? "bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/25"
                                     : sentLower.includes("warm")
-                                      ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20"
+                                      ? "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/25"
                                       : "bg-foreground/[0.06] text-muted-foreground border-foreground/[0.08]";
-                              const sentParts = event.sentiment.split("—").map(s => s.trim());
-                              const sentLabel = sentParts[0] || event.sentiment;
-                              const sentDetail = sentParts[1] || null;
+                              const borderStyle = sentLower.includes("hot") || sentLower.includes("high")
+                                ? "border-l-emerald-500"
+                                : sentLower.includes("caution") || sentLower.includes("mixed")
+                                  ? "border-l-amber-500"
+                                  : sentLower.includes("critical") || sentLower.includes("cold")
+                                    ? "border-l-red-500"
+                                    : sentLower.includes("warm")
+                                      ? "border-l-blue-500"
+                                      : "border-l-foreground/20";
                               return (
-                                <div key={i} className="flex items-start justify-between gap-3">
-                                  <div className="min-w-0">
-                                    <div className="flex items-center gap-2 mb-0.5">
-                                      <p className="text-sm font-semibold">{event.event}</p>
-                                      <span className={`text-[10px] px-1.5 py-0.5 rounded border uppercase font-bold shrink-0 ${sentimentTag}`}>
-                                        {sentLabel}
+                                <div key={i} className={`p-3 rounded-lg border border-foreground/[0.06] bg-foreground/[0.02] border-l-2 ${borderStyle}`}>
+                                  <div className="flex items-center justify-between gap-2 mb-1">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <p className="text-sm font-semibold truncate">{event.event}</p>
+                                      <span className={`text-[10px] px-1.5 py-0.5 rounded border uppercase font-bold shrink-0 ${tagStyle}`}>
+                                        {sentKeyword}
                                       </span>
                                     </div>
-                                    {sentDetail && (
-                                      <p className="text-xs text-muted-foreground">{sentDetail}</p>
-                                    )}
+                                    <span className="text-xs font-bold text-muted-foreground tabular-nums shrink-0">
+                                      {event.mentions}x
+                                    </span>
                                   </div>
-                                  <span className="text-sm font-bold text-foreground tabular-nums shrink-0">
-                                    {event.mentions}x
-                                  </span>
+                                  {sentDetail && (
+                                    <p className="text-xs text-muted-foreground leading-relaxed">{sentDetail}</p>
+                                  )}
                                 </div>
                               );
                             })}
