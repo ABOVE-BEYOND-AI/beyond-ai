@@ -471,7 +471,7 @@ function EventCard({ event, onClick }: { event: SalesforceEvent; onClick: () => 
   return (
     <div
       onClick={onClick}
-      className={`ab-card group cursor-pointer relative overflow-hidden rounded-xl ${isPast ? "opacity-40 hover:opacity-60" : ""}`}
+      className={`ab-card group cursor-pointer relative overflow-hidden rounded-xl ${isPast ? "opacity-60 hover:opacity-90" : ""}`}
       style={{ aspectRatio: "3/4" }}
     >
       {/* Image or gradient background — always positioned absolutely */}
@@ -481,7 +481,7 @@ function EventCard({ event, onClick }: { event: SalesforceEvent; onClick: () => 
           <img
             src={`/api/image-proxy?url=${encodeURIComponent(imageUrl)}`}
             alt=""
-            className="absolute inset-0 w-full h-full object-cover will-change-transform transition-[transform,opacity] duration-700 ease-out opacity-85 group-hover:opacity-100 group-hover:scale-[1.04]"
+            className="absolute inset-0 w-full h-full object-cover will-change-transform transition-[transform,opacity] duration-700 ease-out group-hover:scale-[1.04]"
             loading="lazy"
           />
           {/* Single clean gradient overlay */}
