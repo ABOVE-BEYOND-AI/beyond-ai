@@ -801,8 +801,14 @@ export default function CallsPage() {
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [callAnalysis, setCallAnalysis] = useState<CallAnalysis | null>(null);
 
-  // Digest tab state
-  const [digest, setDigest] = useState<DailyDigest | null>(null);
+  // Digest tab state — restore from sessionStorage if available
+  const [digest, setDigest] = useState<DailyDigest | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const cached = sessionStorage.getItem('calls_digest_today');
+      return cached ? JSON.parse(cached) : null;
+    } catch { return null; }
+  });
   const [digestLoading, setDigestLoading] = useState(false);
   const [digestError, setDigestError] = useState<string | null>(null);
 
@@ -888,6 +894,12 @@ export default function CallsPage() {
 
     previousPeriodRef.current = period;
     fetchCallData(hasFetchedOnce.current);
+
+    // Restore cached digest for this period
+    try {
+      const cached = sessionStorage.getItem(`calls_digest_${period}`);
+      setDigest(cached ? JSON.parse(cached) : null);
+    } catch { setDigest(null); }
   }, [user, period, fetchCallData]);
 
   useEffect(() => {
@@ -902,6 +914,17 @@ export default function CallsPage() {
 
   const analyseCallById = async (callId: number) => {
     setSelectedCallId(callId);
+
+    // Check sessionStorage for cached analysis first
+    try {
+      const cached = sessionStorage.getItem(`call_analysis_${callId}`);
+      if (cached) {
+        setCallAnalysis(JSON.parse(cached));
+        setAnalysisLoading(false);
+        return;
+      }
+    } catch {}
+
     setAnalysisLoading(true);
     setCallAnalysis(null);
 
@@ -914,6 +937,7 @@ export default function CallsPage() {
       const result = await response.json();
       if (result.success) {
         setCallAnalysis(result.data);
+        try { sessionStorage.setItem(`call_analysis_${callId}`, JSON.stringify(result.data)); } catch {}
       } else {
         console.error("Analysis failed:", result.error);
         alert(result.error || "Failed to analyse call. It may not have a transcript.");
@@ -942,6 +966,7 @@ export default function CallsPage() {
       const result = await response.json();
       if (result.success) {
         setDigest(result.data);
+        try { sessionStorage.setItem(`calls_digest_${period}`, JSON.stringify(result.data)); } catch {}
       } else {
         console.error("Digest generation failed:", result.error);
         setDigestError(result.error || "Failed to generate digest.");
@@ -1073,11 +1098,7 @@ export default function CallsPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm"
-              onClick={() => {
-                setSelectedCallId(null);
-                setCallAnalysis(null);
-              }}
+              className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm pointer-events-none"
             />
             {analysisLoading ? (
               <motion.div
