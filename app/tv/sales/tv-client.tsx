@@ -1,9 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import NumberFlow from "@number-flow/react";
-import { TrendingUp } from "lucide-react";
+import { useEffect, useState, useRef, useMemo } from "react";
 
 // ── Types ──
 
@@ -47,158 +44,122 @@ interface DashboardResponse {
 
 // ── Config ──
 
-const PERIODS: { key: SalesPeriod; label: string; width: number }[] = [
-  { key: "today", label: "Today", width: 110 },
-  { key: "week", label: "Week", width: 100 },
-  { key: "month", label: "Month", width: 120 },
-  { key: "year", label: "Year", width: 100 },
-];
+const PERIODS: SalesPeriod[] = ["today", "week", "month", "year"];
+const PERIOD_LABELS: Record<SalesPeriod, string> = {
+  today: "Today", week: "Week", month: "Month", year: "Year",
+};
+const PERIOD_SUBLABELS: Record<SalesPeriod, string> = {
+  today: "today", week: "this week", month: "this month", year: "this year",
+};
 
-const PILL_HEIGHT = 44;
-const POLL_INTERVAL_MS = 30_000;
-const PERIOD_CYCLE_MS = 15_000; // 15s — less frequent to reduce animation load
+const POLL_MS = 30_000;
+const CYCLE_MS = 15_000;
 
 // ── Helpers ──
 
-const formatCurrency = (amount: number): string =>
-  `£${amount.toLocaleString("en-GB", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+const fmtCurrency = (n: number) =>
+  `£${n.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const formatCompact = (amount: number): string =>
-  `£${amount.toLocaleString("en-GB", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  })}`;
+const fmtCompact = (n: number) =>
+  `£${n.toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
-const periodLabel = (period: SalesPeriod): string => {
-  switch (period) {
-    case "today": return "today";
-    case "week": return "this week";
-    case "month": return "this month";
-    case "year": return "this year";
-  }
-};
-
-function getPillX(period: SalesPeriod): number {
-  let x = 0;
-  for (const p of PERIODS) {
-    if (p.key === period) return x;
-    x += p.width;
-  }
-  return 0;
+function clientName(name: string) {
+  return name.split(" - ")[0] || name;
 }
 
-function getPillWidth(period: SalesPeriod): number {
-  return PERIODS.find((p) => p.key === period)?.width || 110;
-}
+// ── Tiny SVG icons (inline, no library) ──
 
-function clientName(oppName: string): string {
-  const parts = oppName.split(" - ");
-  return parts[0] || oppName;
-}
-
-// ── Icons ──
-
-function BarChartIcon({ className, style }: { className?: string; style?: React.CSSProperties }) {
+function BarChartIcon({ size = 14 }: { size?: number }) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className} style={style}>
-      <path d="M18 20V10" />
-      <path d="M12 20V4" />
-      <path d="M6 20V14" />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 20V10" /><path d="M12 20V4" /><path d="M6 20V14" />
     </svg>
   );
 }
 
-// ── Row Components (no per-row motion.div — parent container handles fade) ──
+function TrendUpIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" />
+    </svg>
+  );
+}
+
+// ── Static Row Components (zero animation, zero overhead) ──
 
 function LeaderboardRow({ rep, index }: { rep: LeaderboardEntry; index: number }) {
-  let rankStyle = "bg-muted/30 text-muted-foreground border border-border/30";
-  let rowStyle = "bg-transparent border border-transparent";
-
-  if (index === 0) {
-    rankStyle = "bg-gradient-to-b from-foreground/10 to-foreground/5 text-foreground border border-border/60";
-    rowStyle = "bg-foreground/[0.05] border border-border/60";
-  } else if (index === 1) {
-    rankStyle = "bg-gradient-to-b from-muted/80 to-muted/40 text-foreground/80 border border-border/50";
-    rowStyle = "bg-muted/20 border border-border/20";
-  } else if (index === 2) {
-    rankStyle = "bg-gradient-to-b from-muted/50 to-muted/20 text-foreground/70 border border-border/40";
-    rowStyle = "bg-muted/10 border border-border/10";
-  }
+  const isTop = index < 3;
+  const rankBg = index === 0
+    ? "bg-foreground/10 text-foreground border-border/60"
+    : index === 1
+    ? "bg-muted/60 text-foreground/80 border-border/50"
+    : index === 2
+    ? "bg-muted/40 text-foreground/70 border-border/40"
+    : "bg-muted/30 text-muted-foreground border-border/30";
+  const rowBg = index === 0
+    ? "bg-foreground/[0.05] border-border/60"
+    : index === 1
+    ? "bg-muted/20 border-border/20"
+    : index === 2
+    ? "bg-muted/10 border-border/10"
+    : "border-transparent";
 
   return (
     <div
-      className={`flex items-center gap-[1.2vw] rounded-2xl ${rowStyle}`}
+      className={`flex items-center gap-[1.2vw] rounded-2xl border ${rowBg}`}
       style={{ padding: "clamp(10px, 1.2vh, 18px) clamp(12px, 1vw, 20px)", marginBottom: "clamp(4px, 0.5vh, 8px)" }}
     >
-      {/* Rank badge — no backdrop-blur, simple opaque bg */}
       <div
-        className={`flex items-center justify-center rounded-[12px] font-bold shrink-0 ${rankStyle}`}
+        className={`flex items-center justify-center rounded-[12px] font-bold shrink-0 border ${rankBg}`}
         style={{ width: "clamp(40px, 3vw, 56px)", height: "clamp(40px, 3vw, 56px)", fontSize: "clamp(0.85rem, 1vw, 1.2rem)" }}
       >
         {index + 1}
       </div>
-
-      {/* Name + deals */}
       <div className="flex-1 min-w-0">
         <p
-          className={`tracking-tight truncate ${index < 3 ? "font-semibold text-foreground" : "font-medium text-foreground/90"}`}
-          style={{ fontSize: index < 3 ? "clamp(0.95rem, 1.2vw, 1.4rem)" : "clamp(0.85rem, 1vw, 1.2rem)" }}
+          className={`tracking-tight truncate ${isTop ? "font-semibold text-foreground" : "font-medium text-foreground/90"}`}
+          style={{ fontSize: isTop ? "clamp(0.95rem, 1.2vw, 1.4rem)" : "clamp(0.85rem, 1vw, 1.2rem)" }}
         >
           {rep.name}
         </p>
         <p className="text-muted-foreground flex items-center gap-1.5" style={{ fontSize: "clamp(0.65rem, 0.7vw, 0.85rem)", marginTop: "2px" }}>
-          <span className="inline-block rounded-full bg-primary/20" style={{ width: "5px", height: "5px" }} />
+          <span className="inline-block rounded-full bg-primary/20" style={{ width: 5, height: 5 }} />
           {rep.deal_count} deal{rep.deal_count !== 1 ? "s" : ""}
         </p>
       </div>
-
-      {/* Amount */}
       <p
-        className={`tabular-nums shrink-0 tracking-tight ${index < 3 ? "font-bold text-foreground" : "font-semibold text-foreground/80"}`}
-        style={{ fontSize: index < 3 ? "clamp(1rem, 1.3vw, 1.6rem)" : "clamp(0.85rem, 1.05vw, 1.25rem)" }}
+        className={`tabular-nums shrink-0 tracking-tight ${isTop ? "font-bold text-foreground" : "font-semibold text-foreground/80"}`}
+        style={{ fontSize: isTop ? "clamp(1rem, 1.3vw, 1.6rem)" : "clamp(0.85rem, 1.05vw, 1.25rem)" }}
       >
-        {formatCurrency(rep.total_amount)}
+        {fmtCurrency(rep.total_amount)}
       </p>
     </div>
   );
 }
 
-function DealRow({ deal, index }: { deal: SalesforceOpportunity; index: number }) {
+function DealRow({ deal }: { deal: SalesforceOpportunity }) {
   const amount = deal.Amount ?? deal.Gross_Amount__c ?? 0;
-  const event = deal.Event__r?.Name;
   const owner = deal.Owner?.Name || "Unknown";
+  const event = deal.Event__r?.Name;
 
   return (
     <div
-      className="flex items-center gap-[1.2vw] bg-card border border-border/40 rounded-2xl relative overflow-hidden"
+      className="flex items-center gap-[1.2vw] bg-card border border-border/40 rounded-2xl overflow-hidden"
       style={{ padding: "clamp(10px, 1.2vh, 18px) clamp(12px, 1vw, 20px)", marginBottom: "clamp(4px, 0.5vh, 8px)" }}
     >
-      {/* Pounds icon badge — no backdrop-blur, simple opaque bg */}
       <div
         className="flex items-center justify-center shrink-0 rounded-[12px] bg-muted/60 border border-border/60"
         style={{ width: "clamp(40px, 3vw, 56px)", height: "clamp(40px, 3vw, 56px)" }}
       >
-        <img
-          src="/pounds-cropped.svg"
-          alt=""
-          className="invert-0 opacity-40"
-          style={{ width: "clamp(14px, 1.1vw, 20px)", height: "clamp(14px, 1.1vw, 20px)" }}
-        />
+        <img src="/pounds-cropped.svg" alt="" className="invert-0 opacity-40" style={{ width: "clamp(14px, 1.1vw, 20px)", height: "clamp(14px, 1.1vw, 20px)" }} />
       </div>
-
       <div className="flex-1 min-w-0">
-        <p
-          className="font-semibold tracking-tight truncate text-foreground/90"
-          style={{ fontSize: "clamp(0.85rem, 1.05vw, 1.2rem)" }}
-        >
+        <p className="font-semibold tracking-tight truncate text-foreground/90" style={{ fontSize: "clamp(0.85rem, 1.05vw, 1.2rem)" }}>
           {clientName(deal.Name)}
         </p>
         <div className="flex items-center gap-2" style={{ marginTop: "2px", fontSize: "clamp(0.65rem, 0.7vw, 0.85rem)" }}>
           <span className="text-muted-foreground font-medium flex items-center gap-1.5">
-            <span className="rounded-full bg-muted-foreground/30" style={{ width: "5px", height: "5px", display: "inline-block" }} />
+            <span className="rounded-full bg-muted-foreground/30" style={{ width: 5, height: 5, display: "inline-block" }} />
             {owner}
           </span>
           {event && (
@@ -209,350 +170,261 @@ function DealRow({ deal, index }: { deal: SalesforceOpportunity; index: number }
           )}
         </div>
       </div>
-
-      <p
-        className="font-bold tabular-nums shrink-0 tracking-tight text-foreground/90"
-        style={{ fontSize: "clamp(0.95rem, 1.15vw, 1.4rem)" }}
-      >
-        {formatCurrency(amount)}
+      <p className="font-bold tabular-nums shrink-0 tracking-tight text-foreground/90" style={{ fontSize: "clamp(0.95rem, 1.15vw, 1.4rem)" }}>
+        {fmtCurrency(amount)}
       </p>
     </div>
   );
 }
 
-// ── Main Client Component ──
+// ── Main Component ──
 
 export default function TVSalesClient({ initialData }: { initialData: DashboardResponse | null }) {
   const [data, setData] = useState<DashboardResponse | null>(initialData);
-  const [selectedPeriod, setSelectedPeriod] = useState<SalesPeriod>("month");
+  const [displayPeriod, setDisplayPeriod] = useState<SalesPeriod>("month");
+  const [contentVisible, setContentVisible] = useState(true);
+  const pollRef = useRef<ReturnType<typeof setInterval>>(undefined);
+  const cycleRef = useRef<ReturnType<typeof setInterval>>(undefined);
+  // Track which period to fetch next — rotates independently of display
+  const fetchPeriodRef = useRef<SalesPeriod>("month");
 
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const cycleRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // ── Force dark mode for TV ──
+  // Force dark mode once
   useEffect(() => {
     document.documentElement.classList.add("dark");
   }, []);
 
-  // ── Fetch fresh data ──
-  const fetchData = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/sales/data?period=${selectedPeriod}`);
-      if (!response.ok) throw new Error("Failed to fetch");
-      const result = await response.json();
-      if (result.success) {
-        setData(result.data);
-      }
-    } catch (err) {
-      console.error("TV fetch error:", err);
-    }
-  }, [selectedPeriod]);
-
-  // ── Fetch immediately on period change, then poll every 30s ──
+  // Poll API every 30s — always fetches the CURRENT display period for fresh deals/leaderboard
   useEffect(() => {
-    fetchData();
-    pollRef.current = setInterval(fetchData, POLL_INTERVAL_MS);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [fetchData]);
+    const doFetch = async () => {
+      try {
+        const res = await fetch(`/api/sales/data?period=${fetchPeriodRef.current}`);
+        if (!res.ok) return;
+        const json = await res.json();
+        if (json.success) setData(json.data);
+      } catch {}
+    };
 
-  // ── Auto-cycle periods ──
+    // Initial fetch already done server-side via initialData, just start polling
+    pollRef.current = setInterval(doFetch, POLL_MS);
+    return () => clearInterval(pollRef.current);
+  }, []); // No deps — never re-creates
+
+  // Auto-cycle display period every 15s with a brief fade
   useEffect(() => {
     cycleRef.current = setInterval(() => {
-      setSelectedPeriod((prev) => {
-        const idx = PERIODS.findIndex((p) => p.key === prev);
-        return PERIODS[(idx + 1) % PERIODS.length].key;
-      });
-    }, PERIOD_CYCLE_MS);
-    return () => { if (cycleRef.current) clearInterval(cycleRef.current); };
+      // Fade out
+      setContentVisible(false);
+
+      // After fade-out, switch period + fade in
+      setTimeout(() => {
+        setDisplayPeriod(prev => {
+          const next = PERIODS[(PERIODS.indexOf(prev) + 1) % PERIODS.length];
+          fetchPeriodRef.current = next; // Next poll will fetch this period's deals
+          return next;
+        });
+        setContentVisible(true);
+      }, 200);
+    }, CYCLE_MS);
+    return () => clearInterval(cycleRef.current);
   }, []);
 
   // ── Derived values ──
   const allTotals = data?.all_totals;
-  const totals: PeriodTotals = allTotals?.[selectedPeriod] || data?.totals || {
-    total_amount: 0, total_deals: 0, average_deal: 0,
-  };
+  const totals = useMemo<PeriodTotals>(
+    () => allTotals?.[displayPeriod] || { total_amount: 0, total_deals: 0, average_deal: 0 },
+    [allTotals, displayPeriod]
+  );
   const deals = data?.deals || [];
   const leaderboard = data?.leaderboard || [];
+
+  // ── Pill position (CSS calc, no spring physics) ──
+  const pillWidths = [110, 100, 120, 100];
+  const pillIdx = PERIODS.indexOf(displayPeriod);
+  const pillX = pillWidths.slice(0, pillIdx).reduce((a, b) => a + b, 0);
+  const pillW = pillWidths[pillIdx];
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-background" style={{ padding: "1.5vh 3vw 1vh" }}>
 
-      {/* ── Period Tabs — no backdrop-blur ── */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.1 }}
-        className="flex justify-center shrink-0"
-        style={{ marginBottom: "0.8vh" }}
-      >
-        <div className="bg-muted/80 border border-border/60 rounded-full shadow-sm relative" style={{ padding: "6px" }}>
+      {/* ── Period Tabs ── */}
+      <div className="flex justify-center shrink-0" style={{ marginBottom: "0.8vh" }}>
+        <div className="bg-muted/80 border border-border/60 rounded-full shadow-sm relative" style={{ padding: 6 }}>
           <div className="flex relative items-center">
-            <motion.div
-              className="absolute bg-gradient-to-b from-primary/90 to-primary rounded-full shadow-md ring-1 ring-black/20"
-              initial={false}
-              animate={{ x: getPillX(selectedPeriod), width: getPillWidth(selectedPeriod) }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              style={{ height: `${PILL_HEIGHT}px`, top: "0px" }}
+            {/* Animated pill — CSS transition only */}
+            <div
+              className="absolute bg-primary rounded-full shadow-md ring-1 ring-black/20"
+              style={{
+                height: 44,
+                top: 0,
+                left: pillX,
+                width: pillW,
+                transition: "left 0.4s cubic-bezier(0.4, 0, 0.2, 1), width 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
+              }}
             />
-            {PERIODS.map((p) => (
+            {PERIODS.map((p, i) => (
               <div
-                key={p.key}
-                className={`relative z-10 flex items-center justify-center font-semibold transition-colors duration-200 ${
-                  selectedPeriod === p.key
-                    ? "text-primary-foreground"
-                    : "text-muted-foreground"
+                key={p}
+                className={`relative z-10 flex items-center justify-center font-semibold ${
+                  displayPeriod === p ? "text-primary-foreground" : "text-muted-foreground"
                 }`}
-                style={{ width: `${p.width}px`, height: `${PILL_HEIGHT}px`, fontSize: "clamp(0.9rem, 1.1vw, 1.2rem)" }}
+                style={{
+                  width: pillWidths[i],
+                  height: 44,
+                  fontSize: "clamp(0.9rem, 1.1vw, 1.2rem)",
+                  transition: "color 0.2s",
+                }}
               >
-                {p.label}
+                {PERIOD_LABELS[p]}
               </div>
             ))}
           </div>
         </div>
-      </motion.div>
+      </div>
 
-      {/* ── Hero Amount — no mask-image, simple opacity fade ── */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.7, delay: 0.2 }}
-        className="text-center shrink-0 relative"
-        style={{ marginBottom: "1vh" }}
-      >
-        <div className="relative">
-          <div
-            className="font-black tracking-tighter leading-none text-foreground"
-            style={{ fontSize: "clamp(6rem, 15vw, 14rem)", paddingBottom: "clamp(0.5rem, 1.5vh, 2rem)" }}
-          >
-            <NumberFlow
-              value={totals.total_amount}
-              format={{ style: "currency", currency: "GBP", minimumFractionDigits: 2, maximumFractionDigits: 2 }}
-              locales="en-GB"
-              transformTiming={{ duration: 600, easing: "ease-out" }}
-              spinTiming={{ duration: 500, easing: "ease-out" }}
-              opacityTiming={{ duration: 300, easing: "ease-out" }}
-              willChange={false}
-            />
-          </div>
-          {/* Simple gradient overlay div instead of CSS mask */}
-          <div
-            className="absolute inset-x-0 bottom-0 pointer-events-none"
-            style={{ height: "60%", background: "linear-gradient(to bottom, transparent 0%, hsl(var(--background)) 100%)" }}
-          />
+      {/* ── Hero Amount — static text, CSS fade ── */}
+      <div className="text-center shrink-0" style={{ marginBottom: "1vh" }}>
+        <div
+          className="font-black tracking-tighter leading-none text-foreground tabular-nums"
+          style={{
+            fontSize: "clamp(6rem, 15vw, 14rem)",
+            paddingBottom: "clamp(0.5rem, 1.5vh, 2rem)",
+            opacity: contentVisible ? 1 : 0,
+            transition: "opacity 0.2s ease-out",
+          }}
+        >
+          {fmtCurrency(totals.total_amount)}
         </div>
+        <p
+          className="text-muted-foreground"
+          style={{
+            fontSize: "clamp(1rem, 1.5vw, 1.6rem)",
+            marginTop: "clamp(-2rem, -3vh, -1rem)",
+            opacity: contentVisible ? 1 : 0,
+            transition: "opacity 0.2s ease-out",
+          }}
+        >
+          {totals.total_deals} deal{totals.total_deals !== 1 ? "s" : ""} closed {PERIOD_SUBLABELS[displayPeriod]}
+        </p>
+      </div>
 
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={`subtitle-${selectedPeriod}`}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25 }}
-            className="text-muted-foreground relative z-10"
-            style={{ fontSize: "clamp(1rem, 1.5vw, 1.6rem)", marginTop: "clamp(-2rem, -3vh, -1rem)" }}
-          >
-            {`${totals.total_deals} deal${totals.total_deals !== 1 ? "s" : ""} closed ${periodLabel(selectedPeriod)}`}
-          </motion.div>
-        </AnimatePresence>
-      </motion.div>
-
-      {/* ── Leaderboard & Deals ── */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, delay: 0.3 }}
+      {/* ── Panels ── */}
+      <div
         className="grid grid-cols-2 flex-1 min-h-0"
-        style={{ gap: "clamp(12px, 1.5vw, 28px)" }}
+        style={{
+          gap: "clamp(12px, 1.5vw, 28px)",
+          opacity: contentVisible ? 1 : 0,
+          transition: "opacity 0.2s ease-out",
+        }}
       >
         {/* LEADERBOARD */}
-        <div className="rounded-[24px] bg-card border border-border/40 shadow-sm overflow-hidden flex flex-col relative">
-          {/* Header */}
-          <div className="flex items-center border-b border-border/40 bg-muted/20 relative z-10 shrink-0" style={{ padding: "clamp(12px, 1.5vh, 20px) clamp(16px, 1.5vw, 28px)" }}>
+        <div className="rounded-[24px] bg-card border border-border/40 shadow-sm overflow-hidden flex flex-col">
+          <div className="flex items-center border-b border-border/40 bg-muted/20 shrink-0" style={{ padding: "clamp(12px, 1.5vh, 20px) clamp(16px, 1.5vw, 28px)" }}>
             <div className="flex items-center" style={{ gap: "clamp(8px, 0.8vw, 14px)" }}>
               <div
-                className="relative flex items-center justify-center rounded-[10px] bg-gradient-to-b from-white to-gray-200 shadow-sm"
+                className="flex items-center justify-center rounded-[10px] bg-gradient-to-b from-white to-gray-200 shadow-sm"
                 style={{ width: "clamp(26px, 1.8vw, 34px)", height: "clamp(26px, 1.8vw, 34px)" }}
               >
-                <BarChartIcon
-                  className="text-black"
-                  style={{ width: "clamp(12px, 0.9vw, 16px)", height: "clamp(12px, 0.9vw, 16px)" }}
-                />
+                <BarChartIcon size={14} />
               </div>
               <div>
-                <h2
-                  className="font-bold uppercase tracking-widest text-foreground"
-                  style={{ fontSize: "clamp(0.7rem, 0.8vw, 0.95rem)" }}
-                >
+                <h2 className="font-bold uppercase tracking-widest text-foreground" style={{ fontSize: "clamp(0.7rem, 0.8vw, 0.95rem)" }}>
                   Leaderboard
                 </h2>
-                <p
-                  className="font-medium text-muted-foreground"
-                  style={{ fontSize: "clamp(0.6rem, 0.65vw, 0.8rem)", marginTop: "1px" }}
-                >
-                  {periodLabel(selectedPeriod)}
+                <p className="font-medium text-muted-foreground" style={{ fontSize: "clamp(0.6rem, 0.65vw, 0.8rem)", marginTop: 1 }}>
+                  {PERIOD_SUBLABELS[displayPeriod]}
                 </p>
               </div>
             </div>
           </div>
-
-          {/* Content — single AnimatePresence on container only */}
-          <div className="flex-1 overflow-y-auto scrollbar-hide relative z-10 bg-card" style={{ padding: "clamp(8px, 0.6vw, 14px)" }}>
-            <AnimatePresence mode="wait">
-              {leaderboard.length === 0 ? (
-                <motion.div
-                  key="lb-empty"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.25 }}
-                  className="flex flex-col items-center justify-center h-full text-muted-foreground"
+          <div className="flex-1 overflow-y-auto scrollbar-hide bg-card" style={{ padding: "clamp(8px, 0.6vw, 14px)" }}>
+            {leaderboard.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                <div
+                  className="flex items-center justify-center rounded-[16px] bg-muted/60 border border-border/60 mb-4"
+                  style={{ width: "clamp(48px, 3.5vw, 64px)", height: "clamp(48px, 3.5vw, 64px)" }}
                 >
-                  <div
-                    className="flex items-center justify-center rounded-[16px] bg-muted/60 border border-border/60 mb-4"
-                    style={{ width: "clamp(48px, 3.5vw, 64px)", height: "clamp(48px, 3.5vw, 64px)" }}
-                  >
-                    <BarChartIcon className="text-muted-foreground/30" style={{ width: "clamp(20px, 1.5vw, 28px)", height: "clamp(20px, 1.5vw, 28px)" }} />
-                  </div>
-                  <p className="font-medium" style={{ fontSize: "clamp(0.8rem, 0.9vw, 1rem)" }}>
-                    No deals closed {periodLabel(selectedPeriod)}
-                  </p>
-                </motion.div>
-              ) : (
-                <motion.div
-                  key={`lb-${selectedPeriod}`}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.25 }}
-                >
-                  {leaderboard.map((rep, index) => (
-                    <LeaderboardRow key={rep.email || rep.name} rep={rep} index={index} />
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
+                  <BarChartIcon size={24} />
+                </div>
+                <p className="font-medium" style={{ fontSize: "clamp(0.8rem, 0.9vw, 1rem)" }}>
+                  No deals closed {PERIOD_SUBLABELS[displayPeriod]}
+                </p>
+              </div>
+            ) : (
+              leaderboard.map((rep, i) => (
+                <LeaderboardRow key={rep.email || rep.name} rep={rep} index={i} />
+              ))
+            )}
           </div>
         </div>
 
         {/* RECENT DEALS */}
-        <div className="rounded-[24px] bg-card border border-border/40 shadow-sm overflow-hidden flex flex-col relative">
-          {/* Header */}
-          <div className="flex items-center border-b border-border/40 bg-muted/20 relative z-10 shrink-0" style={{ padding: "clamp(12px, 1.5vh, 20px) clamp(16px, 1.5vw, 28px)" }}>
+        <div className="rounded-[24px] bg-card border border-border/40 shadow-sm overflow-hidden flex flex-col">
+          <div className="flex items-center border-b border-border/40 bg-muted/20 shrink-0" style={{ padding: "clamp(12px, 1.5vh, 20px) clamp(16px, 1.5vw, 28px)" }}>
             <div className="flex items-center" style={{ gap: "clamp(8px, 0.8vw, 14px)" }}>
               <div
-                className="relative flex items-center justify-center rounded-[10px] bg-gradient-to-b from-emerald-400 to-emerald-600 shadow-sm"
+                className="flex items-center justify-center rounded-[10px] bg-gradient-to-b from-emerald-400 to-emerald-600 shadow-sm"
                 style={{ width: "clamp(26px, 1.8vw, 34px)", height: "clamp(26px, 1.8vw, 34px)" }}
               >
-                <img
-                  src="/pounds-cropped.svg"
-                  alt=""
-                  className="brightness-0 invert"
-                  style={{ width: "clamp(14px, 1vw, 18px)", height: "clamp(14px, 1vw, 18px)" }}
-                />
+                <img src="/pounds-cropped.svg" alt="" className="brightness-0 invert" style={{ width: "clamp(14px, 1vw, 18px)", height: "clamp(14px, 1vw, 18px)" }} />
               </div>
               <div>
-                <h2
-                  className="font-bold uppercase tracking-widest text-foreground"
-                  style={{ fontSize: "clamp(0.7rem, 0.8vw, 0.95rem)" }}
-                >
+                <h2 className="font-bold uppercase tracking-widest text-foreground" style={{ fontSize: "clamp(0.7rem, 0.8vw, 0.95rem)" }}>
                   Recent Deals
                 </h2>
-                <p
-                  className="font-medium text-muted-foreground"
-                  style={{ fontSize: "clamp(0.6rem, 0.65vw, 0.8rem)", marginTop: "1px" }}
-                >
-                  {periodLabel(selectedPeriod)}
+                <p className="font-medium text-muted-foreground" style={{ fontSize: "clamp(0.6rem, 0.65vw, 0.8rem)", marginTop: 1 }}>
+                  {PERIOD_SUBLABELS[displayPeriod]}
                 </p>
               </div>
             </div>
           </div>
-
-          {/* Content — single AnimatePresence on container only */}
-          <div className="flex-1 overflow-y-auto scrollbar-hide relative z-10 bg-card" style={{ padding: "clamp(8px, 0.6vw, 14px)" }}>
-            <AnimatePresence mode="wait">
-              {deals.length === 0 ? (
-                <motion.div
-                  key="deals-empty"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.25 }}
-                  className="flex flex-col items-center justify-center h-full text-muted-foreground"
+          <div className="flex-1 overflow-y-auto scrollbar-hide bg-card" style={{ padding: "clamp(8px, 0.6vw, 14px)" }}>
+            {deals.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                <div
+                  className="flex items-center justify-center rounded-[16px] bg-muted/60 border border-border/60 mb-4"
+                  style={{ width: "clamp(48px, 3.5vw, 64px)", height: "clamp(48px, 3.5vw, 64px)" }}
                 >
-                  <div
-                    className="flex items-center justify-center rounded-[16px] bg-muted/60 border border-border/60 mb-4"
-                    style={{ width: "clamp(48px, 3.5vw, 64px)", height: "clamp(48px, 3.5vw, 64px)" }}
-                  >
-                    <img
-                      src="/pounds-cropped.svg"
-                      alt=""
-                      className="invert-0 opacity-30"
-                      style={{ width: "clamp(20px, 1.5vw, 28px)", height: "clamp(20px, 1.5vw, 28px)" }}
-                    />
-                  </div>
-                  <p className="font-medium" style={{ fontSize: "clamp(0.8rem, 0.9vw, 1rem)" }}>
-                    No deals closed {periodLabel(selectedPeriod)}
-                  </p>
-                </motion.div>
-              ) : (
-                <motion.div
-                  key={`deals-${selectedPeriod}`}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.25 }}
-                >
-                  {deals.map((deal, index) => (
-                    <DealRow key={deal.Id} deal={deal} index={index} />
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
+                  <img src="/pounds-cropped.svg" alt="" className="invert-0 opacity-30" style={{ width: "clamp(20px, 1.5vw, 28px)", height: "clamp(20px, 1.5vw, 28px)" }} />
+                </div>
+                <p className="font-medium" style={{ fontSize: "clamp(0.8rem, 0.9vw, 1rem)" }}>
+                  No deals closed {PERIOD_SUBLABELS[displayPeriod]}
+                </p>
+              </div>
+            ) : (
+              deals.map((deal) => (
+                <DealRow key={deal.Id} deal={deal} />
+              ))
+            )}
           </div>
         </div>
-      </motion.div>
+      </div>
 
       {/* ── Bottom Stats ── */}
       {allTotals && (
         <div className="shrink-0" style={{ paddingTop: "1.2vh" }}>
           <div className="flex items-center justify-center border-t border-border/20" style={{ gap: "clamp(16px, 3vw, 48px)", paddingTop: "clamp(8px, 1vh, 16px)" }}>
-            {PERIODS.filter((p) => p.key !== selectedPeriod).map((p) => {
-              const t = allTotals[p.key];
+            {PERIODS.filter(p => p !== displayPeriod).map(p => {
+              const t = allTotals[p];
               return (
-                <div key={p.key} className="flex items-center text-muted-foreground/60" style={{ gap: "clamp(6px, 0.5vw, 10px)" }}>
-                  <span
-                    className="uppercase tracking-wider"
-                    style={{ fontSize: "clamp(0.6rem, 0.7vw, 0.85rem)" }}
-                  >
-                    {p.label}
+                <div key={p} className="flex items-center text-muted-foreground/60" style={{ gap: "clamp(6px, 0.5vw, 10px)" }}>
+                  <span className="uppercase tracking-wider" style={{ fontSize: "clamp(0.6rem, 0.7vw, 0.85rem)" }}>
+                    {PERIOD_LABELS[p]}
                   </span>
-                  <span
-                    className="font-semibold text-foreground/50 tabular-nums"
-                    style={{ fontSize: "clamp(0.75rem, 0.9vw, 1.05rem)" }}
-                  >
-                    {formatCompact(t?.total_amount || 0)}
+                  <span className="font-semibold text-foreground/50 tabular-nums" style={{ fontSize: "clamp(0.75rem, 0.9vw, 1.05rem)" }}>
+                    {fmtCompact(t?.total_amount || 0)}
                   </span>
-                  <span
-                    className="text-muted-foreground/40 tabular-nums"
-                    style={{ fontSize: "clamp(0.6rem, 0.65vw, 0.8rem)" }}
-                  >
+                  <span className="text-muted-foreground/40 tabular-nums" style={{ fontSize: "clamp(0.6rem, 0.65vw, 0.8rem)" }}>
                     {t?.total_deals || 0} deals
                   </span>
                 </div>
               );
             })}
             {totals.average_deal > 0 && (
-              <div
-                className="flex items-center text-muted-foreground/40 border-l border-border/20"
-                style={{ gap: "clamp(4px, 0.4vw, 8px)", paddingLeft: "clamp(12px, 1.5vw, 24px)" }}
-              >
-                <TrendingUp style={{ width: "clamp(12px, 0.9vw, 16px)", height: "clamp(12px, 0.9vw, 16px)" }} />
+              <div className="flex items-center text-muted-foreground/40 border-l border-border/20" style={{ gap: "clamp(4px, 0.4vw, 8px)", paddingLeft: "clamp(12px, 1.5vw, 24px)" }}>
+                <TrendUpIcon size={14} />
                 <span style={{ fontSize: "clamp(0.6rem, 0.7vw, 0.85rem)" }}>Avg deal</span>
-                <span
-                  className="font-semibold text-foreground/50 tabular-nums"
-                  style={{ fontSize: "clamp(0.75rem, 0.9vw, 1.05rem)" }}
-                >
-                  {formatCompact(totals.average_deal)}
+                <span className="font-semibold text-foreground/50 tabular-nums" style={{ fontSize: "clamp(0.75rem, 0.9vw, 1.05rem)" }}>
+                  {fmtCompact(totals.average_deal)}
                 </span>
               </div>
             )}
