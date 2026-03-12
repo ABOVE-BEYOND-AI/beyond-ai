@@ -180,62 +180,74 @@ function DealRow({ deal }: { deal: SalesforceOpportunity }) {
 // ── Main Component ──
 
 export default function TVSalesClient({ initialData }: { initialData: DashboardResponse | null }) {
-  const [data, setData] = useState<DashboardResponse | null>(initialData);
+  // Per-period cache: keyed by period, stores deals + leaderboard
+  const [cache, setCache] = useState<Record<string, DashboardResponse>>(() => {
+    if (!initialData) return {};
+    return { [initialData.period]: initialData };
+  });
+  const [allTotals, setAllTotals] = useState<Record<SalesPeriod, PeriodTotals> | null>(
+    initialData?.all_totals || null
+  );
   const [displayPeriod, setDisplayPeriod] = useState<SalesPeriod>("month");
   const [contentVisible, setContentVisible] = useState(true);
   const pollRef = useRef<ReturnType<typeof setInterval>>(undefined);
   const cycleRef = useRef<ReturnType<typeof setInterval>>(undefined);
-  // Track which period to fetch next — rotates independently of display
-  const fetchPeriodRef = useRef<SalesPeriod>("month");
+  const displayPeriodRef = useRef<SalesPeriod>("month");
 
   // Force dark mode once
   useEffect(() => {
     document.documentElement.classList.add("dark");
   }, []);
 
-  // Poll API every 30s — always fetches the CURRENT display period for fresh deals/leaderboard
+  // Stable fetch function — fetches a specific period and caches result
+  const fetchPeriod = useRef(async (period: SalesPeriod) => {
+    try {
+      const res = await fetch(`/api/sales/data?period=${period}`);
+      if (!res.ok) return;
+      const json = await res.json();
+      if (json.success) {
+        const d = json.data as DashboardResponse;
+        setCache(prev => ({ ...prev, [period]: d }));
+        if (d.all_totals) setAllTotals(d.all_totals);
+      }
+    } catch {}
+  }).current;
+
+  // Poll current display period every 30s for fresh data
   useEffect(() => {
-    const doFetch = async () => {
-      try {
-        const res = await fetch(`/api/sales/data?period=${fetchPeriodRef.current}`);
-        if (!res.ok) return;
-        const json = await res.json();
-        if (json.success) setData(json.data);
-      } catch {}
-    };
-
-    // Initial fetch already done server-side via initialData, just start polling
-    pollRef.current = setInterval(doFetch, POLL_MS);
+    pollRef.current = setInterval(() => {
+      fetchPeriod(displayPeriodRef.current);
+    }, POLL_MS);
     return () => clearInterval(pollRef.current);
-  }, []); // No deps — never re-creates
+  }, [fetchPeriod]);
 
-  // Auto-cycle display period every 15s with a brief fade
+  // Auto-cycle display period every 15s with fade
   useEffect(() => {
     cycleRef.current = setInterval(() => {
-      // Fade out
       setContentVisible(false);
 
-      // After fade-out, switch period + fade in
       setTimeout(() => {
         setDisplayPeriod(prev => {
           const next = PERIODS[(PERIODS.indexOf(prev) + 1) % PERIODS.length];
-          fetchPeriodRef.current = next; // Next poll will fetch this period's deals
+          displayPeriodRef.current = next;
+          // Fire a fetch for the new period (refreshes cache in background)
+          fetchPeriod(next);
           return next;
         });
         setContentVisible(true);
       }, 400);
     }, CYCLE_MS);
     return () => clearInterval(cycleRef.current);
-  }, []);
+  }, [fetchPeriod]);
 
-  // ── Derived values ──
-  const allTotals = data?.all_totals;
+  // ── Derived values — all from cache ──
+  const periodData = cache[displayPeriod];
   const totals = useMemo<PeriodTotals>(
     () => allTotals?.[displayPeriod] || { total_amount: 0, total_deals: 0, average_deal: 0 },
     [allTotals, displayPeriod]
   );
-  const deals = data?.deals || [];
-  const leaderboard = data?.leaderboard || [];
+  const deals = periodData?.deals || [];
+  const leaderboard = periodData?.leaderboard || [];
 
   // ── Pill position (CSS calc, no spring physics) ──
   const pillWidths = [110, 100, 120, 100];
