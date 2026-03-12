@@ -233,7 +233,7 @@ ${input.upcomingEvents.slice(0, 15).map(e => {
 
   const hasDeepData = input.analyses.length > 0 || input.transcripts.length > 0
 
-  const model = google('gemini-3.1-pro-preview')
+  const model = google('gemini-2.5-flash')
 
   const prompt = `You are the AI sales intelligence engine for Above + Beyond, a luxury hospitality company selling premium event packages (Formula 1, The Open, Wimbledon, Six Nations, Cheltenham, Ryder Cup, etc.).
 
