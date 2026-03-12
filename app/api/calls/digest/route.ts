@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Redis } from '@upstash/redis'
 import { google } from '@ai-sdk/google'
-import { generateText } from 'ai'
+import { generateObject } from 'ai'
+import { z } from 'zod'
 import { getCallDashboardData, type CallPeriod, type CallListItem } from '@/lib/call-dashboard'
 import { generateEventRecap } from '@/lib/event-recap'
 import { getRecentTranscripts, storeTranscript } from '@/lib/transcript-store'
@@ -108,10 +109,53 @@ async function getCachedAnalyses(callIds: number[], redis: Redis): Promise<CallA
   return analyses
 }
 
+// ── Zod schema for structured AI output ──
+
+const digestSchema = z.object({
+  team_summary: z.string().describe('3-5 sentence executive summary. Cover: total call volume, answer rate, meaningful conversations, top performers, deal momentum, key themes, energy/pace. Be specific with numbers and names.'),
+  top_objections: z.array(z.object({
+    objection: z.string().describe('The specific objection pattern heard across calls'),
+    frequency: z.number().describe('How many times this objection came up'),
+    suggested_response: z.string().describe('1-2 punchy sentences MAX — displayed on a sales floor screen, not a manual'),
+  })).describe('Common objections heard across calls. Return empty array if insufficient data.'),
+  winning_pitches: z.array(z.object({
+    description: z.string().describe('What the rep said or did that worked'),
+    rep: z.string().describe('Rep name'),
+    context: z.string().describe('Brief context — event, client type, situation'),
+  })).describe('Effective sales techniques observed. Return empty array if insufficient data.'),
+  event_demand: z.array(z.object({
+    event: z.string().describe('Event name'),
+    mentions: z.number().describe('How many times this event was mentioned in calls'),
+    sentiment: z.string().describe('HOT/WARM/MIXED/CAUTION/CRITICAL — then a brief note explaining why'),
+  })).describe('Event-level demand signals from calls, deals, and upcoming targets.'),
+  competitor_intelligence: z.array(z.object({
+    competitor: z.string().describe('Competitor name'),
+    mentions: z.number().describe('Number of mentions across calls'),
+    context: z.string().describe('What was said about them — pricing, availability, quality'),
+  })).describe('Competitor mentions from calls. Return empty array if none.'),
+  coaching_highlights: z.array(z.object({
+    rep: z.string().describe('Rep name'),
+    type: z.enum(['strength', 'improvement']),
+    description: z.string().describe('Specific observation with numbers — answer rates, call durations, outbound balance'),
+  })).describe('Per-rep coaching observations. Analyse EVERY rep — strong answer rates, long meaningful calls, areas to improve.'),
+  follow_up_gaps: z.array(z.object({
+    rep: z.string().describe('Rep name'),
+    description: z.string().describe('Specific gap — e.g. heavy outbound but low answer rate, short call durations'),
+  })).describe('Reps who may be missing follow-up opportunities.'),
+  key_deals: z.array(z.object({
+    contact: z.string().describe('Deal/opportunity name'),
+    rep: z.string().describe('Rep who closed it'),
+    status: z.string().describe('e.g. "Closed today for £1,605"'),
+    next_steps: z.string().describe('Specific actionable next step for this deal — fulfilment, upsell opportunity, or follow-up needed'),
+  })).describe('Deals closed in this period. Include specific next steps based on the event and deal context.'),
+})
+
+const MAX_RETRIES = 2
+
 /**
- * Generate AI-powered digest insights using Gemini 2.5 Flash.
- * Works with whatever data is available: transcripts, cached analyses, or just call stats.
- * Cost: ~$0.003 per digest.
+ * Generate AI-powered digest insights using Gemini 2.5 Flash with structured output.
+ * Uses generateObject for guaranteed valid JSON — no parsing failures.
+ * Retries up to MAX_RETRIES times on failure.
  */
 async function generateAIDigestInsights(input: {
   transcripts: { callId: number; agent: string; contact: string; direction: string; duration: number; transcript: string }[]
@@ -143,26 +187,28 @@ ${input.repStats.map(r => {
 
   // Section 3: Deals (if any)
   if (input.dealsToday.length > 0) {
-    sections.push(`DEALS CLOSED TODAY:
-${input.dealsToday.map(d => `- ${d.name}: £${Math.round(d.amount).toLocaleString()} by ${d.owner} (${d.event})`).join('\n')}`)
+    sections.push(`DEALS CLOSED ${input.period.toUpperCase()}:
+${input.dealsToday.map(d => `- ${d.name}: £${Math.round(d.amount).toLocaleString()} by ${d.owner} for ${d.event}`).join('\n')}
+Total deal value: £${Math.round(input.dealsToday.reduce((s, d) => s + d.amount, 0)).toLocaleString()}`)
   }
 
-  // Section 4: Upcoming events
+  // Section 4: Upcoming events with targets
   if (input.upcomingEvents.length > 0) {
-    sections.push(`UPCOMING EVENTS:
-${input.upcomingEvents.slice(0, 12).map(e => {
-  const target = e.percentageToTarget !== null ? ` (${Math.round(e.percentageToTarget)}% to target)` : ''
-  return `- ${e.name}${e.category ? ` (${e.category})` : ''}${target}`
+    sections.push(`UPCOMING EVENTS (use target %s to flag which need attention):
+${input.upcomingEvents.slice(0, 15).map(e => {
+  const target = e.percentageToTarget !== null ? ` — ${Math.round(e.percentageToTarget)}% to target` : ''
+  return `- ${e.name}${e.category ? ` [${e.category}]` : ''}${target}`
 }).join('\n')}`)
   }
 
   // Section 5: Cached analyses (high quality, already processed by Claude)
+  // Prioritise these — they're pre-distilled and token-efficient
   if (input.analyses.length > 0) {
     const analysisSummaries = input.analyses.map(a =>
       `[Analysed Call] Sentiment: ${a.sentiment} (${a.sentiment_score}/100)\n` +
       `Summary: ${a.summary}\n` +
       `Objections: ${a.objections.length > 0 ? a.objections.join('; ') : 'None'}\n` +
-      `Events: ${a.events_mentioned.length > 0 ? a.events_mentioned.join(', ') : 'None'}\n` +
+      `Events: ${a.events_mentioned.length > 0 ? a.events_mentioned.map(e => typeof e === 'string' ? e : `${e.event} (${e.context})`).join(', ') : 'None'}\n` +
       `Competitors: ${a.competitor_mentions.length > 0 ? a.competitor_mentions.join(', ') : 'None'}\n` +
       `Opportunities: ${a.opportunity_signals.map(o => `${o.type}: ${o.description}`).join('; ') || 'None'}\n` +
       `Coaching: ${a.coaching_notes || 'None'}`
@@ -170,84 +216,67 @@ ${input.upcomingEvents.slice(0, 12).map(e => {
     sections.push(`AI-ANALYSED CALL DETAILS (${input.analyses.length} calls):\n\n${analysisSummaries.join('\n\n---\n\n')}`)
   }
 
-  // Section 6: Raw transcripts (for calls without individual analysis)
+  // Section 6: Raw transcripts — only for calls without analysis, budget-capped
   const analysedCallIds = new Set(input.analyses.map(a => a.call_id))
   const unanalysedTranscripts = input.transcripts.filter(t => !analysedCallIds.has(t.callId))
   if (unanalysedTranscripts.length > 0) {
-    const transcriptSummaries = unanalysedTranscripts.map(t => {
+    // Dynamic word limit: fewer words per transcript when there are many, to stay within budget
+    const maxTranscripts = Math.min(unanalysedTranscripts.length, 15)
+    const wordsPerTranscript = maxTranscripts > 8 ? 250 : 400
+    const transcriptSummaries = unanalysedTranscripts.slice(0, maxTranscripts).map(t => {
       const words = t.transcript.split(/\s+/)
-      const truncated = words.length > 500 ? words.slice(0, 500).join(' ') + '...' : t.transcript
+      const truncated = words.length > wordsPerTranscript ? words.slice(0, wordsPerTranscript).join(' ') + '...' : t.transcript
       return `[Transcript] ${t.agent} <> ${t.contact} (${t.direction}, ${Math.round(t.duration / 60)}min)\n${truncated}`
     })
-    sections.push(`RAW TRANSCRIPTS (${unanalysedTranscripts.length} calls):\n\n${transcriptSummaries.join('\n\n---\n\n')}`)
+    sections.push(`RAW TRANSCRIPTS (${unanalysedTranscripts.length} calls, showing ${maxTranscripts}):\n\n${transcriptSummaries.join('\n\n---\n\n')}`)
   }
 
   const hasDeepData = input.analyses.length > 0 || input.transcripts.length > 0
 
-  const model = google('gemini-2.5-flash')
+  const model = google('gemini-3.1-pro-preview')
 
-  const prompt = `You are the AI sales intelligence engine for Above + Beyond, a luxury hospitality company selling premium event packages (Formula 1, The Open, Wimbledon, Six Nations, Cheltenham, Ryder Cup, etc.). You're generating the ${input.period} team digest — shown to the whole company at lunch and end of day.
+  const prompt = `You are the AI sales intelligence engine for Above + Beyond, a luxury hospitality company selling premium event packages (Formula 1, The Open, Wimbledon, Six Nations, Cheltenham, Ryder Cup, etc.).
 
+You're generating the ${input.period} team digest — this is shown to the WHOLE COMPANY on a sales floor screen at lunch and end of day. Make it sharp, specific, and energising.
+
+DATA:
 ${sections.join('\n\n')}
 
-Generate a comprehensive team intelligence digest as JSON. Return ONLY valid JSON, no markdown, no explanation:
-{
-  "team_summary": "3-5 sentence executive summary. Cover: total call volume, answer rate, meaningful conversations, top performers, deal momentum, ${hasDeepData ? 'key themes from conversations, ' : ''}energy/pace. Be specific with actual numbers and names.",
-  "top_objections": [
-    { "objection": "specific objection pattern", "frequency": 2, "suggested_response": "1-2 punchy sentences MAX — this is displayed on a sales floor screen, not a manual" }
-  ],
-  "winning_pitches": [
-    { "description": "what worked", "rep": "who", "context": "brief context" }
-  ],
-  "event_demand": [
-    { "event": "event name", "mentions": 3, "sentiment": "HOT/WARM/MIXED/CAUTION/CRITICAL — then a brief note" }
-  ],
-  "competitor_intelligence": [
-    { "competitor": "name", "mentions": 1, "context": "what was said" }
-  ],
-  "coaching_highlights": [
-    { "rep": "name", "type": "strength", "description": "specific observation" }
-  ],
-  "follow_up_gaps": [
-    { "rep": "name", "description": "specific gap" }
-  ]
-}
+INSTRUCTIONS:
+- team_summary: 3-5 sentences. Lead with energy. Cover call volume, answer rate, meaningful conversations, name top performers, deal momentum.${hasDeepData ? ' Weave in key themes from conversations.' : ''}
+- top_objections: Pull specific objection patterns from calls. Suggested responses must be 1-2 punchy sentences — this is a sales floor screen, not a training manual.
+- winning_pitches: What specific techniques/phrases/approaches worked? Name the rep and context.
+- event_demand: Cross-reference call mentions, closed deals, and upcoming event target %s. Flag events that are HOT (high demand, deals closing), need CAUTION (behind target), or CRITICAL (way behind).
+- competitor_intelligence: Who are clients comparing you to? What are they saying about pricing, availability, quality?
+- coaching_highlights: Analyse EVERY rep individually. Reference their specific numbers — answer rate, call count, avg duration. Identify both strengths and areas for improvement.
+- follow_up_gaps: Reps with heavy outbound but low answer rates, short call durations suggesting shallow conversations, or missed opportunities.
+- key_deals: For each deal closed, include specific next steps — what needs to happen for fulfilment? Any upsell opportunity? Client follow-up needed?${!hasDeepData ? '\n- Without transcript/analysis data, focus coaching on call PATTERNS: answer rates, outbound/inbound balance, call durations, volume distribution.' : ''}
+- Every insight should tell the team what to DO next
+- Keep it punchy, not corporate — this is for hungry salespeople
+- Return empty arrays ONLY for categories with genuinely zero relevant data`
 
-GUIDELINES:
-- Be SPECIFIC — use actual names, numbers, events from the data${hasDeepData ? '\n- For objections/winning pitches/competitors: pull from transcript and analysis data' : '\n- Without transcript data: focus coaching on call patterns (answer rates, outbound/inbound balance, call durations, volume)'}
-- coaching_highlights: analyse each rep — who has strong answer rates, who has long meaningful calls, who needs to improve. Reference specific numbers.
-- follow_up_gaps: identify reps with heavy outbound but low answer rates, or reps whose call durations suggest they are not having deep conversations
-- event_demand: if deals were closed for specific events, note which events are hot. Use upcoming event target percentages to flag which events need attention.
-- Every insight should tell the team what to DO
-- Keep it punchy, actionable, not corporate — this is for a sales floor
-- Return empty arrays for categories with insufficient data`
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const result = await generateObject({
+        model,
+        prompt,
+        schema: digestSchema,
+        maxOutputTokens: 16384,
+        providerOptions: {
+          google: {
+            thinkingConfig: { thinkingBudget: 4096 },
+          },
+        },
+      })
 
-  try {
-    const result = await generateText({
-      model,
-      prompt,
-    })
-
-    let jsonStr = result.text.trim()
-    if (jsonStr.startsWith('```')) {
-      jsonStr = jsonStr.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '')
+      return result.object
+    } catch (err) {
+      console.error(`AI digest generation failed (attempt ${attempt}/${MAX_RETRIES}):`, err)
+      if (attempt === MAX_RETRIES) return {}
     }
-
-    const parsed = JSON.parse(jsonStr)
-    return parsed
-  } catch (err) {
-    console.error('AI digest generation failed:', err)
-    return {}
   }
-}
 
-function buildKeyDeals(recap: Awaited<ReturnType<typeof generateEventRecap>>): DigestPayload['key_deals'] {
-  return recap.dealsClosedToday.slice(0, 8).map((deal) => ({
-    contact: deal.name,
-    rep: deal.owner,
-    status: `Closed today for £${Math.round(deal.amount).toLocaleString()}`,
-    next_steps: `Confirm fulfilment handoff for ${deal.event}.`,
-  }))
+  return {}
 }
 
 export async function POST(request: NextRequest) {
@@ -390,6 +419,14 @@ export async function POST(request: NextRequest) {
       period: periodLabel(period),
     })
 
+    // AI generates key_deals with intelligent next_steps; fall back to basic recap data
+    const fallbackDeals: DigestPayload['key_deals'] = recap.dealsClosedToday.slice(0, 8).map(d => ({
+      contact: d.name,
+      rep: d.owner,
+      status: `Closed today for £${Math.round(d.amount).toLocaleString()}`,
+      next_steps: `Confirm fulfilment handoff for ${d.event}.`,
+    }))
+
     const digest: DigestPayload = {
       period: periodLabel(period),
       generated_at: new Date().toISOString(),
@@ -401,7 +438,7 @@ export async function POST(request: NextRequest) {
       competitor_intelligence: aiInsights.competitor_intelligence || [],
       follow_up_gaps: aiInsights.follow_up_gaps || [],
       coaching_highlights: aiInsights.coaching_highlights || [],
-      key_deals: buildKeyDeals(recap),
+      key_deals: (aiInsights.key_deals && aiInsights.key_deals.length > 0) ? aiInsights.key_deals : fallbackDeals,
     }
 
     if (redis) {
