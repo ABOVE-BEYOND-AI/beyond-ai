@@ -264,10 +264,10 @@ const SELECT_FIELDS = `
 `.trim()
 
 /**
- * Helper: get the gross amount from a record, falling back to Amount (Net)
+ * Helper: get the net amount from a record, falling back to Gross
  */
-function grossAmount(opp: SalesforceOpportunity): number {
-  return opp.Gross_Amount__c ?? opp.Amount ?? 0
+function netAmount(opp: SalesforceOpportunity): number {
+  return opp.Amount ?? opp.Gross_Amount__c ?? 0
 }
 
 /**
@@ -301,7 +301,7 @@ function computeTotals(deals: SalesforceOpportunity[]): {
   average_deal: number
 } {
   const total_deals = deals.length
-  const total_amount = deals.reduce((sum, d) => sum + grossAmount(d), 0)
+  const total_amount = deals.reduce((sum, d) => sum + netAmount(d), 0)
   const average_deal = total_deals > 0 ? total_amount / total_deals : 0
 
   return { total_amount, total_deals, average_deal }
@@ -325,10 +325,10 @@ function computeLeaderboard(deals: SalesforceOpportunity[]): Array<{
 
     const existing = repMap.get(key)
     if (existing) {
-      existing.total_amount += grossAmount(deal)
+      existing.total_amount += netAmount(deal)
       existing.deal_count += 1
     } else {
-      repMap.set(key, { name, email, total_amount: grossAmount(deal), deal_count: 1 })
+      repMap.set(key, { name, email, total_amount: netAmount(deal), deal_count: 1 })
     }
   }
 
@@ -890,7 +890,7 @@ export async function getChannelAttribution(): Promise<ChannelAttribution[]> {
     const source = deal.LeadSource?.trim() || 'Unattributed'
     const existing = sourceMap.get(source) || { totalDeals: 0, totalRevenue: 0 }
     existing.totalDeals += 1
-    existing.totalRevenue += grossAmount(deal)
+    existing.totalRevenue += netAmount(deal)
     sourceMap.set(source, existing)
   }
 
@@ -924,7 +924,7 @@ export async function getRepPerformance(): Promise<RepPerformance[]> {
     const key = email || name
     const existing = repMap.get(key) || { name, email, ownerId, totalDeals: 0, totalRevenue: 0, avgDealSize: 0, totalGuests: 0 }
     existing.totalDeals += 1
-    existing.totalRevenue += grossAmount(deal)
+    existing.totalRevenue += netAmount(deal)
     existing.totalGuests += deal.Total_Number_of_Guests__c ?? 0
     if (!existing.ownerId && ownerId) existing.ownerId = ownerId
     repMap.set(key, existing)
@@ -958,7 +958,7 @@ export async function getEventPerformance(): Promise<EventPerformance[]> {
     }
     existing.totalDeals += 1
     existing.totalRevenue += deal.Amount ?? 0
-    existing.totalGross += grossAmount(deal)
+    existing.totalGross += netAmount(deal)
     eventMap.set(key, existing)
   }
 

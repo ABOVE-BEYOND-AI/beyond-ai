@@ -165,7 +165,7 @@ function LeaderboardRow({ rep, index, large = false }: { rep: LeaderboardEntry; 
 // ── Deal Row (shared between inline and fullscreen) ──
 
 function DealRow({ deal, index, large = false }: { deal: SalesforceOpportunity; index: number; large?: boolean }) {
-  const amount = deal.Gross_Amount__c ?? deal.Amount ?? 0;
+  const amount = deal.Amount ?? deal.Gross_Amount__c ?? 0;
   const event = deal.Event__r?.Name;
   const owner = deal.Owner?.Name || "Unknown";
 

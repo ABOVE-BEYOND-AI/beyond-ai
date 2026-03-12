@@ -167,7 +167,7 @@ function LeaderboardRow({ rep, index }: { rep: LeaderboardEntry; index: number }
 }
 
 function DealRow({ deal, index }: { deal: SalesforceOpportunity; index: number }) {
-  const amount = deal.Gross_Amount__c ?? deal.Amount ?? 0;
+  const amount = deal.Amount ?? deal.Gross_Amount__c ?? 0;
   const event = deal.Event__r?.Name;
   const owner = deal.Owner?.Name || "Unknown";
 
