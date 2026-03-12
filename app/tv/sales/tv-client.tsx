@@ -282,7 +282,7 @@ export default function TVSalesClient({ initialData }: { initialData: DashboardR
       </div>
 
       {/* ── Hero Amount — static text, CSS fade ── */}
-      <div className="text-center shrink-0" style={{ marginBottom: "1vh" }}>
+      <div className="text-center shrink-0" style={{ marginBottom: "2vh" }}>
         <div
           className="font-black tracking-tighter leading-none text-foreground tabular-nums"
           style={{
@@ -290,6 +290,8 @@ export default function TVSalesClient({ initialData }: { initialData: DashboardR
             paddingBottom: "clamp(0.5rem, 1.5vh, 2rem)",
             opacity: contentVisible ? 1 : 0,
             transition: "opacity 0.2s ease-out",
+            maskImage: "linear-gradient(to bottom, white 60%, transparent 100%)",
+            WebkitMaskImage: "linear-gradient(to bottom, white 60%, transparent 100%)",
           }}
         >
           {fmtCurrency(totals.total_amount)}
