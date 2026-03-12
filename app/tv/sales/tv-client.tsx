@@ -101,9 +101,9 @@ function clientName(oppName: string): string {
 
 // ── Icons ──
 
-function BarChartIcon({ className }: { className?: string }) {
+function BarChartIcon({ className, style }: { className?: string; style?: React.CSSProperties }) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className} style={style}>
       <path d="M18 20V10" />
       <path d="M12 20V4" />
       <path d="M6 20V14" />
@@ -378,12 +378,12 @@ export default function TVSalesClient({ initialData }: { initialData: DashboardR
           <div className="flex items-center border-b border-border/40 bg-gradient-to-b from-muted/30 to-card relative z-10 shrink-0" style={{ padding: "clamp(12px, 1.5vh, 20px) clamp(16px, 1.5vw, 28px)" }}>
             <div className="flex items-center" style={{ gap: "clamp(8px, 0.8vw, 14px)" }}>
               <div
-                className="relative flex items-center justify-center rounded-[12px] bg-gradient-to-b from-white to-gray-200 shadow-[0_2px_8px_rgba(255,255,255,0.3),_inset_0_-1px_1px_rgba(0,0,0,0.2)]"
-                style={{ width: "clamp(28px, 2vw, 36px)", height: "clamp(28px, 2vw, 36px)" }}
+                className="relative flex items-center justify-center rounded-[10px] bg-gradient-to-b from-white to-gray-200 shadow-[0_2px_8px_rgba(255,255,255,0.3),_inset_0_-1px_1px_rgba(0,0,0,0.2)]"
+                style={{ width: "clamp(26px, 1.8vw, 34px)", height: "clamp(26px, 1.8vw, 34px)" }}
               >
                 <BarChartIcon
                   className="text-black drop-shadow-none"
-                  style={{ width: "clamp(14px, 1vw, 18px)", height: "clamp(14px, 1vw, 18px)" } as React.CSSProperties}
+                  style={{ width: "clamp(12px, 0.9vw, 16px)", height: "clamp(12px, 0.9vw, 16px)" }}
                 />
               </div>
               <div>
@@ -421,8 +421,11 @@ export default function TVSalesClient({ initialData }: { initialData: DashboardR
                   exit={{ opacity: 0 }}
                   className="flex flex-col items-center justify-center h-full text-muted-foreground"
                 >
-                  <div className="flex items-center justify-center rounded-[20px] bg-muted/40 backdrop-blur-md border border-border/80 shadow-[inset_0_2px_8px_rgba(0,0,0,0.8),_0_1px_1px_rgba(255,255,255,0.03)] mb-4" style={{ padding: "clamp(12px, 1vw, 20px)" }}>
-                    <BarChartIcon className="text-muted-foreground/30" style={{ width: "clamp(20px, 1.5vw, 32px)", height: "clamp(20px, 1.5vw, 32px)" } as React.CSSProperties} />
+                  <div
+                    className="flex items-center justify-center rounded-[16px] bg-muted/40 backdrop-blur-md border border-border/80 shadow-[inset_0_2px_8px_rgba(0,0,0,0.8),_0_1px_1px_rgba(255,255,255,0.03)] mb-4"
+                    style={{ width: "clamp(48px, 3.5vw, 64px)", height: "clamp(48px, 3.5vw, 64px)" }}
+                  >
+                    <BarChartIcon className="text-muted-foreground/30" style={{ width: "clamp(20px, 1.5vw, 28px)", height: "clamp(20px, 1.5vw, 28px)" }} />
                   </div>
                   <p className="font-medium" style={{ fontSize: "clamp(0.8rem, 0.9vw, 1rem)" }}>
                     No deals closed {periodLabel(selectedPeriod)}
@@ -453,8 +456,8 @@ export default function TVSalesClient({ initialData }: { initialData: DashboardR
           <div className="flex items-center border-b border-border/40 bg-gradient-to-b from-muted/30 to-card relative z-10 shrink-0" style={{ padding: "clamp(12px, 1.5vh, 20px) clamp(16px, 1.5vw, 28px)" }}>
             <div className="flex items-center" style={{ gap: "clamp(8px, 0.8vw, 14px)" }}>
               <div
-                className="relative flex items-center justify-center rounded-[12px] bg-gradient-to-b from-emerald-400 to-emerald-600 shadow-[0_2px_8px_rgba(16,185,129,0.4),_inset_0_1px_1px_rgba(255,255,255,0.5)]"
-                style={{ width: "clamp(28px, 2vw, 36px)", height: "clamp(28px, 2vw, 36px)" }}
+                className="relative flex items-center justify-center rounded-[10px] bg-gradient-to-b from-emerald-400 to-emerald-600 shadow-[0_2px_8px_rgba(16,185,129,0.4),_inset_0_1px_1px_rgba(255,255,255,0.5)]"
+                style={{ width: "clamp(26px, 1.8vw, 34px)", height: "clamp(26px, 1.8vw, 34px)" }}
               >
                 <img
                   src="/pounds-cropped.svg"
@@ -498,12 +501,15 @@ export default function TVSalesClient({ initialData }: { initialData: DashboardR
                   exit={{ opacity: 0 }}
                   className="flex flex-col items-center justify-center h-full text-muted-foreground"
                 >
-                  <div className="flex items-center justify-center rounded-[20px] bg-muted/40 backdrop-blur-md border border-border/80 shadow-[inset_0_2px_8px_rgba(0,0,0,0.8),_0_1px_1px_rgba(255,255,255,0.03)] mb-4" style={{ padding: "clamp(12px, 1vw, 20px)" }}>
+                  <div
+                    className="flex items-center justify-center rounded-[16px] bg-muted/40 backdrop-blur-md border border-border/80 shadow-[inset_0_2px_8px_rgba(0,0,0,0.8),_0_1px_1px_rgba(255,255,255,0.03)] mb-4"
+                    style={{ width: "clamp(48px, 3.5vw, 64px)", height: "clamp(48px, 3.5vw, 64px)" }}
+                  >
                     <img
                       src="/pounds-cropped.svg"
                       alt=""
                       className="invert-0 opacity-30"
-                      style={{ width: "clamp(20px, 1.5vw, 32px)", height: "clamp(20px, 1.5vw, 32px)" }}
+                      style={{ width: "clamp(20px, 1.5vw, 28px)", height: "clamp(20px, 1.5vw, 28px)" }}
                     />
                   </div>
                   <p className="font-medium" style={{ fontSize: "clamp(0.8rem, 0.9vw, 1rem)" }}>
