@@ -223,7 +223,7 @@ export default function TVSalesClient({ initialData }: { initialData: DashboardR
           return next;
         });
         setContentVisible(true);
-      }, 200);
+      }, 400);
     }, CYCLE_MS);
     return () => clearInterval(cycleRef.current);
   }, []);
@@ -289,7 +289,7 @@ export default function TVSalesClient({ initialData }: { initialData: DashboardR
             fontSize: "clamp(6rem, 15vw, 14rem)",
             paddingBottom: "clamp(0.5rem, 1.5vh, 2rem)",
             opacity: contentVisible ? 1 : 0,
-            transition: "opacity 0.2s ease-out",
+            transition: "opacity 0.4s ease-in-out",
             maskImage: "linear-gradient(to bottom, white 60%, transparent 100%)",
             WebkitMaskImage: "linear-gradient(to bottom, white 60%, transparent 100%)",
           }}
@@ -302,7 +302,7 @@ export default function TVSalesClient({ initialData }: { initialData: DashboardR
             fontSize: "clamp(1rem, 1.5vw, 1.6rem)",
             marginTop: "clamp(-2rem, -3vh, -1rem)",
             opacity: contentVisible ? 1 : 0,
-            transition: "opacity 0.2s ease-out",
+            transition: "opacity 0.4s ease-in-out",
           }}
         >
           {totals.total_deals} deal{totals.total_deals !== 1 ? "s" : ""} closed {PERIOD_SUBLABELS[displayPeriod]}
@@ -323,7 +323,7 @@ export default function TVSalesClient({ initialData }: { initialData: DashboardR
           <div className="flex items-center border-b border-border/40 bg-muted/20 shrink-0" style={{ padding: "clamp(12px, 1.5vh, 20px) clamp(16px, 1.5vw, 28px)" }}>
             <div className="flex items-center" style={{ gap: "clamp(8px, 0.8vw, 14px)" }}>
               <div
-                className="flex items-center justify-center rounded-[10px] bg-gradient-to-b from-white to-gray-200 shadow-sm"
+                className="flex items-center justify-center rounded-[10px] bg-gradient-to-b from-white to-gray-200 shadow-sm text-gray-800"
                 style={{ width: "clamp(26px, 1.8vw, 34px)", height: "clamp(26px, 1.8vw, 34px)" }}
               >
                 <BarChartIcon size={14} />
