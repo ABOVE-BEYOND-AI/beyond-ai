@@ -28,6 +28,7 @@ const PUBLIC_API_ROUTES = [
   '/api/notifications/generate',
   '/api/sales/admin/purge',
   '/api/sales/slack-events',
+  '/api/sales/data',
   '/api/tv/verify',
 ]
 
