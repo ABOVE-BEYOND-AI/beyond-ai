@@ -16,6 +16,8 @@ export interface EventRecapDeal {
   event: string
   accountName: string | null
   guests: number | null
+  packageName: string | null
+  isNewBusiness: boolean
 }
 
 export interface EventRecapEvent {
@@ -70,6 +72,8 @@ function mapDeal(d: SalesforceOpportunityFull): EventRecapDeal {
     event: d.Event__r?.Name || 'N/A',
     accountName: d.Account?.Name || null,
     guests: d.Total_Number_of_Guests__c ?? null,
+    packageName: d.Package_Sold__r?.Name || null,
+    isNewBusiness: d.Is_New_Business__c ?? false,
   }
 }
 

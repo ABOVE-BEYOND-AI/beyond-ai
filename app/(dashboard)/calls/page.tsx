@@ -1965,8 +1965,8 @@ export default function CallsPage() {
                             )}
                           </div>
 
-                          {/* Deals closed */}
-                          {eventRecap.dealsClosedToday.length > 0 && (
+                          {/* Deals closed — hide detailed list when AI digest has richer Key Deals section */}
+                          {eventRecap.dealsClosedToday.length > 0 && !(digest && digest.key_deals.length > 0) && (
                             <div className="mb-4">
                               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Deals Closed Today</p>
                               <div className="space-y-2">
@@ -2022,91 +2022,19 @@ export default function CallsPage() {
                       </motion.div>
                     )}
 
-                    {/* Team Summary */}
+                    {/* Team Summary — prominent, the first thing everyone reads */}
                     <motion.div
                       initial={{ opacity: 0, y: 12 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="rounded-2xl bg-card border border-border/50 p-6"
+                      className="rounded-2xl bg-gradient-to-br from-primary/[0.04] to-primary/[0.01] border border-primary/15 p-6"
                     >
-                      <p className="text-base leading-relaxed italic text-foreground/80">{digest.team_summary}</p>
+                      <p className="text-[15px] leading-relaxed text-foreground/90 font-medium">{digest.team_summary}</p>
                     </motion.div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                      {/* Follow-up Gaps — URGENT, shown first */}
-                      {digest.follow_up_gaps.length > 0 && (
-                        <DigestSection title="Follow-up Gaps" icon={Clock} delay={0.1}>
-                          <div className="space-y-2">
-                            {digest.follow_up_gaps.map((gap, i) => (
-                              <div key={i} className="flex items-start gap-3 text-sm p-3 rounded-lg border-l-2 border-l-red-500 bg-red-500/5 border border-red-500/10">
-                                <Clock className="size-3.5 text-red-500 shrink-0 mt-0.5" weight="fill" />
-                                <div className="min-w-0">
-                                  <span className="text-xs font-bold text-foreground">{gap.rep}</span>
-                                  <p className="text-xs text-muted-foreground mt-0.5">{gap.description}</p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </DigestSection>
-                      )}
-
-                      {/* Objection Radar */}
-                      {digest.top_objections.length > 0 && (
-                        <DigestSection title="Objection Radar" icon={Warning} delay={0.15}>
-                          <div className="space-y-4">
-                            {digest.top_objections.map((obj, i) => (
-                              <div key={i}>
-                                <div className="flex items-center justify-between mb-1">
-                                  <p className="text-sm font-semibold">{obj.objection}</p>
-                                  <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 tabular-nums font-medium">
-                                    {obj.frequency}x
-                                  </span>
-                                </div>
-                                <p className="text-xs text-muted-foreground leading-relaxed">
-                                  → {obj.suggested_response}
-                                </p>
-                              </div>
-                            ))}
-                          </div>
-                        </DigestSection>
-                      )}
-
-                      {/* Key Deals */}
-                      {digest.key_deals.length > 0 && (
-                        <DigestSection title="Key Deals" icon={Briefcase} delay={0.2}>
-                          <div className="space-y-3">
-                            {digest.key_deals.map((deal, i) => (
-                              <div key={i} className="p-3 rounded-lg bg-foreground/[0.03] border border-foreground/[0.06]">
-                                <div className="flex items-center justify-between mb-1">
-                                  <p className="text-sm font-semibold">{deal.contact}</p>
-                                  <span className="text-xs text-muted-foreground font-medium">{deal.rep}</span>
-                                </div>
-                                <p className="text-xs text-muted-foreground mb-1">{deal.status}</p>
-                                <p className="text-xs text-foreground font-medium">→ {deal.next_steps}</p>
-                              </div>
-                            ))}
-                          </div>
-                        </DigestSection>
-                      )}
-
-                      {/* What's Working */}
-                      {digest.winning_pitches.length > 0 && (
-                        <DigestSection title="What&apos;s Working" icon={Trophy} delay={0.25}>
-                          <div className="space-y-3">
-                            {digest.winning_pitches.map((pitch, i) => (
-                              <div key={i} className="p-3 rounded-lg border-l-2 border-l-emerald-500 bg-emerald-500/5 border border-emerald-500/10">
-                                <p className="text-sm">{pitch.description}</p>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  {pitch.rep} — {pitch.context}
-                                </p>
-                              </div>
-                            ))}
-                          </div>
-                        </DigestSection>
-                      )}
-
-                      {/* Event Demand */}
+                      {/* Event Demand — PROMOTED: core to the business, shown first */}
                       {digest.event_demand.length > 0 && (
-                        <DigestSection title="Event Demand" icon={TrendUp} delay={0.3}>
+                        <DigestSection title="Event Demand" icon={TrendUp} delay={0.08}>
                           <div className="space-y-2.5">
                             {digest.event_demand.map((event, i) => {
                               const sentLower = event.sentiment.toLowerCase();
@@ -2156,9 +2084,81 @@ export default function CallsPage() {
                         </DigestSection>
                       )}
 
+                      {/* Follow-up Gaps — URGENT */}
+                      {digest.follow_up_gaps.length > 0 && (
+                        <DigestSection title="Follow-up Gaps" icon={Clock} delay={0.12}>
+                          <div className="space-y-2">
+                            {digest.follow_up_gaps.map((gap, i) => (
+                              <div key={i} className="flex items-start gap-3 text-sm p-3 rounded-lg border-l-2 border-l-red-500 bg-red-500/5 border border-red-500/10">
+                                <Clock className="size-3.5 text-red-500 shrink-0 mt-0.5" weight="fill" />
+                                <div className="min-w-0">
+                                  <span className="text-xs font-bold text-foreground">{gap.rep}</span>
+                                  <p className="text-xs text-muted-foreground mt-0.5">{gap.description}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </DigestSection>
+                      )}
+
+                      {/* Key Deals */}
+                      {digest.key_deals.length > 0 && (
+                        <DigestSection title="Key Deals" icon={Briefcase} delay={0.16}>
+                          <div className="space-y-3">
+                            {digest.key_deals.map((deal, i) => (
+                              <div key={i} className="p-3 rounded-lg bg-foreground/[0.03] border border-foreground/[0.06]">
+                                <div className="flex items-center justify-between mb-1">
+                                  <p className="text-sm font-semibold">{deal.contact}</p>
+                                  <span className="text-xs text-muted-foreground font-medium">{deal.rep}</span>
+                                </div>
+                                <p className="text-xs text-muted-foreground mb-1">{deal.status}</p>
+                                <p className="text-xs text-foreground font-medium">→ {deal.next_steps}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </DigestSection>
+                      )}
+
+                      {/* Objection Radar */}
+                      {digest.top_objections.length > 0 && (
+                        <DigestSection title="Objection Radar" icon={Warning} delay={0.2}>
+                          <div className="space-y-4">
+                            {digest.top_objections.map((obj, i) => (
+                              <div key={i}>
+                                <div className="flex items-center justify-between mb-1">
+                                  <p className="text-sm font-semibold">{obj.objection}</p>
+                                  <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 tabular-nums font-medium">
+                                    {obj.frequency}x
+                                  </span>
+                                </div>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                  → {obj.suggested_response}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        </DigestSection>
+                      )}
+
+                      {/* What's Working */}
+                      {digest.winning_pitches.length > 0 && (
+                        <DigestSection title="What&apos;s Working" icon={Trophy} delay={0.24}>
+                          <div className="space-y-3">
+                            {digest.winning_pitches.map((pitch, i) => (
+                              <div key={i} className="p-3 rounded-lg border-l-2 border-l-emerald-500 bg-emerald-500/5 border border-emerald-500/10">
+                                <p className="text-sm">{pitch.description}</p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {pitch.rep} — {pitch.context}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        </DigestSection>
+                      )}
+
                       {/* Coaching Insights */}
                       {digest.coaching_highlights.length > 0 && (
-                        <DigestSection title="Coaching Insights" icon={Lightning} delay={0.35}>
+                        <DigestSection title="Coaching Insights" icon={Lightning} delay={0.28}>
                           <div className="space-y-4">
                             {digest.coaching_highlights.filter(h => h.type === "strength").length > 0 && (
                               <div>
@@ -2200,7 +2200,7 @@ export default function CallsPage() {
 
                       {/* Competitor Intel — only show if data exists */}
                       {digest.competitor_intelligence.length > 0 && (
-                        <DigestSection title="Competitor Intel" icon={Target} delay={0.4}>
+                        <DigestSection title="Competitor Intel" icon={Target} delay={0.32}>
                           <div className="space-y-3">
                             {digest.competitor_intelligence.map((comp, i) => (
                               <div key={i}>
