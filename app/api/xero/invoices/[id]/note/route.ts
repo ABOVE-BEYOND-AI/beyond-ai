@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireApiUser, apiErrorResponse, validateUUID, checkRateLimit, validateCsrf } from '@/lib/api-auth'
+import { requireFinanceUser, apiErrorResponse, validateUUID, checkRateLimit, validateCsrf } from '@/lib/api-auth'
 import { addInvoiceNote, addChaseActivity } from '@/lib/xero'
 
 export const dynamic = 'force-dynamic'
@@ -11,7 +11,7 @@ export async function POST(
 ) {
   try {
     validateCsrf(request)
-    const ctx = await requireApiUser(request)
+    const ctx = await requireFinanceUser(request)
     await checkRateLimit(ctx.email)
 
     const { id } = await params
@@ -31,15 +31,20 @@ export async function POST(
       return NextResponse.json({ error: 'Note text required' }, { status: 400 })
     }
 
-    // Add to both Xero History and local Redis activity log
-    await Promise.all([
-      addInvoiceNote(id, sanitizedNote),
-      addChaseActivity(id, {
+    // Write to Xero first (source of truth), then Redis activity log
+    // Sequential to ensure Xero succeeds before logging locally
+    await addInvoiceNote(id, sanitizedNote)
+
+    // Redis activity log is best-effort — don't fail the request if this errors
+    try {
+      await addChaseActivity(id, {
         action: 'note',
         detail: sanitizedNote,
         user: ctx.email,
-      }),
-    ])
+      })
+    } catch (err) {
+      console.error('Failed to log note activity to Redis (non-blocking):', err)
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {

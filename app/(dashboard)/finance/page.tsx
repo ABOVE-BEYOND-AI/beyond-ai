@@ -154,7 +154,7 @@ export default function FinancePage() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Action states
-  const [noteText, setNoteText] = useState("");
+  const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
   const [addingNote, setAddingNote] = useState<string | null>(null);
   const [sendingEmail, setSendingEmail] = useState<string | null>(null);
   const [changingStage, setChangingStage] = useState<string | null>(null);
@@ -278,6 +278,7 @@ export default function FinancePage() {
   };
 
   const handleAddNote = async (invoiceId: string) => {
+    const noteText = noteDrafts[invoiceId] || "";
     if (!noteText.trim()) return;
     setAddingNote(invoiceId);
     try {
@@ -286,7 +287,7 @@ export default function FinancePage() {
         body: JSON.stringify({ note: noteText.trim() }),
       });
       if (!res.ok) throw new Error();
-      setNoteText(""); showFeedback(invoiceId, "Note added!");
+      setNoteDrafts(prev => ({ ...prev, [invoiceId]: "" })); showFeedback(invoiceId, "Note added!");
       fetchInvoiceDetails(invoiceId);
     } catch { showFeedback(invoiceId, "Failed to add note"); }
     finally { setAddingNote(null); }
@@ -549,7 +550,7 @@ export default function FinancePage() {
                           onStageChange={handleStageChange} changingStage={changingStage}
                           onOpenPayment={(id, amt) => { setShowPaymentModal(id); setPaymentAmount(amt.toFixed(2)); }}
                           onOpenStripePayment={(id, email, amt) => openStripeModal(id, email, amt)}
-                          noteText={noteText} onNoteTextChange={setNoteText} onAddNote={handleAddNote} addingNote={addingNote}
+                          noteText={noteDrafts[inv.InvoiceID] || ""} onNoteTextChange={(t: string) => setNoteDrafts(prev => ({ ...prev, [inv.InvoiceID]: t }))} onAddNote={handleAddNote} addingNote={addingNote}
                           activities={expandedInvoice === inv.InvoiceID ? activities : []}
                           loadingActivities={expandedInvoice === inv.InvoiceID && loadingActivities}
                           actionFeedback={actionFeedback}

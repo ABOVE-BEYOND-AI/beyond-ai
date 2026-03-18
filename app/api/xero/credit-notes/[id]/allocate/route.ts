@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireApiUser, apiErrorResponse, validateUUID, validateDateString, checkRateLimit, validateCsrf } from '@/lib/api-auth'
-import { allocateCreditToInvoice, addChaseActivity, getInvoice, roundCurrency } from '@/lib/xero'
+import { requireFinanceUser, apiErrorResponse, validateUUID, validateDateString, checkRateLimit, validateCsrf, checkOrgRateLimit } from '@/lib/api-auth'
+import { allocateCreditToInvoice, addChaseActivity, getInvoice, roundCurrency, invalidateFinanceCaches } from '@/lib/xero'
+import { acquireOperationLock, releaseOperationLock, getCompletedOperation, recordCompletedOperation } from '@/lib/finance-operations'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,8 +12,9 @@ export async function POST(
 ) {
   try {
     validateCsrf(request)
-    const ctx = await requireApiUser(request)
+    const ctx = await requireFinanceUser(request)
     await checkRateLimit(ctx.email)
+    await checkOrgRateLimit()
 
     const { id: creditNoteId } = await params
     validateUUID(creditNoteId, 'Credit Note ID')
@@ -38,10 +40,8 @@ export async function POST(
       return NextResponse.json({ error: 'Amount exceeds maximum' }, { status: 400 })
     }
 
-    // Validate date format and range
     validateDateString(date)
 
-    // Validate amount does not exceed invoice balance
     const invoice = await getInvoice(invoiceId)
     const invoiceBalance = roundCurrency(invoice.AmountDue)
     const requestedAmount = roundCurrency(amount)
@@ -52,18 +52,40 @@ export async function POST(
       }, { status: 400 })
     }
 
-    // Note: Xero will also validate that the amount does not exceed the credit note's
-    // RemainingCredit on the server side. We validate the invoice balance here as the
-    // primary check. If Xero rejects, the error will propagate via xeroFetch.
+    // Idempotency check
+    const idempotencyKey = `credit:${creditNoteId}:${invoiceId}:${requestedAmount}:${date}`
+    const existing = await getCompletedOperation(idempotencyKey)
+    if (existing) {
+      return NextResponse.json({ success: true, idempotent: true })
+    }
 
-    await allocateCreditToInvoice(creditNoteId, invoiceId, requestedAmount, date)
+    // Acquire per-invoice lock
+    const locked = await acquireOperationLock('credit', invoiceId)
+    if (!locked) {
+      return NextResponse.json(
+        { error: 'Another credit operation is being processed for this invoice. Please wait.' },
+        { status: 409 }
+      )
+    }
 
-    // Log activity
-    await addChaseActivity(invoiceId, {
-      action: 'payment_recorded',
-      detail: `Credit of £${requestedAmount.toFixed(2)} applied from credit note`,
-      user: ctx.email,
-    })
+    try {
+      await allocateCreditToInvoice(creditNoteId, invoiceId, requestedAmount, date)
+      await recordCompletedOperation(idempotencyKey, { success: true, completedAt: new Date().toISOString() })
+    } finally {
+      await releaseOperationLock('credit', invoiceId)
+    }
+
+    await invalidateFinanceCaches()
+
+    try {
+      await addChaseActivity(invoiceId, {
+        action: 'payment_recorded',
+        detail: `Credit of £${requestedAmount.toFixed(2)} applied from credit note`,
+        user: ctx.email,
+      })
+    } catch (err) {
+      console.error('Failed to log credit allocation activity (non-blocking):', err)
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {

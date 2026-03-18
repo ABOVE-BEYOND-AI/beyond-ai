@@ -1,84 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { decodeSession, encodeSession, UserSession } from '@/lib/google-oauth-clean'
-import { refreshAccessToken } from '@/lib/google-oauth-clean'
-import { getUserTokens, saveUserTokens } from '@/lib/redis-database'
+import { verifySecureSession, createSecureSession } from '@/lib/session-security'
+import { getValidGoogleAccessToken } from '@/lib/google-tokens'
+import { getUserTokens } from '@/lib/redis-database'
 
 export async function POST(req: NextRequest) {
   try {
-    // Get the session cookie
-    const sessionCookie = req.cookies.get('beyond_ai_session')
-    if (!sessionCookie?.value) {
+    // Read and verify the httpOnly session cookie
+    const sessionCookie = req.cookies.get('beyond_ai_session')?.value
+    if (!sessionCookie) {
       return NextResponse.json({ error: 'No session' }, { status: 401 })
     }
 
-    const session = decodeSession(sessionCookie.value)
+    const session = await verifySecureSession(sessionCookie)
     if (!session) {
       return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
     }
 
-    const email = session.user.email
+    const email = session.email
 
-    // Check if the current access token is still valid (has > 5 min left)
-    if (session.tokens.expires_at && (session.tokens.expires_at - Date.now()) > 5 * 60 * 1000) {
+    // Check if the stored access token is still valid (> 5 min left)
+    const tokens = await getUserTokens(email)
+    if (tokens?.google_token_expires_at && (tokens.google_token_expires_at - Date.now()) > 5 * 60 * 1000) {
       return NextResponse.json({
         refreshed: false,
         message: 'Token still valid',
-        expires_at: session.tokens.expires_at,
+        expires_at: tokens.google_token_expires_at,
+        access_token: tokens.google_access_token,
       })
     }
 
-    // Get the stored refresh token
-    let refreshToken = session.tokens.refresh_token
+    // Get a valid access token (refreshes automatically if expired)
+    const accessToken = await getValidGoogleAccessToken(email)
 
-    // If no refresh token in session, check persistent storage
-    if (!refreshToken) {
-      const storedTokens = await getUserTokens(email)
-      refreshToken = storedTokens?.google_refresh_token
-    }
+    // Get updated expiry
+    const updatedTokens = await getUserTokens(email)
 
-    if (!refreshToken) {
-      return NextResponse.json({
-        error: 'No refresh token available. User needs to re-authenticate.',
-        requireReauth: true,
-      }, { status: 401 })
-    }
+    // Refresh the session cookie (extends expiry)
+    const newSessionToken = await createSecureSession(email)
+    const isProduction = process.env.NODE_ENV === 'production'
 
-    console.log('🔄 Token Refresh: Refreshing access token for', email)
-
-    // Refresh the token with Google
-    const newTokens = await refreshAccessToken(refreshToken)
-
-    console.log('✅ Token Refresh: New access token obtained')
-
-    // Update persistent token storage
-    await saveUserTokens(email, {
-      google_access_token: newTokens.access_token,
-      google_token_expires_at: newTokens.expires_at,
-      google_refresh_token: refreshToken, // Preserve the refresh token
-    })
-
-    // Create new session with updated tokens
-    const updatedSession: UserSession = {
-      ...session,
-      tokens: {
-        ...newTokens,
-        refresh_token: refreshToken, // Always keep the refresh token
-      },
-    }
-
-    const newSessionToken = encodeSession(updatedSession)
-
-    // Return the new token info and set updated cookie
     const response = NextResponse.json({
       refreshed: true,
-      expires_at: newTokens.expires_at,
-      access_token: newTokens.access_token,
+      expires_at: updatedTokens?.google_token_expires_at,
+      access_token: accessToken,
     })
 
     response.cookies.set('beyond_ai_session', newSessionToken, {
-      secure: process.env.NODE_ENV === 'production',
+      httpOnly: true,
+      secure: isProduction,
       sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7, // 7 days
+      maxAge: 60 * 60 * 24 * 7,
       path: '/',
     })
 

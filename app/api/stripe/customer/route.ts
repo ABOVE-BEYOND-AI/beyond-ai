@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireApiUser, apiErrorResponse } from '@/lib/api-auth'
+import { requireFinanceUser, apiErrorResponse, checkReadRateLimit } from '@/lib/api-auth'
 import { findCustomerByEmail, getCustomerPaymentMethods, isStripeConfigured } from '@/lib/stripe'
 
 export const dynamic = 'force-dynamic'
@@ -7,7 +7,8 @@ export const dynamic = 'force-dynamic'
 // GET /api/stripe/customer?email=xxx — Find Stripe customer and their saved cards
 export async function GET(request: NextRequest) {
   try {
-    await requireApiUser(request)
+    const ctx = await requireFinanceUser(request)
+    await checkReadRateLimit(ctx.email)
 
     if (!isStripeConfigured()) {
       return NextResponse.json({ success: false, error: 'Stripe not configured' }, { status: 503 })

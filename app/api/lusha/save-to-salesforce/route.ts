@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { decodeSession } from '@/lib/google-oauth-clean'
+import { requireApiUser, apiErrorResponse } from '@/lib/api-auth'
 import { updateRecord } from '@/lib/salesforce'
 
 export const dynamic = 'force-dynamic'
@@ -13,21 +13,10 @@ interface EnrichmentData {
   linkedin?: string
 }
 
-/**
- * POST /api/lusha/save-to-salesforce — Write enriched data back to a Lead or Contact in Salesforce
- * Body: { recordType: 'Lead' | 'Contact', recordId: string, data: EnrichmentData }
- */
+/** POST /api/lusha/save-to-salesforce — Write enriched data back to a Lead or Contact in Salesforce */
 export async function POST(request: NextRequest) {
   try {
-    const sessionCookie = request.cookies.get('beyond_ai_session')?.value
-    if (!sessionCookie) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const session = decodeSession(sessionCookie)
-    if (!session) {
-      return NextResponse.json({ success: false, error: 'Invalid session' }, { status: 401 })
-    }
+    await requireApiUser(request)
 
     const body = await request.json()
     const { recordType, recordId, data } = body as {
@@ -36,7 +25,6 @@ export async function POST(request: NextRequest) {
       data?: EnrichmentData
     }
 
-    // Validate recordType
     if (!recordType || (recordType !== 'Lead' && recordType !== 'Contact')) {
       return NextResponse.json(
         { success: false, error: 'recordType must be "Lead" or "Contact"' },
@@ -44,7 +32,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate recordId
     if (!recordId || typeof recordId !== 'string' || recordId.trim().length === 0) {
       return NextResponse.json(
         { success: false, error: 'recordId is required' },
@@ -52,7 +39,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate data
     if (!data || typeof data !== 'object') {
       return NextResponse.json(
         { success: false, error: 'data object is required' },
@@ -60,27 +46,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Build Salesforce field map from enrichment data
     const fields: Record<string, unknown> = {}
 
-    if (data.email) {
-      fields.Email = data.email
-    }
-    if (data.phone) {
-      // Use MobilePhone for both Leads and Contacts
-      fields.MobilePhone = data.phone
-    }
-    if (data.title) {
-      fields.Title = data.title
-    }
-    if (data.company && recordType === 'Lead') {
-      // Company only applies to Leads (Contacts have Account)
-      fields.Company = data.company
-    }
-    if (data.linkedin) {
-      // Custom LinkedIn field (common in many orgs)
-      fields.LinkedIn__c = data.linkedin
-    }
+    if (data.email) fields.Email = data.email
+    if (data.phone) fields.MobilePhone = data.phone
+    if (data.title) fields.Title = data.title
+    if (data.company && recordType === 'Lead') fields.Company = data.company
+    if (data.linkedin) fields.LinkedIn__c = data.linkedin
 
     if (Object.keys(fields).length === 0) {
       return NextResponse.json(
@@ -101,9 +73,6 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('Lusha save-to-salesforce error:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to save enrichment data to Salesforce', details: process.env.NODE_ENV === 'development' ? String(error) : undefined },
-      { status: 500 }
-    )
+    return apiErrorResponse(error, 'Failed to save enrichment data to Salesforce')
   }
 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireApiUser, apiErrorResponse, validateUUID } from '@/lib/api-auth'
+import { requireFinanceUser, apiErrorResponse, validateUUID, checkReadRateLimit } from '@/lib/api-auth'
 import { getInvoice, getContact, getInvoiceHistory, getChaseStage, getChaseActivities } from '@/lib/xero'
 
 export const dynamic = 'force-dynamic'
@@ -10,7 +10,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requireApiUser(request)
+    const ctx = await requireFinanceUser(request)
+    await checkReadRateLimit(ctx.email)
     const { id } = await params
     validateUUID(id, 'Invoice ID')
 

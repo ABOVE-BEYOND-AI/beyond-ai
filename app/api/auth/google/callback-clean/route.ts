@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { exchangeCodeForTokens, getUserInfo, encodeSession, UserSession } from '@/lib/google-oauth-clean'
+import { exchangeCodeForTokens, getUserInfo } from '@/lib/google-oauth-clean'
+import { createSecureSession } from '@/lib/session-security'
 import { createUser, getUser, updateUser, saveUserTokens } from '@/lib/redis-database'
 
 export async function GET(req: NextRequest) {
@@ -45,8 +46,7 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    // Persist refresh token separately — this survives session expiry
-    // Google only sends refresh_token on first consent, so only save if present
+    // Persist tokens in Redis ONLY — never in cookies
     if (tokens.refresh_token) {
       console.log('🔑 OAuth Callback: Persisting refresh token...')
       await saveUserTokens(googleUser.email, {
@@ -56,7 +56,6 @@ export async function GET(req: NextRequest) {
         google_scopes: tokens.scope,
       })
     } else {
-      // Still update the access token even if no new refresh token
       console.log('🔑 OAuth Callback: Updating access token (no new refresh token)...')
       await saveUserTokens(googleUser.email, {
         google_access_token: tokens.access_token,
@@ -65,26 +64,34 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    // Create session
-    const session: UserSession = {
-      user: googleUser,
-      tokens,
-      created_at: Date.now(),
-    }
+    // Create signed session token (email + expiry only — NO tokens)
+    const sessionToken = await createSecureSession(googleUser.email)
 
-    // Encode session using standard base64
-    const sessionToken = encodeSession(session)
+    console.log('🍪 OAuth Callback: Setting session cookies...')
 
-    console.log('🍪 OAuth Callback: Setting session cookie...')
-
-    // Create response with redirect
     const response = NextResponse.redirect(new URL('/itinerary', req.url))
+    const isProduction = process.env.NODE_ENV === 'production'
 
-    // Set session cookie (NOT httpOnly so client can read it)
+    // Auth cookie: httpOnly, signed, contains no secrets
     response.cookies.set('beyond_ai_session', sessionToken, {
-      secure: process.env.NODE_ENV === 'production',
+      httpOnly: true,
+      secure: isProduction,
       sameSite: 'lax',
       maxAge: 60 * 60 * 24 * 7, // 7 days
+      path: '/',
+    })
+
+    // Display cookie: NOT httpOnly, contains only public user info for client-side UI
+    const displayData = btoa(JSON.stringify({
+      email: googleUser.email,
+      name: googleUser.name,
+      picture: googleUser.picture,
+    }))
+    response.cookies.set('beyond_ai_user', displayData, {
+      httpOnly: false,
+      secure: isProduction,
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7,
       path: '/',
     })
 

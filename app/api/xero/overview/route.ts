@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireApiUser, apiErrorResponse } from '@/lib/api-auth'
+import { requireFinanceUser, apiErrorResponse, checkReadRateLimit } from '@/lib/api-auth'
 import { getOverdueSummary } from '@/lib/xero'
 
 export const dynamic = 'force-dynamic'
@@ -7,7 +7,8 @@ export const dynamic = 'force-dynamic'
 // GET /api/xero/overview — Dashboard summary stats
 export async function GET(request: NextRequest) {
   try {
-    await requireApiUser(request)
+    const ctx = await requireFinanceUser(request)
+    await checkReadRateLimit(ctx.email)
     const summary = await getOverdueSummary()
     return NextResponse.json({ success: true, data: summary })
   } catch (error) {

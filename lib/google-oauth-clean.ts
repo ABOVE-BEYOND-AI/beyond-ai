@@ -109,14 +109,25 @@ export function encodeSession(session: UserSession): string {
   return Buffer.from(JSON.stringify(session)).toString('base64')
 }
 
-// Decode session (browser-safe - uses atob)
+// Decode session (browser-safe - uses atob, no Node.js crypto)
+// NOTE: This does NOT verify the signature — use verifySecureSession() from
+// lib/session-security.ts for server-side authentication decisions.
+// This function is safe for client-side display of user info only.
 export function decodeSession(sessionToken: string): UserSession | null {
   try {
     // First URL-decode the session token (browsers URL-encode cookies automatically)
     const urlDecodedToken = decodeURIComponent(sessionToken)
+    // Support signed format: base64payload.signature — strip the signature
+    const dotIndex = urlDecodedToken.lastIndexOf('.')
+    const payload = dotIndex !== -1 ? urlDecodedToken.substring(0, dotIndex) : urlDecodedToken
     // Then base64 decode using standard web API - works everywhere
-    const sessionData = atob(urlDecodedToken)
-    return JSON.parse(sessionData) as UserSession
+    const sessionData = atob(payload)
+    const parsed = JSON.parse(sessionData)
+    // Check expiry if present
+    if (parsed.exp && Date.now() > parsed.exp) {
+      return null
+    }
+    return parsed as UserSession
   } catch (error) {
     console.error('Failed to decode session:', error)
     return null

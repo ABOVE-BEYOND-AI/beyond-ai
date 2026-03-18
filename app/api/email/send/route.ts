@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { decodeSession } from '@/lib/google-oauth-clean'
-import { refreshAccessToken } from '@/lib/google-oauth-clean'
-import { getUserTokens, saveUserTokens } from '@/lib/redis-database'
+import { requireApiUser, apiErrorResponse } from '@/lib/api-auth'
+import { getValidGoogleAccessToken } from '@/lib/google-tokens'
 import { sendEmail } from '@/lib/gmail'
 
 export const dynamic = 'force-dynamic'
@@ -13,55 +12,13 @@ export const dynamic = 'force-dynamic'
  */
 export async function POST(request: NextRequest) {
   try {
-    // ── Auth: extract session from cookie ──
-    const sessionCookie = request.cookies.get('beyond_ai_session')
-    if (!sessionCookie?.value) {
-      return NextResponse.json(
-        { success: false, error: 'Not authenticated' },
-        { status: 401 }
-      )
-    }
+    const ctx = await requireApiUser(request)
+    const email = ctx.email
 
-    const session = decodeSession(sessionCookie.value)
-    if (!session) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid session' },
-        { status: 401 }
-      )
-    }
+    // Get a valid access token from Redis (refreshes if expired)
+    const accessToken = await getValidGoogleAccessToken(email)
 
-    const email = session.user.email
-
-    // ── Get a valid access token ──
-    let accessToken = session.tokens.access_token
-    const isExpired = session.tokens.expires_at && Date.now() > session.tokens.expires_at
-
-    if (isExpired) {
-      // Try to refresh
-      let refreshToken = session.tokens.refresh_token
-      if (!refreshToken) {
-        const stored = await getUserTokens(email)
-        refreshToken = stored?.google_refresh_token
-      }
-
-      if (!refreshToken) {
-        return NextResponse.json(
-          { success: false, error: 'Token expired — please sign in again' },
-          { status: 401 }
-        )
-      }
-
-      const refreshed = await refreshAccessToken(refreshToken)
-      accessToken = refreshed.access_token
-
-      await saveUserTokens(email, {
-        google_access_token: refreshed.access_token,
-        google_token_expires_at: refreshed.expires_at,
-        google_refresh_token: refreshToken,
-      })
-    }
-
-    // ── Parse body ──
+    // Parse body
     const body = await request.json()
     const { to, subject, body: htmlBody } = body as {
       to?: string
@@ -76,7 +33,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // ── Send ──
+    // Send
     const result = await sendEmail(accessToken, { to, subject, htmlBody })
 
     return NextResponse.json({
@@ -85,13 +42,6 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('Email send API error:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to send email',
-        details: process.env.NODE_ENV === 'development' ? String(error) : undefined,
-      },
-      { status: 500 }
-    )
+    return apiErrorResponse(error, 'Failed to send email')
   }
 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireApiUser, apiErrorResponse, validateUUID } from '@/lib/api-auth'
+import { requireFinanceUser, apiErrorResponse, validateUUID, checkReadRateLimit } from '@/lib/api-auth'
 import { getCreditNotesForContact, getAllCreditNotes } from '@/lib/xero'
 
 export const dynamic = 'force-dynamic'
@@ -7,7 +7,9 @@ export const dynamic = 'force-dynamic'
 // GET /api/xero/credit-notes?contactId=xxx — Get credit notes
 export async function GET(request: NextRequest) {
   try {
-    await requireApiUser(request)
+    const ctx = await requireFinanceUser(request)
+    await checkReadRateLimit(ctx.email)
+
     const contactId = request.nextUrl.searchParams.get('contactId')
 
     if (contactId) {

@@ -1,29 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { decodeSession } from '@/lib/google-oauth-clean'
+import { requireApiUser, apiErrorResponse } from '@/lib/api-auth'
 import { getLushaKey, checkCredits } from '@/lib/lusha'
 
 export const dynamic = 'force-dynamic'
 
-/**
- * GET /api/lusha/credits — Check remaining Lusha credits for the current user
- * Returns: { success: true, data: { credits: number, connected: boolean } }
- */
+/** GET /api/lusha/credits — Check remaining Lusha credits for the current user */
 export async function GET(request: NextRequest) {
   try {
-    const sessionCookie = request.cookies.get('beyond_ai_session')?.value
-    if (!sessionCookie) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-    }
+    const ctx = await requireApiUser(request)
 
-    const session = decodeSession(sessionCookie)
-    if (!session) {
-      return NextResponse.json({ success: false, error: 'Invalid session' }, { status: 401 })
-    }
-
-    const email = session.user.email
-
-    // Get user's stored Lusha API key
-    const apiKey = await getLushaKey(email)
+    const apiKey = await getLushaKey(ctx.email)
     if (!apiKey) {
       return NextResponse.json({
         success: true,
@@ -40,7 +26,6 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Lusha credits error:', error)
 
-    // If credits check fails due to auth, report as disconnected
     const message = error instanceof Error ? error.message : ''
     if (message.includes('401') || message.includes('403')) {
       return NextResponse.json({
@@ -49,9 +34,6 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    return NextResponse.json(
-      { success: false, error: 'Failed to check Lusha credits', details: process.env.NODE_ENV === 'development' ? String(error) : undefined },
-      { status: 500 }
-    )
+    return apiErrorResponse(error, 'Failed to check Lusha credits')
   }
 }

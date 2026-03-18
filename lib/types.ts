@@ -9,7 +9,7 @@ export interface GoogleUser {
   family_name?: string
 }
 
-export type UserRole = 'admin' | 'member' | 'viewer'
+export type UserRole = 'admin' | 'finance' | 'member' | 'viewer'
 
 export interface User {
   email: string

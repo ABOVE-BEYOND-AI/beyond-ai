@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { decodeSession } from '@/lib/google-oauth-clean'
+import { requireApiUser, apiErrorResponse } from '@/lib/api-auth'
 import {
   getSequence,
   pauseSequence,
@@ -19,22 +19,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const sessionCookie = request.cookies.get('beyond_ai_session')
-    if (!sessionCookie?.value) {
-      return NextResponse.json(
-        { success: false, error: 'Not authenticated' },
-        { status: 401 }
-      )
-    }
-
-    const session = decodeSession(sessionCookie.value)
-    if (!session) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid session' },
-        { status: 401 }
-      )
-    }
-
+    const ctx = await requireApiUser(request)
     const { id } = await params
     const sequence = await getSequence(id)
 
@@ -46,7 +31,7 @@ export async function GET(
     }
 
     // Ensure the user owns this sequence
-    if (sequence.repEmail !== session.user.email) {
+    if (sequence.repEmail !== ctx.email) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },
         { status: 403 }
@@ -56,14 +41,7 @@ export async function GET(
     return NextResponse.json({ success: true, data: sequence })
   } catch (error) {
     console.error('Sequence GET error:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to fetch sequence',
-        details: process.env.NODE_ENV === 'development' ? String(error) : undefined,
-      },
-      { status: 500 }
-    )
+    return apiErrorResponse(error, 'Failed to fetch sequence')
   }
 }
 
@@ -77,22 +55,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const sessionCookie = request.cookies.get('beyond_ai_session')
-    if (!sessionCookie?.value) {
-      return NextResponse.json(
-        { success: false, error: 'Not authenticated' },
-        { status: 401 }
-      )
-    }
-
-    const session = decodeSession(sessionCookie.value)
-    if (!session) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid session' },
-        { status: 401 }
-      )
-    }
-
+    const ctx = await requireApiUser(request)
     const { id } = await params
     const existing = await getSequence(id)
 
@@ -103,7 +66,7 @@ export async function PATCH(
       )
     }
 
-    if (existing.repEmail !== session.user.email) {
+    if (existing.repEmail !== ctx.email) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },
         { status: 403 }
@@ -134,14 +97,7 @@ export async function PATCH(
     return NextResponse.json({ success: true, data: updated })
   } catch (error) {
     console.error('Sequence PATCH error:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to update sequence',
-        details: process.env.NODE_ENV === 'development' ? String(error) : undefined,
-      },
-      { status: 500 }
-    )
+    return apiErrorResponse(error, 'Failed to update sequence')
   }
 }
 
@@ -154,22 +110,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const sessionCookie = request.cookies.get('beyond_ai_session')
-    if (!sessionCookie?.value) {
-      return NextResponse.json(
-        { success: false, error: 'Not authenticated' },
-        { status: 401 }
-      )
-    }
-
-    const session = decodeSession(sessionCookie.value)
-    if (!session) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid session' },
-        { status: 401 }
-      )
-    }
-
+    const ctx = await requireApiUser(request)
     const { id } = await params
     const existing = await getSequence(id)
 
@@ -180,7 +121,7 @@ export async function DELETE(
       )
     }
 
-    if (existing.repEmail !== session.user.email) {
+    if (existing.repEmail !== ctx.email) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },
         { status: 403 }
@@ -192,13 +133,6 @@ export async function DELETE(
     return NextResponse.json({ success: true, data: { deleted: true } })
   } catch (error) {
     console.error('Sequence DELETE error:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to delete sequence',
-        details: process.env.NODE_ENV === 'development' ? String(error) : undefined,
-      },
-      { status: 500 }
-    )
+    return apiErrorResponse(error, 'Failed to delete sequence')
   }
 }

@@ -1,29 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { decodeSession } from '@/lib/google-oauth-clean'
+import { requireApiUser, apiErrorResponse } from '@/lib/api-auth'
 import { getLushaKey, enrichPerson } from '@/lib/lusha'
 
 export const dynamic = 'force-dynamic'
 
-/**
- * POST /api/lusha/enrich — Enrich a person using the current user's stored Lusha API key
- * Body: { firstName: string, lastName: string, company?: string }
- */
+/** POST /api/lusha/enrich — Enrich a person using the current user's stored Lusha API key */
 export async function POST(request: NextRequest) {
   try {
-    const sessionCookie = request.cookies.get('beyond_ai_session')?.value
-    if (!sessionCookie) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-    }
+    const ctx = await requireApiUser(request)
 
-    const session = decodeSession(sessionCookie)
-    if (!session) {
-      return NextResponse.json({ success: false, error: 'Invalid session' }, { status: 401 })
-    }
-
-    const email = session.user.email
-
-    // Get user's stored Lusha API key
-    const apiKey = await getLushaKey(email)
+    const apiKey = await getLushaKey(ctx.email)
     if (!apiKey) {
       return NextResponse.json(
         { success: false, error: 'Lusha not connected. Please add your Lusha API key in settings.' },
@@ -64,14 +50,6 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('Lusha enrich error:', error)
-
-    // Surface Lusha API errors more clearly
-    const message = error instanceof Error ? error.message : 'Failed to enrich person'
-    const status = message.includes('401') || message.includes('403') ? 401 : 500
-
-    return NextResponse.json(
-      { success: false, error: message, details: process.env.NODE_ENV === 'development' ? String(error) : undefined },
-      { status }
-    )
+    return apiErrorResponse(error, 'Failed to enrich person')
   }
 }

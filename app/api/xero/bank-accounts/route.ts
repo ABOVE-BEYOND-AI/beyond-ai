@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireApiUser, apiErrorResponse } from '@/lib/api-auth'
+import { requireFinanceUser, apiErrorResponse, checkReadRateLimit } from '@/lib/api-auth'
 import { getBankAccounts } from '@/lib/xero'
 
 export const dynamic = 'force-dynamic'
@@ -7,7 +7,8 @@ export const dynamic = 'force-dynamic'
 // GET /api/xero/bank-accounts — Get available bank accounts for payment recording
 export async function GET(request: NextRequest) {
   try {
-    await requireApiUser(request)
+    const ctx = await requireFinanceUser(request)
+    await checkReadRateLimit(ctx.email)
     const accounts = await getBankAccounts()
     return NextResponse.json({ success: true, data: accounts })
   } catch (error) {

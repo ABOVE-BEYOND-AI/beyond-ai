@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { decodeSession } from '@/lib/google-oauth-clean'
+import { requireApiUser, apiErrorResponse } from '@/lib/api-auth'
 import {
   startSequence,
   getActiveSequences,
@@ -14,23 +14,8 @@ export const dynamic = 'force-dynamic'
  */
 export async function GET(request: NextRequest) {
   try {
-    const sessionCookie = request.cookies.get('beyond_ai_session')
-    if (!sessionCookie?.value) {
-      return NextResponse.json(
-        { success: false, error: 'Not authenticated' },
-        { status: 401 }
-      )
-    }
-
-    const session = decodeSession(sessionCookie.value)
-    if (!session) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid session' },
-        { status: 401 }
-      )
-    }
-
-    const repEmail = session.user.email
+    const ctx = await requireApiUser(request)
+    const repEmail = ctx.email
 
     const [sequences, stats] = await Promise.all([
       getActiveSequences(repEmail),
@@ -50,14 +35,7 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('Sequences GET error:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to fetch sequences',
-        details: process.env.NODE_ENV === 'development' ? String(error) : undefined,
-      },
-      { status: 500 }
-    )
+    return apiErrorResponse(error, 'Failed to fetch sequences')
   }
 }
 
@@ -68,21 +46,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const sessionCookie = request.cookies.get('beyond_ai_session')
-    if (!sessionCookie?.value) {
-      return NextResponse.json(
-        { success: false, error: 'Not authenticated' },
-        { status: 401 }
-      )
-    }
-
-    const session = decodeSession(sessionCookie.value)
-    if (!session) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid session' },
-        { status: 401 }
-      )
-    }
+    const ctx = await requireApiUser(request)
 
     const body = await request.json()
     const { templateId, contactId, contactEmail, contactName, steps } = body as {
@@ -108,8 +72,8 @@ export async function POST(request: NextRequest) {
       contactId: contactId || '',
       contactEmail,
       contactName,
-      repEmail: session.user.email,
-      repName: session.user.name,
+      repEmail: ctx.email,
+      repName: ctx.user.name,
       steps,
     })
 
@@ -119,13 +83,6 @@ export async function POST(request: NextRequest) {
     )
   } catch (error) {
     console.error('Sequences POST error:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to start sequence',
-        details: process.env.NODE_ENV === 'development' ? String(error) : undefined,
-      },
-      { status: 500 }
-    )
+    return apiErrorResponse(error, 'Failed to start sequence')
   }
 }

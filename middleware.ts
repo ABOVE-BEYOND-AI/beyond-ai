@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifySecureSession } from './lib/session-security'
 
 // Routes that require authentication
 const PROTECTED_ROUTES = [
@@ -24,14 +25,12 @@ const PROTECTED_ROUTES = [
 const AUTH_ROUTES = ['/auth/signin']
 // SECURITY: Be as specific as possible — startsWith matching means any sub-path is also public.
 // Only include routes that genuinely need unauthenticated access (webhooks, OAuth callbacks).
-// NOTE: /api/sales/admin/purge was REMOVED — it's a destructive admin operation that must require auth.
-// SECURITY: Be as specific as possible with public routes.
-// Only include routes that genuinely need unauthenticated access (webhooks, OAuth callbacks).
 const PUBLIC_API_ROUTES = [
   '/api/auth/google',              // Google OAuth initiation + callback
   '/api/auth/canva',               // Canva OAuth initiation + callback
   '/api/auth/xero/callback',       // Xero OAuth callback (has its own auth check inside)
   '/api/auth/refresh',             // Token refresh endpoint
+  '/api/auth/signout',             // Sign-out endpoint (clears httpOnly cookie)
   '/api/email/process-queue',      // Webhook from email provider
   '/api/notifications/generate',   // Internal cron trigger
   '/api/sales/slack-events',       // Slack webhook
@@ -39,25 +38,28 @@ const PUBLIC_API_ROUTES = [
   '/api/tv/verify',                // TV screen verification
 ]
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
-  const sessionCookie = request.cookies.get('beyond_ai_session')
-  const hasSession = !!sessionCookie?.value
+  const sessionCookie = request.cookies.get('beyond_ai_session')?.value
+
+  // Verify session: not just cookie presence, but valid HMAC signature + expiry
+  const validSession = sessionCookie ? await verifySecureSession(sessionCookie) : null
+  const hasValidSession = !!validSession
 
   const isApiRoute = pathname.startsWith('/api/')
   const isPublicApiRoute = PUBLIC_API_ROUTES.some((route) => pathname.startsWith(route))
 
-  if (isApiRoute && !isPublicApiRoute && !hasSession) {
+  if (isApiRoute && !isPublicApiRoute && !hasValidSession) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // If visiting auth pages while logged in, redirect to itinerary
-  if (AUTH_ROUTES.some(route => pathname.startsWith(route)) && hasSession) {
-    return NextResponse.redirect(new URL('/itinerary', request.url))
+  // If visiting auth pages while logged in, redirect to dashboard
+  if (AUTH_ROUTES.some(route => pathname.startsWith(route)) && hasValidSession) {
+    return NextResponse.redirect(new URL('/', request.url))
   }
 
   // If visiting protected routes without session, redirect to sign in
-  if (PROTECTED_ROUTES.some(route => pathname.startsWith(route)) && !hasSession) {
+  if (PROTECTED_ROUTES.some(route => pathname.startsWith(route)) && !hasValidSession) {
     const signInUrl = new URL('/auth/signin', request.url)
     signInUrl.searchParams.set('redirect', pathname)
     return NextResponse.redirect(signInUrl)
@@ -68,12 +70,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization)
-     * - favicon.ico, images, etc.
-     */
     '/((?!_next/static|_next/image|favicon.ico|.*\\..*|auth/google).*)',
   ],
 }

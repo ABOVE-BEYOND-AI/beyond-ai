@@ -350,10 +350,10 @@ export async function getOverdueInvoices(page = 1): Promise<XeroInvoice[]> {
   return data.Invoices || []
 }
 
-export async function getAllOverdueInvoices(): Promise<XeroInvoice[]> {
+export async function getAllOverdueInvoices(): Promise<{ invoices: XeroInvoice[]; truncated: boolean }> {
   const allInvoices: XeroInvoice[] = []
   let page = 1
-  const MAX_PAGES = 10 // Safety limit: max 1,000 invoices (10 pages × 100 per page)
+  const MAX_PAGES = 20 // Safety limit: max 2,000 invoices (20 pages × 100 per page)
 
   while (page <= MAX_PAGES) {
     const invoices = await getOverdueInvoices(page)
@@ -362,11 +362,12 @@ export async function getAllOverdueInvoices(): Promise<XeroInvoice[]> {
     page++
   }
 
-  if (page > MAX_PAGES) {
+  const truncated = page > MAX_PAGES
+  if (truncated) {
     console.warn(`getAllOverdueInvoices hit page limit (${MAX_PAGES}). Total fetched: ${allInvoices.length}`)
   }
 
-  return allInvoices
+  return { invoices: allInvoices, truncated }
 }
 
 export async function getInvoice(invoiceId: string): Promise<XeroInvoice> {
@@ -678,6 +679,7 @@ async function getEventDataForContacts(
 export interface EnrichedInvoicesResult {
   invoices: EnrichedInvoice[]
   stale: boolean       // true when serving from cache after Xero API failure
+  truncated: boolean   // true when pagination limit was hit (incomplete dataset)
   cachedAt?: string    // ISO timestamp of when data was cached (if serving cached data)
 }
 
@@ -686,35 +688,41 @@ export async function getEnrichedOverdueInvoices(forceRefresh = false): Promise<
 
   // Check cache first (5 min TTL) — prevents rate limiting on page revisits
   if (!forceRefresh) {
-    const cached = await redis.get(REDIS_KEYS.invoicesCache) as EnrichedInvoice[] | null
-    if (cached) {
+    const cached = await redis.get(REDIS_KEYS.invoicesCache) as { data: EnrichedInvoice[]; truncated: boolean; cachedAt: string } | null
+    if (cached?.data) {
       // Re-apply chase stages from Redis (always fresh) on top of cached invoice data
       const chaseStages = await getAllChaseStages()
       return {
-        invoices: cached.map(inv => ({
+        invoices: cached.data.map(inv => ({
           ...inv,
           chaseStage: chaseStages[inv.InvoiceID] || undefined,
         })),
         stale: false,
+        truncated: cached.truncated,
+        cachedAt: cached.cachedAt,
       }
     }
   }
 
   // Fetch invoices and chase stages (credit summary is cache-only to save rate limit)
   let invoices: XeroInvoice[]
+  let truncated = false
   const isStale = false
   try {
-    invoices = await getAllOverdueInvoices()
+    const result = await getAllOverdueInvoices()
+    invoices = result.invoices
+    truncated = result.truncated
   } catch (err) {
     // If Xero fails (rate limit, etc), try to serve stale cache with warning
-    const staleCache = await redis.get(REDIS_KEYS.invoicesCache) as EnrichedInvoice[] | null
-    if (staleCache && staleCache.length > 0) {
+    const staleCache = await redis.get(REDIS_KEYS.invoicesCache) as { data: EnrichedInvoice[]; truncated: boolean; cachedAt: string } | null
+    if (staleCache?.data && staleCache.data.length > 0) {
       console.warn('Xero API failed, serving stale cache:', err instanceof Error ? err.message : err)
       const chaseStages = await getAllChaseStages()
       return {
-        invoices: staleCache.map(inv => ({ ...inv, chaseStage: chaseStages[inv.InvoiceID] || undefined })),
+        invoices: staleCache.data.map(inv => ({ ...inv, chaseStage: chaseStages[inv.InvoiceID] || undefined })),
         stale: true,
-        cachedAt: new Date().toISOString(), // approximate — we don't track exact cache time
+        truncated: staleCache.truncated,
+        cachedAt: staleCache.cachedAt,
       }
     }
     throw err // No cache at all, propagate the error
@@ -773,10 +781,10 @@ export async function getEnrichedOverdueInvoices(forceRefresh = false): Promise<
   // Sort by days overdue (most overdue first)
   enriched.sort((a, b) => b.daysOverdue - a.daysOverdue)
 
-  // Cache for 5 minutes to avoid rate limiting (60 calls/min Xero limit)
-  await redis.set(REDIS_KEYS.invoicesCache, enriched, { ex: 300 })
+  // Cache for 5 minutes — store truncation metadata alongside data
+  await redis.set(REDIS_KEYS.invoicesCache, { data: enriched, truncated, cachedAt: new Date().toISOString() }, { ex: 300 })
 
-  return { invoices: enriched, stale: isStale }
+  return { invoices: enriched, stale: isStale, truncated }
 }
 
 // ── Overview / Summary (reuses cached enriched data — no extra API calls) ──
@@ -876,20 +884,19 @@ export async function allocateCreditToInvoice(
 
 // ── Payment Plans (Partially Paid Invoices) ──
 
-export async function getPaymentPlanInvoices(): Promise<PaymentPlanInvoice[]> {
+export async function getPaymentPlanInvoices(): Promise<{ plans: PaymentPlanInvoice[]; truncated: boolean }> {
   const redis = getRedis()
   const cacheKey = 'xero:payment_plans_cache'
 
-  const cached = await redis.get(cacheKey) as PaymentPlanInvoice[] | null
+  const cached = await redis.get(cacheKey) as { plans: PaymentPlanInvoice[]; truncated: boolean } | null
   if (cached) return cached
 
   try {
     // Get AUTHORISED invoices with partial payments (AmountPaid > 0 AND AmountDue > 0)
-    // Paginate to get all results (max 5 pages = 500 invoices)
     const where = encodeURIComponent('Status=="AUTHORISED"&&AmountPaid>0&&AmountDue>0&&Type=="ACCREC"')
     const allInvoices: XeroInvoice[] = []
     let page = 1
-    const MAX_PAGES = 5
+    const MAX_PAGES = 10
 
     while (page <= MAX_PAGES) {
       const data = await xeroFetch<{ Invoices: XeroInvoice[] }>(
@@ -901,9 +908,12 @@ export async function getPaymentPlanInvoices(): Promise<PaymentPlanInvoice[]> {
       page++
     }
 
-    const invoices = allInvoices
+    const truncated = page > MAX_PAGES
+    if (truncated) {
+      console.warn(`getPaymentPlanInvoices hit page limit (${MAX_PAGES}). Total fetched: ${allInvoices.length}`)
+    }
 
-    // Batch fetch contact emails
+    const invoices = allInvoices
     const contactIds = [...new Set(invoices.map(inv => inv.Contact.ContactID))]
     const contactEmails = await batchGetContactEmails(contactIds)
 
@@ -927,11 +937,12 @@ export async function getPaymentPlanInvoices(): Promise<PaymentPlanInvoice[]> {
     })
 
     plans.sort((a, b) => a.percentagePaid - b.percentagePaid)
-    await redis.set(cacheKey, plans, { ex: 300 })
-    return plans
+    const result = { plans, truncated }
+    await redis.set(cacheKey, result, { ex: 300 })
+    return result
   } catch {
     // If Xero fails, return empty rather than crashing
-    return []
+    return { plans: [], truncated: false }
   }
 }
 
@@ -961,6 +972,45 @@ export async function getCreditSummaryByContact(): Promise<Map<string, number>> 
 // Warm the credit cache in background — called from a separate endpoint, not on every page load
 export async function warmCreditCache(): Promise<void> {
   await getCreditSummaryByContact()
+}
+
+// ── Cache Invalidation ──
+// Call after mutations (payments, credit allocations, Stripe charges) to prevent stale data
+
+export async function invalidateInvoiceCache(): Promise<void> {
+  try {
+    const redis = getRedis()
+    await redis.del(REDIS_KEYS.invoicesCache)
+  } catch (err) {
+    console.error('Failed to invalidate invoice cache:', err)
+  }
+}
+
+export async function invalidatePaymentPlansCache(): Promise<void> {
+  try {
+    const redis = getRedis()
+    await redis.del('xero:payment_plans_cache')
+  } catch (err) {
+    console.error('Failed to invalidate payment plans cache:', err)
+  }
+}
+
+export async function invalidateCreditCache(): Promise<void> {
+  try {
+    const redis = getRedis()
+    await redis.del('xero:credit_summary_cache')
+  } catch (err) {
+    console.error('Failed to invalidate credit cache:', err)
+  }
+}
+
+/** Invalidate all finance caches after a mutation */
+export async function invalidateFinanceCaches(): Promise<void> {
+  await Promise.allSettled([
+    invalidateInvoiceCache(),
+    invalidatePaymentPlansCache(),
+    invalidateCreditCache(),
+  ])
 }
 
 // ── Connection Check ──

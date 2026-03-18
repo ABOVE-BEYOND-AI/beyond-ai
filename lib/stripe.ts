@@ -51,6 +51,25 @@ export async function findCustomerByEmail(email: string): Promise<StripeCustomer
   }
 }
 
+/**
+ * Find a Stripe customer by email, rejecting ambiguous matches.
+ * If multiple customers share the same email, throws rather than guessing.
+ */
+export async function findUniqueCustomerByEmail(email: string): Promise<StripeCustomerMatch | null> {
+  const stripe = getStripe()
+  const result = await stripe.customers.list({ email, limit: 2 })
+  if (!result.data.length) return null
+  if (result.data.length > 1) {
+    throw new Error(`Multiple Stripe customers found for ${email}. Please resolve duplicates in Stripe before charging.`)
+  }
+  const customer = result.data[0]
+  return {
+    customerId: customer.id,
+    name: customer.name ?? null,
+    email: customer.email ?? null,
+  }
+}
+
 // ── Payment Methods ──
 
 export async function getCustomerPaymentMethods(customerId: string): Promise<StripePaymentMethod[]> {

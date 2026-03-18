@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireApiUser, apiErrorResponse, validateUUID, checkRateLimit, validateCsrf } from '@/lib/api-auth'
+import { requireFinanceUser, apiErrorResponse, validateUUID, checkRateLimit, validateCsrf } from '@/lib/api-auth'
 import { setChaseStage, CHASE_STAGES } from '@/lib/xero'
 import type { ChaseStageKey } from '@/lib/types'
 
@@ -12,7 +12,7 @@ export async function PUT(
 ) {
   try {
     validateCsrf(request)
-    const ctx = await requireApiUser(request)
+    const ctx = await requireFinanceUser(request)
     await checkRateLimit(ctx.email)
 
     const { id } = await params
