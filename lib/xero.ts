@@ -273,7 +273,10 @@ async function xeroFetch<T>(
 // ── Invoice Methods ──
 
 export async function getOverdueInvoices(page = 1): Promise<XeroInvoice[]> {
-  const where = encodeURIComponent('Status=="AUTHORISED"&&AmountDue>0&&Type=="ACCREC"&&DueDate<DateTime.UtcNow()')
+  // Build today's date as DateTime(year,month,day) for Xero's query syntax
+  const now = new Date()
+  const dateFilter = `DateTime(${now.getUTCFullYear()},${now.getUTCMonth() + 1},${now.getUTCDate()})`
+  const where = encodeURIComponent(`Status=="AUTHORISED"&&AmountDue>0&&Type=="ACCREC"&&DueDate<${dateFilter}`)
   const data = await xeroFetch<{ Invoices: XeroInvoice[] }>(
     `/Invoices?where=${where}&order=DueDate&page=${page}`
   )
