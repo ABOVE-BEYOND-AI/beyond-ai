@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
     // Only admins can connect/disconnect Xero — this is an org-wide operation
     const ctx = await requireApiAdmin(request)
 
-    const authUrl = getXeroAuthUrl(ctx.email)
+    const authUrl = await getXeroAuthUrl(ctx.email)
     return NextResponse.redirect(authUrl)
   } catch (error) {
     console.error('Error initiating Xero OAuth:', error)

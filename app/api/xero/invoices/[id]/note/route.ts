@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireApiUser, apiErrorResponse } from '@/lib/api-auth'
-import { decodeSession } from '@/lib/google-oauth-clean'
+import { requireApiUser, apiErrorResponse, validateUUID, checkRateLimit, validateCsrf } from '@/lib/api-auth'
 import { addInvoiceNote, addChaseActivity } from '@/lib/xero'
 
 export const dynamic = 'force-dynamic'
@@ -11,8 +10,13 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requireApiUser(request)
+    validateCsrf(request)
+    const ctx = await requireApiUser(request)
+    await checkRateLimit(ctx.email)
+
     const { id } = await params
+    validateUUID(id, 'Invoice ID')
+
     const body = await request.json()
     const { note } = body as { note: string }
 
@@ -27,22 +31,19 @@ export async function POST(
       return NextResponse.json({ error: 'Note text required' }, { status: 400 })
     }
 
-    const session = decodeSession(request.cookies.get('beyond_ai_session')?.value || '')
-    const userEmail = session?.user?.email || 'unknown'
-
     // Add to both Xero History and local Redis activity log
     await Promise.all([
       addInvoiceNote(id, sanitizedNote),
       addChaseActivity(id, {
         action: 'note',
         detail: sanitizedNote,
-        user: userEmail,
+        user: ctx.email,
       }),
     ])
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Add note error:', error)
+    console.error('Add note error:', error instanceof Error ? error.message : error)
     return apiErrorResponse(error, 'Failed to add note')
   }
 }

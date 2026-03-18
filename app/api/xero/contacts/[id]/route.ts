@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireApiUser, apiErrorResponse } from '@/lib/api-auth'
+import { requireApiUser, apiErrorResponse, validateUUID } from '@/lib/api-auth'
 import { getContact } from '@/lib/xero'
 
 export const dynamic = 'force-dynamic'
@@ -12,10 +12,12 @@ export async function GET(
   try {
     await requireApiUser(request)
     const { id } = await params
+    validateUUID(id, 'Contact ID')
+
     const contact = await getContact(id)
     return NextResponse.json({ success: true, data: contact })
   } catch (error) {
-    console.error('Contact fetch error:', error)
+    console.error('Contact fetch error:', error instanceof Error ? error.message : error)
     return apiErrorResponse(error, 'Failed to fetch contact')
   }
 }

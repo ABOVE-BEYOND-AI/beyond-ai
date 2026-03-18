@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireApiUser, apiErrorResponse } from '@/lib/api-auth'
+import { requireApiUser, apiErrorResponse, validateUUID } from '@/lib/api-auth'
 import { getInvoice, getContact, getInvoiceHistory, getChaseStage, getChaseActivities } from '@/lib/xero'
 
 export const dynamic = 'force-dynamic'
@@ -12,6 +12,7 @@ export async function GET(
   try {
     await requireApiUser(request)
     const { id } = await params
+    validateUUID(id, 'Invoice ID')
 
     const invoice = await getInvoice(id)
 
@@ -40,7 +41,7 @@ export async function GET(
       },
     })
   } catch (error) {
-    console.error('Xero invoice detail error:', error)
+    console.error('Xero invoice detail error:', error instanceof Error ? error.message : error)
     return apiErrorResponse(error, 'Failed to fetch invoice details')
   }
 }

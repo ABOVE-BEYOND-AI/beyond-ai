@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireApiUser, apiErrorResponse } from '@/lib/api-auth'
-import { decodeSession } from '@/lib/google-oauth-clean'
+import { requireApiUser, apiErrorResponse, validateUUID, checkRateLimit, validateCsrf } from '@/lib/api-auth'
 import { sendInvoiceEmail, addChaseActivity } from '@/lib/xero'
 
 export const dynamic = 'force-dynamic'
@@ -11,11 +10,12 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requireApiUser(request)
-    const { id } = await params
+    validateCsrf(request)
+    const ctx = await requireApiUser(request)
+    await checkRateLimit(ctx.email)
 
-    const session = decodeSession(request.cookies.get('beyond_ai_session')?.value || '')
-    const userEmail = session?.user?.email || 'unknown'
+    const { id } = await params
+    validateUUID(id, 'Invoice ID')
 
     await sendInvoiceEmail(id)
 
@@ -23,12 +23,12 @@ export async function POST(
     await addChaseActivity(id, {
       action: 'email_sent',
       detail: 'Reminder email sent via Xero',
-      user: userEmail,
+      user: ctx.email,
     })
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Send email error:', error)
+    console.error('Send email error:', error instanceof Error ? error.message : error)
     return apiErrorResponse(error, 'Failed to send reminder email')
   }
 }

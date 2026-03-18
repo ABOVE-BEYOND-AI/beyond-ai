@@ -29,6 +29,15 @@ const XERO_SCOPES = 'openid profile email accounting.invoices accounting.payment
 // Token refresh buffer: refresh 5 minutes before expiry
 const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000
 
+// UUID format validation for Xero IDs (invoices, contacts, accounts, credit notes)
+const XERO_UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+function assertValidXeroId(id: string, label = 'ID'): void {
+  if (!XERO_UUID_REGEX.test(id)) {
+    throw new Error(`Invalid ${label} format`)
+  }
+}
+
 // Redis keys
 const REDIS_KEYS = {
   orgTokens: 'xero:org_tokens',
@@ -85,11 +94,11 @@ let refreshPromise: Promise<XeroOrgTokens> | null = null
 
 // ── OAuth Helpers ──
 
-export function getXeroAuthUrl(adminEmail: string): string {
+export async function getXeroAuthUrl(adminEmail: string): Promise<string> {
   const state = crypto.randomUUID()
   const redis = getRedis()
-  // Store state for CSRF validation (fire-and-forget, 10 min expiry)
-  redis.set(REDIS_KEYS.oauthState(state), { email: adminEmail, created: Date.now() }, { ex: 600 })
+  // Store state for CSRF validation (10 min expiry) — must await to ensure state is stored before redirect
+  await redis.set(REDIS_KEYS.oauthState(state), { email: adminEmail, created: Date.now() }, { ex: 600 })
 
   const params = new URLSearchParams({
     response_type: 'code',
@@ -104,9 +113,16 @@ export function getXeroAuthUrl(adminEmail: string): string {
 
 export async function validateOAuthState(state: string): Promise<{ email: string } | null> {
   const redis = getRedis()
-  const data = await redis.get(REDIS_KEYS.oauthState(state)) as { email: string } | null
+  // Atomic get-and-delete to prevent TOCTOU race condition (state reuse)
+  const key = REDIS_KEYS.oauthState(state)
+  const data = await redis.get(key) as { email: string } | null
   if (data) {
-    await redis.del(REDIS_KEYS.oauthState(state))
+    // Delete immediately — if two requests race, only the first succeeds
+    const deleted = await redis.del(key)
+    if (deleted === 0) {
+      // Another request already consumed this state token
+      return null
+    }
   }
   return data
 }
@@ -129,8 +145,8 @@ export async function exchangeCodeForTokens(code: string): Promise<XeroOrgTokens
 
   if (!tokenRes.ok) {
     const err = await tokenRes.text()
-    console.error('Xero token exchange failed:', err)
-    throw new Error(`Xero token exchange failed: ${tokenRes.status}`)
+    console.error('Xero token exchange failed:', tokenRes.status, err.slice(0, 200))
+    throw new Error('Xero token exchange failed. Please try again.')
   }
 
   const data = await tokenRes.json()
@@ -220,7 +236,7 @@ async function doRefreshTokens(): Promise<XeroOrgTokens> {
 
   if (!res.ok) {
     const err = await res.text()
-    console.error('Xero token refresh failed:', err)
+    console.error('Xero token refresh failed:', res.status, err.slice(0, 200))
     throw new Error('Xero token refresh failed. Please reconnect Xero.')
   }
 
@@ -313,7 +329,8 @@ async function xeroFetch<T>(
 
   if (!res.ok) {
     const errText = await res.text()
-    console.error(`Xero API error ${res.status} on ${method} ${path}:`, errText)
+    // Log truncated error for debugging — never expose full Xero error to clients
+    console.error(`Xero API error ${res.status} on ${method} ${path}:`, errText.slice(0, 300))
     throw new Error(`Xero API error: ${res.status}`)
   }
 
@@ -353,13 +370,21 @@ export async function getAllOverdueInvoices(): Promise<XeroInvoice[]> {
 }
 
 export async function getInvoice(invoiceId: string): Promise<XeroInvoice> {
+  assertValidXeroId(invoiceId, 'Invoice ID')
   const data = await xeroFetch<{ Invoices: XeroInvoice[] }>(`/Invoices/${invoiceId}`)
   if (!data.Invoices?.length) throw new Error('Invoice not found')
   return data.Invoices[0]
 }
 
+// Valid Xero invoice statuses — whitelist to prevent query injection
+const VALID_INVOICE_STATUSES = ['DRAFT', 'SUBMITTED', 'AUTHORISED', 'PAID', 'VOIDED', 'DELETED']
+
 export async function getInvoicesByStatus(status: string, page = 1): Promise<XeroInvoice[]> {
-  const where = encodeURIComponent(`Status=="${status}"&&Type=="ACCREC"`)
+  const normalised = status.toUpperCase()
+  if (!VALID_INVOICE_STATUSES.includes(normalised)) {
+    throw new Error(`Invalid invoice status: ${status}`)
+  }
+  const where = encodeURIComponent(`Status=="${normalised}"&&Type=="ACCREC"`)
   const data = await xeroFetch<{ Invoices: XeroInvoice[] }>(
     `/Invoices?where=${where}&order=DueDate%20DESC&page=${page}`
   )
@@ -368,10 +393,13 @@ export async function getInvoicesByStatus(status: string, page = 1): Promise<Xer
 
 // ── Contact Methods ──
 
+// NOTE: Contact data is cached for 1 hour. If a contact's email or details change in Xero,
+// the old data will be used for up to 1 hour. Use force-refresh for critical lookups.
 export async function getContact(contactId: string): Promise<XeroContact> {
+  assertValidXeroId(contactId, 'Contact ID')
   const redis = getRedis()
 
-  // Check cache first
+  // Check cache first (1hr TTL — see note above)
   const cached = await redis.get(REDIS_KEYS.contactCache(contactId)) as XeroContact | null
   if (cached) return cached
 
@@ -443,6 +471,8 @@ export async function recordPayment(
   bankAccountId: string,
   date: string
 ): Promise<void> {
+  assertValidXeroId(invoiceId, 'Invoice ID')
+  assertValidXeroId(bankAccountId, 'Bank Account ID')
   await xeroFetch('/Payments', {
     method: 'POST',
     body: {
@@ -473,6 +503,7 @@ export async function getBankAccounts(): Promise<XeroBankAccount[]> {
 // ── History / Notes Methods ──
 
 export async function getInvoiceHistory(invoiceId: string): Promise<XeroHistoryRecord[]> {
+  assertValidXeroId(invoiceId, 'Invoice ID')
   const data = await xeroFetch<{ HistoryRecords: XeroHistoryRecord[] }>(
     `/Invoices/${invoiceId}/History`
   )
@@ -480,6 +511,7 @@ export async function getInvoiceHistory(invoiceId: string): Promise<XeroHistoryR
 }
 
 export async function addInvoiceNote(invoiceId: string, note: string): Promise<void> {
+  assertValidXeroId(invoiceId, 'Invoice ID')
   await xeroFetch(`/Invoices/${invoiceId}/History`, {
     method: 'PUT',
     body: {
@@ -489,6 +521,7 @@ export async function addInvoiceNote(invoiceId: string, note: string): Promise<v
 }
 
 export async function sendInvoiceEmail(invoiceId: string): Promise<void> {
+  assertValidXeroId(invoiceId, 'Invoice ID')
   await xeroFetch(`/Invoices/${invoiceId}/Email`, {
     method: 'POST',
     body: {},
@@ -568,8 +601,12 @@ export async function addChaseActivity(
   }
 
   // Push to front of list (most recent first), trim to 100 entries
-  await redis.lpush(REDIS_KEYS.chaseActivity(invoiceId), JSON.stringify(entry))
-  await redis.ltrim(REDIS_KEYS.chaseActivity(invoiceId), 0, 99)
+  // Use pipeline for atomicity — prevents unbounded list growth if process crashes between ops
+  const key = REDIS_KEYS.chaseActivity(invoiceId)
+  const pipeline = redis.pipeline()
+  pipeline.lpush(key, JSON.stringify(entry))
+  pipeline.ltrim(key, 0, 99)
+  await pipeline.exec()
 }
 
 export async function getChaseActivities(invoiceId: string, limit = 50): Promise<ChaseActivity[]> {
@@ -633,34 +670,52 @@ async function getEventDataForContacts(
 }
 
 // ── Enriched Invoices (combines Xero + Redis chase data, with caching) ──
+// NOTE on serverless: The in-memory cachedTokens (line ~80) is per-instance.
+// In serverless environments (Vercel), each cold start gets its own copy.
+// Token refresh is protected by a per-instance mutex, but cross-instance races
+// are handled by always falling back to Redis as source of truth.
 
-export async function getEnrichedOverdueInvoices(forceRefresh = false): Promise<EnrichedInvoice[]> {
+export interface EnrichedInvoicesResult {
+  invoices: EnrichedInvoice[]
+  stale: boolean       // true when serving from cache after Xero API failure
+  cachedAt?: string    // ISO timestamp of when data was cached (if serving cached data)
+}
+
+export async function getEnrichedOverdueInvoices(forceRefresh = false): Promise<EnrichedInvoicesResult> {
   const redis = getRedis()
 
-  // Check cache first (3 min TTL) — prevents rate limiting on page revisits
+  // Check cache first (5 min TTL) — prevents rate limiting on page revisits
   if (!forceRefresh) {
     const cached = await redis.get(REDIS_KEYS.invoicesCache) as EnrichedInvoice[] | null
     if (cached) {
       // Re-apply chase stages from Redis (always fresh) on top of cached invoice data
       const chaseStages = await getAllChaseStages()
-      return cached.map(inv => ({
-        ...inv,
-        chaseStage: chaseStages[inv.InvoiceID] || undefined,
-      }))
+      return {
+        invoices: cached.map(inv => ({
+          ...inv,
+          chaseStage: chaseStages[inv.InvoiceID] || undefined,
+        })),
+        stale: false,
+      }
     }
   }
 
   // Fetch invoices and chase stages (credit summary is cache-only to save rate limit)
   let invoices: XeroInvoice[]
+  const isStale = false
   try {
     invoices = await getAllOverdueInvoices()
   } catch (err) {
-    // If Xero fails (rate limit, etc), try to serve stale cache
+    // If Xero fails (rate limit, etc), try to serve stale cache with warning
     const staleCache = await redis.get(REDIS_KEYS.invoicesCache) as EnrichedInvoice[] | null
     if (staleCache && staleCache.length > 0) {
-      console.warn('Xero API failed, serving stale cache:', err)
+      console.warn('Xero API failed, serving stale cache:', err instanceof Error ? err.message : err)
       const chaseStages = await getAllChaseStages()
-      return staleCache.map(inv => ({ ...inv, chaseStage: chaseStages[inv.InvoiceID] || undefined }))
+      return {
+        invoices: staleCache.map(inv => ({ ...inv, chaseStage: chaseStages[inv.InvoiceID] || undefined })),
+        stale: true,
+        cachedAt: new Date().toISOString(), // approximate — we don't track exact cache time
+      }
     }
     throw err // No cache at all, propagate the error
   }
@@ -721,10 +776,15 @@ export async function getEnrichedOverdueInvoices(forceRefresh = false): Promise<
   // Cache for 5 minutes to avoid rate limiting (60 calls/min Xero limit)
   await redis.set(REDIS_KEYS.invoicesCache, enriched, { ex: 300 })
 
-  return enriched
+  return { invoices: enriched, stale: isStale }
 }
 
 // ── Overview / Summary (reuses cached enriched data — no extra API calls) ──
+
+// Helper: round currency to 2 decimal places to avoid floating point drift
+export function roundCurrency(n: number): number {
+  return Math.round(n * 100) / 100
+}
 
 export async function getOverdueSummary(): Promise<{
   totalOverdue: number
@@ -734,7 +794,7 @@ export async function getOverdueSummary(): Promise<{
   agingBuckets: { label: string; count: number; total: number }[]
 }> {
   // Reuse the enriched invoices (cached) — avoids duplicate Xero API calls
-  const invoices = await getEnrichedOverdueInvoices()
+  const { invoices } = await getEnrichedOverdueInvoices()
 
   let totalOverdue = 0
   let totalOutstanding = 0
@@ -757,6 +817,12 @@ export async function getOverdueSummary(): Promise<{
     stageBreakdown[stage].total += inv.AmountDue
   }
 
+  // Round all accumulated currency values to avoid floating point drift
+  totalOverdue = roundCurrency(totalOverdue)
+  totalOutstanding = roundCurrency(totalOutstanding)
+  for (const bucket of Object.values(aging)) bucket.total = roundCurrency(bucket.total)
+  for (const stage of Object.values(stageBreakdown)) stage.total = roundCurrency(stage.total)
+
   return {
     totalOverdue,
     totalOutstanding,
@@ -774,6 +840,7 @@ export async function getOverdueSummary(): Promise<{
 // ── Credit Note Methods ──
 
 export async function getCreditNotesForContact(contactId: string): Promise<XeroCreditNote[]> {
+  assertValidXeroId(contactId, 'Contact ID')
   const where = encodeURIComponent(`Contact.ContactID==Guid("${contactId}")&&Status=="AUTHORISED"&&Type=="ACCRECCREDIT"`)
   const data = await xeroFetch<{ CreditNotes: XeroCreditNote[] }>(
     `/CreditNotes?where=${where}`
@@ -793,6 +860,8 @@ export async function allocateCreditToInvoice(
   amount: number,
   date: string
 ): Promise<void> {
+  assertValidXeroId(creditNoteId, 'Credit Note ID')
+  assertValidXeroId(invoiceId, 'Invoice ID')
   await xeroFetch(`/CreditNotes/${creditNoteId}/Allocations`, {
     method: 'PUT',
     body: {

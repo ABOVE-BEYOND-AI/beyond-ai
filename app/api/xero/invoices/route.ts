@@ -13,15 +13,20 @@ export async function GET(request: NextRequest) {
     const forceRefresh = searchParams.get('refresh') === 'true'
 
     if (view === 'overdue') {
-      const invoices = await getEnrichedOverdueInvoices(forceRefresh)
-      return NextResponse.json({ success: true, data: invoices })
+      const result = await getEnrichedOverdueInvoices(forceRefresh)
+      return NextResponse.json({
+        success: true,
+        data: result.invoices,
+        stale: result.stale,
+        cachedAt: result.cachedAt,
+      })
     }
 
-    // Other views: authorised, paid, etc.
-    const invoices = await getInvoicesByStatus(view.toUpperCase())
+    // Other views: authorised, paid, etc. — status is validated inside getInvoicesByStatus
+    const invoices = await getInvoicesByStatus(view)
     return NextResponse.json({ success: true, data: invoices })
   } catch (error) {
-    console.error('Xero invoices error:', error)
+    console.error('Xero invoices error:', error instanceof Error ? error.message : error)
     return apiErrorResponse(error, 'Failed to fetch invoices')
   }
 }

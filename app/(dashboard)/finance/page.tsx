@@ -144,6 +144,7 @@ export default function FinancePage() {
   const [initialLoading, setInitialLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [staleWarning, setStaleWarning] = useState(false);
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState("all");
   const [amountFilter, setAmountFilter] = useState<AmountFilter>("all");
@@ -195,7 +196,11 @@ export default function FinancePage() {
         throw new Error(errData.error || "Failed to fetch invoices");
       }
       const json = await res.json();
-      if (json.success) { setInvoices(json.data || []); hasFetchedOnce.current = true; }
+      if (json.success) {
+        setInvoices(json.data || []);
+        setStaleWarning(!!json.stale);
+        hasFetchedOnce.current = true;
+      }
       else throw new Error(json.error || "Unknown error");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to load finance data";
@@ -368,7 +373,11 @@ export default function FinancePage() {
       });
       const json = await res.json();
       if (json.success) {
-        showFeedback(inv.InvoiceID, "Payment charged & recorded!");
+        if (json.data?.xeroRecorded === false) {
+          showFeedback(inv.InvoiceID, "Payment charged but Xero recording failed — record manually!");
+        } else {
+          showFeedback(inv.InvoiceID, "Payment charged & recorded!");
+        }
         setShowStripeModal(null);
         fetchInvoices(true, true);
       } else {
@@ -454,6 +463,15 @@ export default function FinancePage() {
           })}
           {isRefreshing && <div className="ml-auto shrink-0"><Spinner className="size-4 animate-spin text-muted-foreground/50" /></div>}
         </motion.div>
+
+        {/* Stale Data Warning */}
+        {staleWarning && !error && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+            className="mb-6 p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-500 text-sm flex items-center justify-between">
+            <span>Showing cached data — Xero API is temporarily unavailable. Data may be outdated.</span>
+            <button onClick={() => fetchInvoices(false, true)} className="text-xs font-medium hover:text-amber-300 underline underline-offset-2">Retry</button>
+          </motion.div>
+        )}
 
         {/* Error */}
         {error && (

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireApiUser, apiErrorResponse } from '@/lib/api-auth'
-import { decodeSession } from '@/lib/google-oauth-clean'
-import { allocateCreditToInvoice, addChaseActivity } from '@/lib/xero'
+import { requireApiUser, apiErrorResponse, validateUUID, validateDateString, checkRateLimit, validateCsrf } from '@/lib/api-auth'
+import { allocateCreditToInvoice, addChaseActivity, getInvoice, roundCurrency } from '@/lib/xero'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,8 +10,13 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requireApiUser(request)
+    validateCsrf(request)
+    const ctx = await requireApiUser(request)
+    await checkRateLimit(ctx.email)
+
     const { id: creditNoteId } = await params
+    validateUUID(creditNoteId, 'Credit Note ID')
+
     const body = await request.json()
     const { invoiceId, amount, date } = body as {
       invoiceId: string
@@ -24,34 +28,46 @@ export async function POST(
       return NextResponse.json({ error: 'Missing required fields: invoiceId, amount, date' }, { status: 400 })
     }
 
-    if (amount <= 0) {
-      return NextResponse.json({ error: 'Amount must be positive' }, { status: 400 })
+    validateUUID(invoiceId, 'Invoice ID')
+
+    if (typeof amount !== 'number' || !isFinite(amount) || amount <= 0) {
+      return NextResponse.json({ error: 'Amount must be a positive number' }, { status: 400 })
     }
 
     if (amount > 1000000) {
       return NextResponse.json({ error: 'Amount exceeds maximum' }, { status: 400 })
     }
 
-    // Validate date format (YYYY-MM-DD)
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      return NextResponse.json({ error: 'Invalid date format. Use YYYY-MM-DD' }, { status: 400 })
+    // Validate date format and range
+    validateDateString(date)
+
+    // Validate amount does not exceed invoice balance
+    const invoice = await getInvoice(invoiceId)
+    const invoiceBalance = roundCurrency(invoice.AmountDue)
+    const requestedAmount = roundCurrency(amount)
+
+    if (requestedAmount > invoiceBalance) {
+      return NextResponse.json({
+        error: `Amount £${requestedAmount.toFixed(2)} exceeds invoice balance of £${invoiceBalance.toFixed(2)}`,
+      }, { status: 400 })
     }
 
-    const session = decodeSession(request.cookies.get('beyond_ai_session')?.value || '')
-    const userEmail = session?.user?.email || 'unknown'
+    // Note: Xero will also validate that the amount does not exceed the credit note's
+    // RemainingCredit on the server side. We validate the invoice balance here as the
+    // primary check. If Xero rejects, the error will propagate via xeroFetch.
 
-    await allocateCreditToInvoice(creditNoteId, invoiceId, amount, date)
+    await allocateCreditToInvoice(creditNoteId, invoiceId, requestedAmount, date)
 
     // Log activity
     await addChaseActivity(invoiceId, {
       action: 'payment_recorded',
-      detail: `Credit of £${amount.toFixed(2)} applied from credit note`,
-      user: userEmail,
+      detail: `Credit of £${requestedAmount.toFixed(2)} applied from credit note`,
+      user: ctx.email,
     })
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Credit allocation error:', error)
+    console.error('Credit allocation error:', error instanceof Error ? error.message : error)
     return apiErrorResponse(error, 'Failed to allocate credit')
   }
 }

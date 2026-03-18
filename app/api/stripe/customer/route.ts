@@ -18,6 +18,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Email parameter required' }, { status: 400 })
     }
 
+    // Basic email format validation to prevent sending garbage to Stripe API
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return NextResponse.json({ error: 'Invalid email format' }, { status: 400 })
+    }
+
     const customer = await findCustomerByEmail(email)
     if (!customer) {
       return NextResponse.json({ success: true, data: { found: false, customer: null, paymentMethods: [] } })
@@ -34,7 +39,7 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('Stripe customer lookup error:', error)
+    console.error('Stripe customer lookup error:', error instanceof Error ? error.message : error)
     return apiErrorResponse(error, 'Failed to find Stripe customer')
   }
 }
