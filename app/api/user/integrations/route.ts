@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
         email: xeroTokens?.connected_by,
         connected_at: xeroTokens?.connected_at,
         expires_at: xeroTokens?.expires_at,
-        scopes: ['accounting.transactions', 'accounting.contacts', 'accounting.settings', 'accounting.payments'],
+        scopes: ['accounting.invoices', 'accounting.payments', 'accounting.contacts', 'accounting.settings'],
       },
     ]
 

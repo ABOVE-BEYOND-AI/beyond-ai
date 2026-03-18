@@ -40,10 +40,10 @@ const SCOPE_LABELS: Record<string, string> = {
   "https://www.googleapis.com/auth/presentations": "Google Slides",
   "design:content:write": "Create designs",
   "asset:read": "Read assets",
-  "accounting.transactions": "Invoices & Payments",
+  "accounting.invoices": "Invoices",
+  "accounting.payments": "Payments",
   "accounting.contacts": "Contacts",
   "accounting.settings": "Settings",
-  "accounting.payments": "Payments",
 }
 
 const container = {

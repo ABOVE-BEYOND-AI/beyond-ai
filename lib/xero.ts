@@ -20,7 +20,9 @@ const XERO_TOKEN_URL = 'https://identity.xero.com/connect/token'
 const XERO_API_BASE = 'https://api.xero.com/api.xro/2.0'
 const XERO_CONNECTIONS_URL = 'https://api.xero.com/connections'
 
-const XERO_SCOPES = 'openid profile email accounting.transactions accounting.contacts accounting.settings offline_access'
+// New granular scopes (required for apps created after March 2, 2026)
+// accounting.transactions was split into accounting.invoices + accounting.payments
+const XERO_SCOPES = 'openid profile email accounting.invoices accounting.payments accounting.contacts accounting.settings offline_access'
 
 // Token refresh buffer: refresh 5 minutes before expiry
 const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000
