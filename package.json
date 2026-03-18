@@ -57,6 +57,7 @@
     "react-dom": "^19.1.2",
     "react-hook-form": "^7.61.1",
     "react-markdown": "^10.1.0",
+    "stripe": "^20.4.1",
     "tailwind-merge": "^3.3.1",
     "tailwindcss": "^3.4.17",
     "unicornstudio-react": "^2.0.1-1",

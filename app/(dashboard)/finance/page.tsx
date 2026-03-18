@@ -30,6 +30,8 @@ import type {
   ChaseStageConfig,
   ChaseActivity,
   XeroBankAccount,
+  PaymentPlanInvoice,
+  StripePaymentMethodInfo,
 } from "@/lib/types";
 
 // ── Severity Tiers ──
@@ -115,7 +117,7 @@ function getLastChasedTime(inv: EnrichedInvoice): string | undefined {
   return inv.lastActivity?.timestamp || inv.chaseStage?.updatedAt;
 }
 
-type TabKey = "overdue" | "overview";
+type TabKey = "overdue" | "overview" | "payments";
 type AmountFilter = "all" | "1k" | "5k" | "10k";
 
 interface OverviewData {
@@ -135,6 +137,8 @@ export default function FinancePage() {
   const [invoices, setInvoices] = useState<EnrichedInvoice[]>([]);
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [bankAccounts, setBankAccounts] = useState<XeroBankAccount[]>([]);
+  const [paymentPlans, setPaymentPlans] = useState<PaymentPlanInvoice[]>([]);
+  const [loadingPlans, setLoadingPlans] = useState(false);
 
   const [activeTab, setActiveTab] = useState<TabKey>("overdue");
   const [initialLoading, setInitialLoading] = useState(true);
@@ -163,6 +167,15 @@ export default function FinancePage() {
 
   const [activities, setActivities] = useState<ChaseActivity[]>([]);
   const [loadingActivities, setLoadingActivities] = useState(false);
+
+  // Stripe Take Payment
+  const [showStripeModal, setShowStripeModal] = useState<string | null>(null);
+  const [stripeCustomer, setStripeCustomer] = useState<{ customerId: string; name: string | null } | null>(null);
+  const [stripeMethods, setStripeMethods] = useState<StripePaymentMethodInfo[]>([]);
+  const [stripeLoading, setStripeLoading] = useState(false);
+  const [stripeCharging, setStripeCharging] = useState(false);
+  const [selectedMethod, setSelectedMethod] = useState("");
+  const [stripeAmount, setStripeAmount] = useState("");
 
   useEffect(() => {
     if (!loading && !user) router.push("/auth/signin");
@@ -204,6 +217,14 @@ export default function FinancePage() {
     } catch {}
   }, []);
 
+  const fetchPaymentPlans = useCallback(async () => {
+    setLoadingPlans(true);
+    try {
+      const res = await fetch("/api/xero/payment-plans");
+      if (res.ok) { const json = await res.json(); if (json.success) setPaymentPlans(json.data || []); }
+    } catch {} finally { setLoadingPlans(false); }
+  }, []);
+
   const fetchInvoiceDetails = useCallback(async (invoiceId: string) => {
     setLoadingActivities(true);
     try {
@@ -213,8 +234,8 @@ export default function FinancePage() {
   }, []);
 
   useEffect(() => {
-    if (user) { fetchInvoices(hasFetchedOnce.current); fetchOverview(); fetchBankAccounts(); }
-  }, [user, fetchInvoices, fetchOverview, fetchBankAccounts]);
+    if (user) { fetchInvoices(hasFetchedOnce.current); fetchOverview(); fetchBankAccounts(); fetchPaymentPlans(); }
+  }, [user, fetchInvoices, fetchOverview, fetchBankAccounts, fetchPaymentPlans]);
 
   useEffect(() => {
     if (!user) return;
@@ -295,6 +316,61 @@ export default function FinancePage() {
     setActionFeedback({ id, msg }); setTimeout(() => setActionFeedback(null), 3000);
   };
 
+  // ── Stripe Take Payment ──
+
+  const openStripeModal = async (invoiceId: string, email: string, amount: number) => {
+    setShowStripeModal(invoiceId);
+    setStripeAmount(amount.toFixed(2));
+    setStripeLoading(true);
+    setStripeCustomer(null);
+    setStripeMethods([]);
+    setSelectedMethod("");
+    try {
+      const res = await fetch(`/api/stripe/customer?email=${encodeURIComponent(email)}`);
+      if (!res.ok) throw new Error();
+      const json = await res.json();
+      if (json.success && json.data.found) {
+        setStripeCustomer(json.data.customer);
+        setStripeMethods(json.data.paymentMethods);
+        if (json.data.paymentMethods.length > 0) {
+          const def = json.data.paymentMethods.find((m: StripePaymentMethodInfo) => m.isDefault);
+          setSelectedMethod(def?.id || json.data.paymentMethods[0].id);
+        }
+      }
+    } catch {} finally { setStripeLoading(false); }
+  };
+
+  const handleStripeCharge = async () => {
+    if (!showStripeModal || !stripeCustomer || !selectedMethod || !stripeAmount) return;
+    const inv = invoices.find(i => i.InvoiceID === showStripeModal);
+    if (!inv) return;
+    setStripeCharging(true);
+    try {
+      const res = await fetch("/api/stripe/charge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerId: stripeCustomer.customerId,
+          paymentMethodId: selectedMethod,
+          amount: parseFloat(stripeAmount),
+          invoiceId: inv.InvoiceID,
+          invoiceNumber: inv.InvoiceNumber,
+          contactName: inv.Contact.Name,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        showFeedback(inv.InvoiceID, "Payment charged & recorded!");
+        setShowStripeModal(null);
+        fetchInvoices(true, true);
+      } else {
+        showFeedback(inv.InvoiceID, json.error || "Payment failed");
+      }
+    } catch {
+      showFeedback(showStripeModal, "Payment failed");
+    } finally { setStripeCharging(false); }
+  };
+
   // ── Computed Values ──
 
   const filteredInvoices = useMemo(() => invoices.filter(inv => {
@@ -354,6 +430,7 @@ export default function FinancePage() {
           className="flex items-center gap-1 mb-6 border-b border-border">
           {([
             { key: "overdue" as TabKey, label: "Overdue Queue", icon: Warning, count: invoices.length },
+            { key: "payments" as TabKey, label: "Payment Plans", icon: CurrencyGbp, count: paymentPlans.length || undefined },
             { key: "overview" as TabKey, label: "Overview", icon: ChartBar },
           ]).map(tab => {
             const isActive = activeTab === tab.key;
@@ -445,6 +522,7 @@ export default function FinancePage() {
                           sendingEmail={sendingEmail}
                           onStageChange={handleStageChange} changingStage={changingStage}
                           onOpenPayment={(id, amt) => { setShowPaymentModal(id); setPaymentAmount(amt.toFixed(2)); }}
+                          onOpenStripePayment={(id, email, amt) => openStripeModal(id, email, amt)}
                           noteText={noteText} onNoteTextChange={setNoteText} onAddNote={handleAddNote} addingNote={addingNote}
                           activities={expandedInvoice === inv.InvoiceID ? activities : []}
                           loadingActivities={expandedInvoice === inv.InvoiceID && loadingActivities}
@@ -456,6 +534,9 @@ export default function FinancePage() {
                   )}
                 </div>
               )}
+
+              {/* ── PAYMENT PLANS ── */}
+              {activeTab === "payments" && <PaymentPlansTab plans={paymentPlans} loading={loadingPlans} />}
 
               {/* ── OVERVIEW ── */}
               {activeTab === "overview" && <OverviewTab overview={overview} invoices={invoices} tierBreakdown={tierBreakdown} totalForBar={totalForBar} />}
@@ -484,6 +565,25 @@ export default function FinancePage() {
                 onCancel={() => setShowSendConfirm(null)} sending={sendingEmail === showSendConfirm} />
             );
           })()}
+        </AnimatePresence>
+
+        {/* Stripe Take Payment Modal */}
+        <AnimatePresence>
+          {showStripeModal && (
+            <StripePaymentModal
+              invoice={invoices.find(i => i.InvoiceID === showStripeModal)}
+              customer={stripeCustomer}
+              methods={stripeMethods}
+              loading={stripeLoading}
+              charging={stripeCharging}
+              selectedMethod={selectedMethod}
+              onSelectMethod={setSelectedMethod}
+              amount={stripeAmount}
+              onAmountChange={setStripeAmount}
+              onCharge={handleStripeCharge}
+              onClose={() => setShowStripeModal(null)}
+            />
+          )}
         </AnimatePresence>
       </div>
     </div>
@@ -542,11 +642,13 @@ function AgingBar({ tiers, total }: { tiers: { key: string; label: string; barCo
 
 // ── Invoice Row ──
 
-function InvoiceRow({ invoice, isExpanded, onToggle, copiedEmail, onCopyEmail, sendingEmail, onStageChange, changingStage, onOpenPayment, noteText, onNoteTextChange, onAddNote, addingNote, activities, loadingActivities, actionFeedback, setShowSendConfirm }: {
+function InvoiceRow({ invoice, isExpanded, onToggle, copiedEmail, onCopyEmail, sendingEmail, onStageChange, changingStage, onOpenPayment, onOpenStripePayment, noteText, onNoteTextChange, onAddNote, addingNote, activities, loadingActivities, actionFeedback, setShowSendConfirm }: {
   invoice: EnrichedInvoice; isExpanded: boolean; onToggle: () => void; copiedEmail: string | null;
   onCopyEmail: (email: string, id: string) => void; sendingEmail: string | null;
   onStageChange: (id: string, stage: ChaseStageKey) => void; changingStage: string | null;
-  onOpenPayment: (id: string, amount: number) => void; noteText: string; onNoteTextChange: (t: string) => void;
+  onOpenPayment: (id: string, amount: number) => void;
+  onOpenStripePayment: (id: string, email: string, amount: number) => void;
+  noteText: string; onNoteTextChange: (t: string) => void;
   onAddNote: (id: string) => void; addingNote: string | null; activities: ChaseActivity[];
   loadingActivities: boolean; actionFeedback: { id: string; msg: string } | null;
   setShowSendConfirm: (id: string | null) => void;
@@ -578,6 +680,22 @@ function InvoiceRow({ invoice, isExpanded, onToggle, copiedEmail, onCopyEmail, s
               ? <><Check className="size-3 text-emerald-500 shrink-0" /><span className="text-emerald-500">Copied</span></>
               : <><CopySimple className="size-3 shrink-0 opacity-50" /><span className="truncate">{invoice.contactEmail}</span></>}
           </button>
+        )}
+
+        {/* Credit Badge */}
+        {invoice.creditAvailable && invoice.creditAvailable > 0 && (
+          <span className="hidden lg:inline-flex shrink-0 items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-400">
+            CR {formatCurrency(invoice.creditAvailable)}
+          </span>
+        )}
+
+        {/* Event Urgency */}
+        {invoice.weeksToEvent != null && invoice.weeksToEvent <= 20 && (
+          <span className={`hidden lg:inline-flex shrink-0 items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+            invoice.weeksToEvent <= 4 ? "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400" : "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400"
+          }`} title={invoice.eventName || ""}>
+            {invoice.weeksToEvent}w
+          </span>
         )}
 
         {/* Last Chased */}
@@ -673,6 +791,11 @@ function InvoiceRow({ invoice, isExpanded, onToggle, copiedEmail, onCopyEmail, s
                 <button onClick={() => setShowSendConfirm(invoice.InvoiceID)} disabled={sendingEmail === invoice.InvoiceID || !invoice.contactEmail}
                   className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-40">
                   {sendingEmail === invoice.InvoiceID ? <Spinner className="size-3.5 animate-spin" /> : <PaperPlaneTilt className="size-3.5" />} Send Reminder
+                </button>
+                <button onClick={() => onOpenStripePayment(invoice.InvoiceID, invoice.contactEmail, invoice.AmountDue)}
+                  disabled={!invoice.contactEmail}
+                  className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors disabled:opacity-40">
+                  <CurrencyGbp className="size-3.5" /> Take Payment
                 </button>
                 <button onClick={() => onOpenPayment(invoice.InvoiceID, invoice.AmountDue)}
                   className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg bg-card border border-border hover:bg-accent transition-colors">
@@ -875,6 +998,140 @@ function SendConfirmDialog({ email, invoiceNumber, onConfirm, onCancel, sending 
             className="flex-1 px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5">
             {sending ? <Spinner className="size-4 animate-spin" /> : <PaperPlaneTilt className="size-4" />} Send
           </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ── Payment Plans Tab ──
+
+function PaymentPlansTab({ plans, loading }: { plans: PaymentPlanInvoice[]; loading: boolean }) {
+  const totalRemaining = plans.reduce((s, p) => s + p.amountDue, 0);
+  const totalPaid = plans.reduce((s, p) => s + p.amountPaid, 0);
+
+  if (loading) return <div className="text-center py-16 text-muted-foreground/40"><Spinner className="size-8 mx-auto mb-3 animate-spin opacity-30" /><p className="text-sm">Loading payment plans...</p></div>;
+  if (!plans.length) return <div className="text-center py-16 text-muted-foreground/40"><CheckCircle className="size-12 mx-auto mb-3 opacity-30" /><p className="text-lg font-medium">No active payment plans</p></div>;
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl bg-card border border-border overflow-hidden">
+        <div className="grid grid-cols-3 divide-x divide-border/50">
+          <StatCell label="Active Plans" value={String(plans.length)} subText={`${plans.length} invoice${plans.length !== 1 ? "s" : ""}`} color="text-foreground" />
+          <StatCell label="Total Remaining" value={formatCurrency(totalRemaining)} color="text-amber-600 dark:text-amber-400" />
+          <StatCell label="Total Collected" value={formatCurrency(totalPaid)} color="text-emerald-600 dark:text-emerald-400" />
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        {plans.map(plan => (
+          <div key={plan.invoiceId} className="rounded-lg bg-card border border-border/40 p-3.5 hover:border-border/70 transition-colors">
+            <div className="flex items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-[13px] font-semibold truncate">{plan.contactName}</p>
+                  <span className="text-[11px] font-mono text-muted-foreground/60">{plan.invoiceNumber}</span>
+                </div>
+                {plan.contactEmail && <p className="text-[11px] text-muted-foreground/50 truncate">{plan.contactEmail}</p>}
+              </div>
+              <div className="flex items-center gap-4 shrink-0">
+                <div className="w-32">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="h-1.5 flex-1 rounded-full bg-border overflow-hidden">
+                      <div className={`h-full rounded-full transition-all ${plan.percentagePaid >= 75 ? "bg-emerald-500" : plan.percentagePaid >= 40 ? "bg-blue-500" : "bg-amber-500"}`}
+                        style={{ width: `${Math.min(plan.percentagePaid, 100)}%` }} />
+                    </div>
+                    <span className="text-[11px] font-bold tabular-nums text-muted-foreground">{plan.percentagePaid}%</span>
+                  </div>
+                  <div className="flex justify-between text-[10px] text-muted-foreground/50">
+                    <span>Paid: {formatCurrency(plan.amountPaid)}</span>
+                  </div>
+                </div>
+                <div className="text-right w-24">
+                  <p className="text-[13px] font-bold tabular-nums text-amber-600 dark:text-amber-400">{formatCurrency(plan.amountDue)}</p>
+                  <p className="text-[10px] text-muted-foreground/50">remaining</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Stripe Payment Modal ──
+
+function StripePaymentModal({ invoice, customer, methods, loading, charging, selectedMethod, onSelectMethod, amount, onAmountChange, onCharge, onClose }: {
+  invoice?: EnrichedInvoice; customer: { customerId: string; name: string | null } | null;
+  methods: StripePaymentMethodInfo[]; loading: boolean; charging: boolean;
+  selectedMethod: string; onSelectMethod: (id: string) => void;
+  amount: string; onAmountChange: (v: string) => void;
+  onCharge: () => void; onClose: () => void;
+}) {
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
+      <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+        className="bg-card rounded-2xl border border-border shadow-2xl p-6 w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-2 rounded-full bg-emerald-500/10"><CurrencyGbp className="size-5 text-emerald-400" /></div>
+          <div>
+            <h3 className="text-sm font-bold">Take Payment via Stripe</h3>
+            {invoice && <p className="text-xs text-muted-foreground mt-0.5">{invoice.Contact.Name} · {invoice.InvoiceNumber}</p>}
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center gap-2 py-8 justify-center text-muted-foreground">
+            <Spinner className="size-4 animate-spin" /><span className="text-sm">Looking up Stripe customer...</span>
+          </div>
+        ) : !customer ? (
+          <div className="py-6 text-center">
+            <p className="text-sm text-muted-foreground mb-2">No Stripe customer found for this email.</p>
+            <p className="text-xs text-muted-foreground/60">The client needs to be set up in Stripe first.</p>
+          </div>
+        ) : methods.length === 0 ? (
+          <div className="py-6 text-center">
+            <p className="text-sm text-muted-foreground mb-2">Customer found but no saved cards.</p>
+            <p className="text-xs text-muted-foreground/60">{customer.name || "Customer"} has no payment methods on file.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Select Card</label>
+              <div className="mt-1.5 space-y-1.5">
+                {methods.map(pm => (
+                  <button key={pm.id} onClick={() => onSelectMethod(pm.id)}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-colors text-left ${
+                      selectedMethod === pm.id ? "border-emerald-500/50 bg-emerald-500/5" : "border-border hover:border-border/80"
+                    }`}>
+                    <div className="flex-1">
+                      <span className="text-sm font-medium capitalize">{pm.brand}</span>
+                      <span className="text-sm text-muted-foreground ml-1.5">····{pm.last4}</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">{String(pm.expMonth).padStart(2, "0")}/{pm.expYear}</span>
+                    {pm.isDefault && <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">Default</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Amount (£)</label>
+              <input type="number" value={amount} onChange={e => onAmountChange(e.target.value)} step="0.01" min="0"
+                className="w-full mt-1 px-3 py-2 rounded-lg bg-background border border-border text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20" />
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-center gap-3 mt-5">
+          <button onClick={onClose} className="flex-1 px-4 py-2 text-sm font-medium rounded-lg border border-border hover:bg-accent transition-colors">Cancel</button>
+          {customer && methods.length > 0 && (
+            <button onClick={onCharge} disabled={charging || !selectedMethod || !amount}
+              className="flex-1 px-4 py-2 text-sm font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5">
+              {charging ? <Spinner className="size-4 animate-spin" /> : <CurrencyGbp className="size-4" />} Charge Card
+            </button>
+          )}
         </div>
       </motion.div>
     </motion.div>

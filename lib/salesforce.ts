@@ -1547,3 +1547,37 @@ export async function getUpcomingEvents(days: number = 7): Promise<SalesforceEve
   const result = await query<SalesforceEventRecord>(soql)
   return result.records
 }
+
+// Get upcoming events grouped by account name — used by finance dashboard for urgency flags
+export async function getOpportunitiesForAccounts(): Promise<Map<string, { name: string; startDate: string }[]>> {
+  const soql = `
+    SELECT Account.Name, Event__r.Name, Event__r.Start_Date__c
+    FROM Opportunity
+    WHERE Event__r.Start_Date__c >= TODAY
+      AND Event__r.Start_Date__c <= NEXT_N_DAYS:140
+      AND Account.Name != null
+      AND Event__c != null
+    ORDER BY Event__r.Start_Date__c ASC
+    LIMIT 500
+  `.trim()
+
+  const result = await query<{
+    Account: { Name: string } | null
+    Event__r: { Name: string; Start_Date__c: string } | null
+  }>(soql)
+
+  const map = new Map<string, { name: string; startDate: string }[]>()
+
+  for (const rec of result.records) {
+    const accountName = rec.Account?.Name
+    const eventName = rec.Event__r?.Name
+    const startDate = rec.Event__r?.Start_Date__c
+    if (!accountName || !eventName || !startDate) continue
+
+    const existing = map.get(accountName) || []
+    existing.push({ name: eventName, startDate })
+    map.set(accountName, existing)
+  }
+
+  return map
+}

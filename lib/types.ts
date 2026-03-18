@@ -153,6 +153,52 @@ export interface EnrichedInvoice extends XeroInvoice {
   daysOverdue: number
   chaseStage?: ChaseStageData
   lastActivity?: ChaseActivity
+  creditAvailable?: number // unallocated credit for this contact
+  eventDate?: string // nearest event date from Salesforce
+  eventName?: string // event name from Salesforce
+  weeksToEvent?: number // weeks until the event
+}
+
+// ── Xero Credit Note Types ──
+
+export interface XeroCreditNote {
+  CreditNoteID: string
+  CreditNoteNumber: string
+  Type: 'ACCRECCREDIT' | 'ACCPAYCREDIT'
+  Status: string
+  Contact: { ContactID: string; Name: string }
+  Date: string
+  Total: number
+  RemainingCredit: number
+  CurrencyCode: string
+  Allocations: { Amount: number; Date: string; Invoice: { InvoiceID: string; InvoiceNumber: string } }[]
+}
+
+// ── Payment Plan (derived from Xero partial payments) ──
+
+export interface PaymentPlanInvoice {
+  invoiceId: string
+  invoiceNumber: string
+  contactName: string
+  contactEmail: string
+  total: number
+  amountPaid: number
+  amountDue: number
+  percentagePaid: number
+  dueDate: string
+  date: string
+  reference: string
+}
+
+// ── Stripe Types (for frontend) ──
+
+export interface StripePaymentMethodInfo {
+  id: string
+  brand: string
+  last4: string
+  expMonth: number
+  expYear: number
+  isDefault: boolean
 }
 
 export interface Itinerary {

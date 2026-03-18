@@ -6,11 +6,13 @@ import type {
   XeroContact,
   XeroBankAccount,
   XeroHistoryRecord,
+  XeroCreditNote,
   ChaseStageKey,
   ChaseStageData,
   ChaseActivity,
   ChaseStageConfig,
   EnrichedInvoice,
+  PaymentPlanInvoice,
 } from './types'
 
 // ── Constants ──
@@ -553,6 +555,55 @@ export async function getChaseActivities(invoiceId: string, limit = 50): Promise
   }).filter(Boolean) as ChaseActivity[]
 }
 
+// ── Salesforce Event Data (for urgency flags) ──
+
+async function getEventDataForContacts(
+  contactNames: string[]
+): Promise<Map<string, { eventName: string; eventDate: string; weeksToEvent: number }>> {
+  const redis = getRedis()
+  const cacheKey = 'xero:event_data_cache'
+  const result = new Map<string, { eventName: string; eventDate: string; weeksToEvent: number }>()
+
+  // Check cache first (15 min TTL)
+  const cached = await redis.get(cacheKey) as Record<string, { eventName: string; eventDate: string; weeksToEvent: number }> | null
+  if (cached) return new Map(Object.entries(cached))
+
+  try {
+    // Dynamic import to avoid circular dependency
+    const { getOpportunitiesForAccounts } = await import('./salesforce')
+    const accountEventMap = await getOpportunitiesForAccounts()
+
+    const now = new Date()
+    for (const [accountName, events] of accountEventMap.entries()) {
+      // Find nearest upcoming event
+      let nearest: { name: string; date: string; weeks: number } | null = null
+      for (const evt of events) {
+        if (!evt.startDate) continue
+        const evtDate = new Date(evt.startDate)
+        if (evtDate <= now) continue
+        const weeks = Math.floor((evtDate.getTime() - now.getTime()) / (7 * 24 * 60 * 60 * 1000))
+        if (!nearest || weeks < nearest.weeks) {
+          nearest = { name: evt.name, date: evt.startDate, weeks }
+        }
+      }
+      if (nearest) {
+        result.set(accountName.toLowerCase(), {
+          eventName: nearest.name,
+          eventDate: nearest.date,
+          weeksToEvent: nearest.weeks,
+        })
+      }
+    }
+
+    // Cache for 15 minutes
+    await redis.set(cacheKey, Object.fromEntries(result), { ex: 900 })
+  } catch {
+    // Salesforce may not be available — non-blocking
+  }
+
+  return result
+}
+
 // ── Enriched Invoices (combines Xero + Redis chase data, with caching) ──
 
 export async function getEnrichedOverdueInvoices(forceRefresh = false): Promise<EnrichedInvoice[]> {
@@ -571,10 +622,11 @@ export async function getEnrichedOverdueInvoices(forceRefresh = false): Promise<
     }
   }
 
-  // Fetch invoices and chase stages in parallel
-  const [invoices, chaseStages] = await Promise.all([
+  // Fetch invoices, chase stages, and credit summary in parallel
+  const [invoices, chaseStages, creditSummary] = await Promise.all([
     getAllOverdueInvoices(),
     getAllChaseStages(),
+    getCreditSummaryByContact().catch(() => new Map<string, number>()),
   ])
 
   // Collect unique contact IDs
@@ -582,6 +634,14 @@ export async function getEnrichedOverdueInvoices(forceRefresh = false): Promise<
 
   // Batch fetch contact emails
   const contactEmails = await batchGetContactEmails(contactIds)
+
+  // Try to get event data from Salesforce (non-blocking)
+  let eventMap = new Map<string, { eventName: string; eventDate: string; weeksToEvent: number }>()
+  try {
+    eventMap = await getEventDataForContacts(invoices.map(inv => inv.Contact.Name))
+  } catch (err) {
+    console.error('Failed to fetch Salesforce event data (non-blocking):', err)
+  }
 
   // Enrich each invoice with parsed dates
   const now = new Date()
@@ -591,6 +651,8 @@ export async function getEnrichedOverdueInvoices(forceRefresh = false): Promise<
     const dueDate = new Date(parsedDueDate)
     const daysOverdue = isNaN(dueDate.getTime()) ? 0 : Math.max(0, Math.floor((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)))
     const contactInfo = contactEmails.get(inv.Contact.ContactID)
+    const creditAvailable = creditSummary.get(inv.Contact.ContactID) || 0
+    const eventData = eventMap.get(inv.Contact.Name.toLowerCase())
 
     return {
       ...inv,
@@ -600,6 +662,10 @@ export async function getEnrichedOverdueInvoices(forceRefresh = false): Promise<
       contactPhone: contactInfo?.phone,
       daysOverdue,
       chaseStage: chaseStages[inv.InvoiceID] || undefined,
+      creditAvailable: creditAvailable > 0 ? creditAvailable : undefined,
+      eventName: eventData?.eventName,
+      eventDate: eventData?.eventDate,
+      weeksToEvent: eventData?.weeksToEvent,
     }
   })
 
@@ -657,6 +723,110 @@ export async function getOverdueSummary(): Promise<{
       { label: '30+ days', ...aging['30+'] },
     ],
   }
+}
+
+// ── Credit Note Methods ──
+
+export async function getCreditNotesForContact(contactId: string): Promise<XeroCreditNote[]> {
+  const where = encodeURIComponent(`Contact.ContactID==Guid("${contactId}")&&Status=="AUTHORISED"&&Type=="ACCRECCREDIT"`)
+  const data = await xeroFetch<{ CreditNotes: XeroCreditNote[] }>(
+    `/CreditNotes?where=${where}`
+  )
+  return (data.CreditNotes || []).filter(cn => cn.RemainingCredit > 0)
+}
+
+export async function getAllCreditNotes(): Promise<XeroCreditNote[]> {
+  const where = encodeURIComponent('Status=="AUTHORISED"&&Type=="ACCRECCREDIT"&&RemainingCredit>0')
+  const data = await xeroFetch<{ CreditNotes: XeroCreditNote[] }>(`/CreditNotes?where=${where}`)
+  return data.CreditNotes || []
+}
+
+export async function allocateCreditToInvoice(
+  creditNoteId: string,
+  invoiceId: string,
+  amount: number,
+  date: string
+): Promise<void> {
+  await xeroFetch(`/CreditNotes/${creditNoteId}/Allocations`, {
+    method: 'PUT',
+    body: {
+      Allocations: [{
+        Amount: amount,
+        Date: date,
+        Invoice: { InvoiceID: invoiceId },
+      }],
+    },
+  })
+}
+
+// ── Payment Plans (Partially Paid Invoices) ──
+
+export async function getPaymentPlanInvoices(): Promise<PaymentPlanInvoice[]> {
+  const redis = getRedis()
+  const cacheKey = 'xero:payment_plans_cache'
+
+  const cached = await redis.get(cacheKey) as PaymentPlanInvoice[] | null
+  if (cached) return cached
+
+  // Get AUTHORISED invoices with partial payments (AmountPaid > 0 AND AmountDue > 0)
+  const where = encodeURIComponent('Status=="AUTHORISED"&&AmountPaid>0&&AmountDue>0&&Type=="ACCREC"')
+  const data = await xeroFetch<{ Invoices: XeroInvoice[] }>(
+    `/Invoices?where=${where}&order=DueDate&page=1`
+  )
+
+  const invoices = data.Invoices || []
+
+  // Batch fetch contact emails
+  const contactIds = [...new Set(invoices.map(inv => inv.Contact.ContactID))]
+  const contactEmails = await batchGetContactEmails(contactIds)
+
+  const plans: PaymentPlanInvoice[] = invoices.map(inv => {
+    const contactInfo = contactEmails.get(inv.Contact.ContactID)
+    const parsedDueDate = parseXeroDate(inv.DueDate)
+    const parsedDate = parseXeroDate(inv.Date)
+    return {
+      invoiceId: inv.InvoiceID,
+      invoiceNumber: inv.InvoiceNumber,
+      contactName: inv.Contact.Name,
+      contactEmail: contactInfo?.email || '',
+      total: inv.Total,
+      amountPaid: inv.AmountPaid,
+      amountDue: inv.AmountDue,
+      percentagePaid: inv.Total > 0 ? Math.round((inv.AmountPaid / inv.Total) * 100) : 0,
+      dueDate: parsedDueDate,
+      date: parsedDate,
+      reference: inv.Reference || '',
+    }
+  })
+
+  // Sort by percentage paid ascending (least progress first)
+  plans.sort((a, b) => a.percentagePaid - b.percentagePaid)
+
+  await redis.set(cacheKey, plans, { ex: 300 }) // 5 min cache
+  return plans
+}
+
+// ── Credit Summary per Contact (for enrichment) ──
+
+export async function getCreditSummaryByContact(): Promise<Map<string, number>> {
+  const redis = getRedis()
+  const cacheKey = 'xero:credit_summary_cache'
+
+  const cached = await redis.get(cacheKey) as Record<string, number> | null
+  if (cached) return new Map(Object.entries(cached))
+
+  const creditNotes = await getAllCreditNotes()
+  const summary = new Map<string, number>()
+
+  for (const cn of creditNotes) {
+    const contactId = cn.Contact.ContactID
+    const existing = summary.get(contactId) || 0
+    summary.set(contactId, existing + cn.RemainingCredit)
+  }
+
+  // Cache for 5 minutes
+  await redis.set(cacheKey, Object.fromEntries(summary), { ex: 300 })
+  return summary
 }
 
 // ── Connection Check ──
