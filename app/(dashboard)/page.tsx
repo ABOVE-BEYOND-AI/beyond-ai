@@ -3,13 +3,13 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, ArrowUpRight, Phone, PhoneIncoming, PhoneOutgoing, MapPin, Calendar, Clock, RefreshCw } from "lucide-react";
+import { ArrowRight, ArrowUpRight, PhoneIncoming, PhoneOutgoing, MapPin, Calendar } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useGoogleAuth } from "@/components/google-auth-provider-clean";
 import { useRouter } from "next/navigation";
 import NumberFlow from "@number-flow/react";
-import { formatCurrency, daysUntil, EVENT_CATEGORY_COLORS, OPPORTUNITY_STAGES, PIPELINE_STAGES, formatRelativeTime } from "@/lib/constants";
+import { formatCurrency, daysUntil, EVENT_CATEGORY_COLORS, OPPORTUNITY_STAGES, PIPELINE_STAGES } from "@/lib/constants";
 import { resolveEventImage } from "@/lib/event-images";
 import type { SalesforceEvent, SalesforceOpportunityFull } from "@/lib/salesforce-types";
 
@@ -65,6 +65,16 @@ interface OverdueSummary {
   totalOutstanding: number;
   invoiceCount: number;
   agingBuckets: { label: string; count: number; total: number }[];
+}
+
+interface DashboardLead {
+  Id: string;
+  Name?: string;
+  FirstName?: string;
+  LastName?: string;
+  Company?: string;
+  Email?: string;
+  Lead_Score__c?: number | null;
 }
 
 interface Itinerary {
@@ -187,7 +197,7 @@ export default function DashboardPage() {
   const [pipelineData, setPipelineData] = useState<SalesforceOpportunityFull[] | null>(null);
   const [callsData, setCallsData] = useState<CallsData | null>(null);
   const [financeData, setFinanceData] = useState<OverdueSummary | null>(null);
-  const [leadsData, setLeadsData] = useState<any[] | null>(null);
+  const [leadsData, setLeadsData] = useState<DashboardLead[] | null>(null);
   const [eventsData, setEventsData] = useState<SalesforceEvent[] | null>(null);
   const [itinerariesData, setItinerariesData] = useState<Itinerary[] | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -549,6 +559,7 @@ export default function DashboardPage() {
                   <Card className="rounded-[20px] shadow-soft border-border/40 overflow-hidden hover:shadow-md hover:border-primary/20 transition-all duration-300 h-full">
                     <div className="relative h-[130px] bg-muted/30 overflow-hidden">
                       {img ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
                         <img
                           src={img}
                           alt={event.Name}
@@ -659,7 +670,7 @@ export default function DashboardPage() {
                 </div>
                 {leadsData && leadsData.length > 0 ? (
                   <div className="space-y-3">
-                    {leadsData.slice(0, 5).map((lead: any) => (
+                    {leadsData.slice(0, 5).map((lead) => (
                       <Link key={lead.Id} href="/leads" className="block group">
                         <div className="flex items-center justify-between gap-2">
                           <div className="min-w-0">

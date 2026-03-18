@@ -574,7 +574,7 @@ export default function FinancePage() {
         {/* Payment Modal */}
         <AnimatePresence>
           {showPaymentModal && (
-            <PaymentModal invoiceId={showPaymentModal} invoice={invoices.find(i => i.InvoiceID === showPaymentModal)}
+            <PaymentModal invoice={invoices.find(i => i.InvoiceID === showPaymentModal)}
               bankAccounts={bankAccounts} amount={paymentAmount} onAmountChange={setPaymentAmount}
               date={paymentDate} onDateChange={setPaymentDate} bankId={paymentBankId} onBankChange={setPaymentBankId}
               recording={recordingPayment} onRecord={handleRecordPayment} onClose={() => setShowPaymentModal(null)} />
@@ -955,8 +955,8 @@ function OverviewTab({ overview, invoices, tierBreakdown, totalForBar }: {
 
 // ── Payment Modal ──
 
-function PaymentModal({ invoiceId, invoice, bankAccounts, amount, onAmountChange, date, onDateChange, bankId, onBankChange, recording, onRecord, onClose }: {
-  invoiceId: string; invoice?: EnrichedInvoice; bankAccounts: XeroBankAccount[];
+function PaymentModal({ invoice, bankAccounts, amount, onAmountChange, date, onDateChange, bankId, onBankChange, recording, onRecord, onClose }: {
+  invoice?: EnrichedInvoice; bankAccounts: XeroBankAccount[];
   amount: string; onAmountChange: (v: string) => void; date: string; onDateChange: (v: string) => void;
   bankId: string; onBankChange: (v: string) => void; recording: boolean; onRecord: () => void; onClose: () => void;
 }) {
