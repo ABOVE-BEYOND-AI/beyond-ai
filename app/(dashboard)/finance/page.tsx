@@ -129,13 +129,14 @@ export default function FinancePage() {
 
   // ── Data Fetching ──
 
-  const fetchInvoices = useCallback(async (silent = false) => {
+  const fetchInvoices = useCallback(async (silent = false, forceRefresh = false) => {
     if (!silent && !hasFetchedOnce.current) setInitialLoading(true);
     if (silent) setIsRefreshing(true);
     setError(null);
 
     try {
-      const res = await fetch("/api/xero/invoices");
+      const url = forceRefresh ? "/api/xero/invoices?refresh=true" : "/api/xero/invoices";
+      const res = await fetch(url);
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.error || "Failed to fetch invoices");
@@ -370,7 +371,7 @@ export default function FinancePage() {
               </p>
             </div>
             <button
-              onClick={() => fetchInvoices(true)}
+              onClick={() => fetchInvoices(true, true)}
               disabled={isRefreshing}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-card border border-border hover:bg-accent transition-colors disabled:opacity-50"
             >

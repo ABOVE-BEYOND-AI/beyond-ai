@@ -10,9 +10,10 @@ export async function GET(request: NextRequest) {
     await requireApiUser(request)
     const { searchParams } = request.nextUrl
     const view = searchParams.get('view') || 'overdue'
+    const forceRefresh = searchParams.get('refresh') === 'true'
 
     if (view === 'overdue') {
-      const invoices = await getEnrichedOverdueInvoices()
+      const invoices = await getEnrichedOverdueInvoices(forceRefresh)
       return NextResponse.json({ success: true, data: invoices })
     }
 

@@ -35,6 +35,21 @@ const REDIS_KEYS = {
   contactCache: (contactId: string) => `xero:contacts_cache:${contactId}`,
   bankAccounts: 'xero:bank_accounts',
   oauthState: (state: string) => `xero:oauth_state:${state}`,
+  invoicesCache: 'xero:invoices_cache',
+  overviewCache: 'xero:overview_cache',
+}
+
+// ── Xero Date Parser ──
+// Xero returns dates as "/Date(1629292800000+0000)/" or ISO strings
+function parseXeroDate(dateStr: string): string {
+  if (!dateStr) return ''
+  // Handle /Date(timestamp+offset)/ format
+  const match = dateStr.match(/\/Date\((\d+)([+-]\d{4})?\)\//)
+  if (match) {
+    return new Date(parseInt(match[1])).toISOString()
+  }
+  // Already ISO or standard date string
+  return dateStr
 }
 
 // Chase stage definitions matching Scarlett's Salesforce dropdown
@@ -538,9 +553,24 @@ export async function getChaseActivities(invoiceId: string, limit = 50): Promise
   }).filter(Boolean) as ChaseActivity[]
 }
 
-// ── Enriched Invoices (combines Xero + Redis chase data) ──
+// ── Enriched Invoices (combines Xero + Redis chase data, with caching) ──
 
-export async function getEnrichedOverdueInvoices(): Promise<EnrichedInvoice[]> {
+export async function getEnrichedOverdueInvoices(forceRefresh = false): Promise<EnrichedInvoice[]> {
+  const redis = getRedis()
+
+  // Check cache first (3 min TTL) — prevents rate limiting on page revisits
+  if (!forceRefresh) {
+    const cached = await redis.get(REDIS_KEYS.invoicesCache) as EnrichedInvoice[] | null
+    if (cached) {
+      // Re-apply chase stages from Redis (always fresh) on top of cached invoice data
+      const chaseStages = await getAllChaseStages()
+      return cached.map(inv => ({
+        ...inv,
+        chaseStage: chaseStages[inv.InvoiceID] || undefined,
+      }))
+    }
+  }
+
   // Fetch invoices and chase stages in parallel
   const [invoices, chaseStages] = await Promise.all([
     getAllOverdueInvoices(),
@@ -553,15 +583,19 @@ export async function getEnrichedOverdueInvoices(): Promise<EnrichedInvoice[]> {
   // Batch fetch contact emails
   const contactEmails = await batchGetContactEmails(contactIds)
 
-  // Enrich each invoice
+  // Enrich each invoice with parsed dates
   const now = new Date()
   const enriched: EnrichedInvoice[] = invoices.map(inv => {
-    const dueDate = new Date(inv.DueDate)
-    const daysOverdue = Math.floor((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24))
+    const parsedDueDate = parseXeroDate(inv.DueDate)
+    const parsedDate = parseXeroDate(inv.Date)
+    const dueDate = new Date(parsedDueDate)
+    const daysOverdue = isNaN(dueDate.getTime()) ? 0 : Math.max(0, Math.floor((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)))
     const contactInfo = contactEmails.get(inv.Contact.ContactID)
 
     return {
       ...inv,
+      DueDate: parsedDueDate,
+      Date: parsedDate,
       contactEmail: contactInfo?.email || '',
       contactPhone: contactInfo?.phone,
       daysOverdue,
@@ -572,10 +606,13 @@ export async function getEnrichedOverdueInvoices(): Promise<EnrichedInvoice[]> {
   // Sort by days overdue (most overdue first)
   enriched.sort((a, b) => b.daysOverdue - a.daysOverdue)
 
+  // Cache for 3 minutes to avoid rate limiting
+  await redis.set(REDIS_KEYS.invoicesCache, enriched, { ex: 180 })
+
   return enriched
 }
 
-// ── Overview / Summary ──
+// ── Overview / Summary (reuses cached enriched data — no extra API calls) ──
 
 export async function getOverdueSummary(): Promise<{
   totalOverdue: number
@@ -584,12 +621,9 @@ export async function getOverdueSummary(): Promise<{
   stageBreakdown: Record<string, { count: number; total: number }>
   agingBuckets: { label: string; count: number; total: number }[]
 }> {
-  const [invoices, chaseStages] = await Promise.all([
-    getAllOverdueInvoices(),
-    getAllChaseStages(),
-  ])
+  // Reuse the enriched invoices (cached) — avoids duplicate Xero API calls
+  const invoices = await getEnrichedOverdueInvoices()
 
-  const now = new Date()
   let totalOverdue = 0
   let totalOutstanding = 0
   const stageBreakdown: Record<string, { count: number; total: number }> = {}
@@ -599,13 +633,13 @@ export async function getOverdueSummary(): Promise<{
     totalOverdue += inv.AmountDue
     totalOutstanding += inv.Total - inv.AmountPaid
 
-    const daysOverdue = Math.floor((now.getTime() - new Date(inv.DueDate).getTime()) / (1000 * 60 * 60 * 24))
+    const daysOverdue = inv.daysOverdue
     if (daysOverdue <= 7) { aging['1-7'].count++; aging['1-7'].total += inv.AmountDue }
     else if (daysOverdue <= 14) { aging['8-14'].count++; aging['8-14'].total += inv.AmountDue }
     else if (daysOverdue <= 30) { aging['15-30'].count++; aging['15-30'].total += inv.AmountDue }
     else { aging['30+'].count++; aging['30+'].total += inv.AmountDue }
 
-    const stage = chaseStages[inv.InvoiceID]?.stage || 'unassigned'
+    const stage = inv.chaseStage?.stage || 'unassigned'
     if (!stageBreakdown[stage]) stageBreakdown[stage] = { count: 0, total: 0 }
     stageBreakdown[stage].count++
     stageBreakdown[stage].total += inv.AmountDue
