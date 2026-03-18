@@ -33,12 +33,126 @@ export interface StoredTokens {
 }
 
 export interface Integration {
-  service: 'google' | 'canva' | 'slack'
+  service: 'google' | 'canva' | 'slack' | 'xero'
   connected: boolean
   email?: string
   scopes?: string[]
   connected_at?: string
   expires_at?: number
+}
+
+// ── Xero Types ──
+
+export interface XeroOrgTokens {
+  access_token: string
+  refresh_token: string
+  expires_at: number // ms timestamp
+  tenant_id: string
+  connected_by: string // admin email who connected
+  connected_at: string // ISO string
+}
+
+export interface XeroInvoice {
+  InvoiceID: string
+  InvoiceNumber: string
+  Type: 'ACCREC' | 'ACCPAY'
+  Contact: { ContactID: string; Name: string }
+  DueDate: string
+  Date: string
+  Status: string
+  AmountDue: number
+  AmountPaid: number
+  Total: number
+  SubTotal: number
+  Reference: string
+  CurrencyCode: string
+  HasAttachments: boolean
+  LineItems: XeroLineItem[]
+}
+
+export interface XeroLineItem {
+  LineItemID: string
+  Description: string
+  Quantity: number
+  UnitAmount: number
+  LineAmount: number
+  AccountCode: string
+  Tracking: { Name: string; Option: string }[]
+}
+
+export interface XeroContact {
+  ContactID: string
+  Name: string
+  FirstName?: string
+  LastName?: string
+  EmailAddress: string
+  ContactPersons: { FirstName: string; LastName: string; EmailAddress: string; IncludeInEmails: boolean }[]
+  Phones: { PhoneType: string; PhoneNumber: string; PhoneAreaCode: string; PhoneCountryCode: string }[]
+  Addresses: { AddressType: string; AddressLine1: string; City: string; Region: string; PostalCode: string; Country: string }[]
+  ContactStatus: string
+  IsCustomer: boolean
+  IsSupplier: boolean
+  Balances?: {
+    AccountsReceivable: { Outstanding: number; Overdue: number }
+    AccountsPayable: { Outstanding: number; Overdue: number }
+  }
+}
+
+export interface XeroBankAccount {
+  AccountID: string
+  Name: string
+  Code: string
+  Type: string
+  BankAccountNumber?: string
+  CurrencyCode: string
+}
+
+export interface XeroHistoryRecord {
+  Details: string
+  DateUTC: string
+  User: string
+  Changes: string
+}
+
+export type ChaseStageKey =
+  | '1-3_days_xero_reminder'
+  | '3-5_days_finance_email'
+  | '8_days_process_email'
+  | '10_days_process_email'
+  | 'daily_chaser'
+  | 'final_warning'
+  | 'cancellation_terms'
+  | 'bolt_on'
+
+export interface ChaseStageConfig {
+  key: ChaseStageKey
+  label: string
+  color: string       // tailwind bg class
+  textColor: string   // tailwind text class
+  description: string
+}
+
+export interface ChaseStageData {
+  stage: ChaseStageKey
+  updatedAt: string
+  updatedBy: string
+}
+
+export interface ChaseActivity {
+  id: string
+  invoiceId: string
+  action: 'stage_change' | 'note' | 'payment_recorded' | 'email_sent'
+  detail: string
+  timestamp: string
+  user: string
+}
+
+export interface EnrichedInvoice extends XeroInvoice {
+  contactEmail: string
+  contactPhone?: string
+  daysOverdue: number
+  chaseStage?: ChaseStageData
+  lastActivity?: ChaseActivity
 }
 
 export interface Itinerary {

@@ -3,6 +3,7 @@ import { decodeSession } from '@/lib/google-oauth-clean'
 import { getUserTokens, getUser } from '@/lib/redis-database'
 import { Redis } from '@upstash/redis'
 import { Integration } from '@/lib/types'
+import { getOrgTokens } from '@/lib/xero'
 
 const redis = Redis.fromEnv()
 
@@ -31,6 +32,9 @@ export async function GET(req: NextRequest) {
       scope?: string
     } | null
 
+    // Check Xero org-wide tokens
+    const xeroTokens = await getOrgTokens()
+
     const integrations: Integration[] = [
       {
         service: 'google',
@@ -45,6 +49,14 @@ export async function GET(req: NextRequest) {
         connected: !!canvaTokens,
         scopes: canvaTokens?.scope?.split(' ') || [],
         expires_at: canvaTokens?.expires_at ? new Date(canvaTokens.expires_at).getTime() : undefined,
+      },
+      {
+        service: 'xero',
+        connected: !!xeroTokens?.refresh_token,
+        email: xeroTokens?.connected_by,
+        connected_at: xeroTokens?.connected_at,
+        expires_at: xeroTokens?.expires_at,
+        scopes: ['accounting.transactions', 'accounting.contacts', 'accounting.settings', 'accounting.payments'],
       },
     ]
 

@@ -17,7 +17,7 @@ import {
 import type { NotificationPreferences } from "@/lib/salesforce-types"
 
 interface Integration {
-  service: "google" | "canva" | "slack"
+  service: "google" | "canva" | "slack" | "xero"
   connected: boolean
   email?: string
   scopes?: string[]
@@ -40,6 +40,10 @@ const SCOPE_LABELS: Record<string, string> = {
   "https://www.googleapis.com/auth/presentations": "Google Slides",
   "design:content:write": "Create designs",
   "asset:read": "Read assets",
+  "accounting.transactions": "Invoices & Payments",
+  "accounting.contacts": "Contacts",
+  "accounting.settings": "Settings",
+  "accounting.payments": "Payments",
 }
 
 const container = {
@@ -305,26 +309,14 @@ export default function SettingsPage() {
 }
 
 function IntegrationCard({ integration }: { integration: Integration }) {
-  const icon =
-    integration.service === "google"
-      ? "/google-icon.svg"
-      : integration.service === "canva"
-        ? "/canva-icon.svg"
-        : null
+  const configs: Record<string, { title: string; description: string }> = {
+    google: { title: "Google", description: "Drive, Slides, and authentication" },
+    canva: { title: "Canva", description: "Design creation and templates" },
+    slack: { title: "Slack", description: "Team messaging and notifications" },
+    xero: { title: "Xero", description: "Invoices, payments, and finance" },
+  }
 
-  const title =
-    integration.service === "google"
-      ? "Google"
-      : integration.service === "canva"
-        ? "Canva"
-        : "Slack"
-
-  const description =
-    integration.service === "google"
-      ? "Drive, Slides, and authentication"
-      : integration.service === "canva"
-        ? "Design creation and templates"
-        : "Team messaging and notifications"
+  const config = configs[integration.service] || { title: integration.service, description: "" }
 
   const scopeLabels = (integration.scopes || [])
     .map((s) => SCOPE_LABELS[s] || s)
@@ -336,18 +328,12 @@ function IntegrationCard({ integration }: { integration: Integration }) {
     <div className="rounded-xl border border-border bg-card p-5 space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          {icon ? (
-            <div className="size-9 rounded-lg bg-muted/50 flex items-center justify-center">
-              <ServiceIcon service={integration.service} />
-            </div>
-          ) : (
-            <div className="size-9 rounded-lg bg-muted/50 flex items-center justify-center">
-              <Unplug className="size-4 text-muted-foreground" />
-            </div>
-          )}
+          <div className="size-9 rounded-lg bg-muted/50 flex items-center justify-center">
+            <ServiceIcon service={integration.service} />
+          </div>
           <div>
-            <p className="font-medium text-sm">{title}</p>
-            <p className="text-xs text-muted-foreground">{description}</p>
+            <p className="font-medium text-sm">{config.title}</p>
+            <p className="text-xs text-muted-foreground">{config.description}</p>
           </div>
         </div>
 
@@ -357,6 +343,14 @@ function IntegrationCard({ integration }: { integration: Integration }) {
               <Check className="size-3" />
               Connected
             </span>
+          ) : integration.service === "xero" ? (
+            <a
+              href="/api/auth/xero"
+              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-[#13B5EA]/10 text-[#13B5EA] hover:bg-[#13B5EA]/20 transition-colors border border-[#13B5EA]/20"
+            >
+              <ExternalLink className="size-3" />
+              Connect Xero
+            </a>
           ) : (
             <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-muted text-muted-foreground">
               Not connected
@@ -385,7 +379,7 @@ function IntegrationCard({ integration }: { integration: Integration }) {
       {integration.connected && integration.email && (
         <div className="pt-2 border-t border-border/50">
           <p className="text-xs text-muted-foreground">
-            Signed in as{" "}
+            {integration.service === "xero" ? "Connected by" : "Signed in as"}{" "}
             <span className="text-foreground">{integration.email}</span>
           </p>
         </div>
@@ -427,6 +421,14 @@ function ServiceIcon({ service }: { service: string }) {
           strokeWidth="2"
           strokeLinecap="round"
         />
+      </svg>
+    )
+  }
+  if (service === "xero") {
+    return (
+      <svg className="size-5" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="10" fill="#13B5EA" />
+        <path d="M8 8l8 8M16 8l-8 8" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
       </svg>
     )
   }
