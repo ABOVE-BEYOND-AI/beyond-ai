@@ -118,10 +118,17 @@ const CustomIcons = {
       <path d="M16 10h.01" />
     </svg>
   ),
+  Itinerary: (props: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <circle cx="12" cy="12" r="10" />
+      <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
+    </svg>
+  ),
 };
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: CustomIcons.Dashboard, active: true },
+  { name: "Itinerary", href: "/itinerary", icon: CustomIcons.Itinerary, active: true },
   { name: "Leads", href: "/leads", icon: CustomIcons.Leads, active: true },
   { name: "Sales", href: "/sales", icon: CustomIcons.Sales, active: true },
   { name: "Pipeline", href: "/pipeline", icon: CustomIcons.Pipeline, active: true },

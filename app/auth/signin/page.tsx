@@ -45,7 +45,7 @@ export default function SignInPage() {
 
   useEffect(() => {
     if (user && !loading) {
-      router.push('/itinerary')
+      router.push('/')
     }
   }, [user, loading, router])
 
