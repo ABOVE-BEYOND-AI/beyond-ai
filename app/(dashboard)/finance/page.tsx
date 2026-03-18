@@ -234,12 +234,20 @@ export default function FinancePage() {
   }, []);
 
   useEffect(() => {
-    if (user) { fetchInvoices(hasFetchedOnce.current); fetchOverview(); fetchBankAccounts(); fetchPaymentPlans(); }
+    if (user) {
+      fetchInvoices(hasFetchedOnce.current);
+      fetchBankAccounts();
+      // Delay secondary fetches to avoid hitting Xero rate limit all at once
+      const t1 = setTimeout(() => fetchPaymentPlans(), 3000);
+      const t2 = setTimeout(() => fetchOverview(), 6000);
+      return () => { clearTimeout(t1); clearTimeout(t2); };
+    }
   }, [user, fetchInvoices, fetchOverview, fetchBankAccounts, fetchPaymentPlans]);
 
   useEffect(() => {
     if (!user) return;
-    pollRef.current = setInterval(() => { fetchInvoices(true); fetchOverview(); }, 120_000);
+    // Poll every 5 minutes (Xero has 5,000/day limit — conserve calls)
+    pollRef.current = setInterval(() => { fetchInvoices(true); }, 300_000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [user, fetchInvoices, fetchOverview]);
 

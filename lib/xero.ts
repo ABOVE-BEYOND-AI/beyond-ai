@@ -275,12 +275,18 @@ async function xeroFetch<T>(
   }
 
   if (res.status === 429) {
-    // Check remaining limits from headers
     const minRemaining = res.headers.get('X-MinLimit-Remaining')
-    console.warn(`Xero rate limit hit. MinLimit-Remaining: ${minRemaining}. Path: ${path}`)
-    // Wait 10 seconds and retry once
+    const dayRemaining = res.headers.get('X-DayLimit-Remaining')
+    console.warn(`Xero 429: MinLimit=${minRemaining}, DayLimit=${dayRemaining}. Path: ${path}`)
+
+    // If daily limit is exhausted, don't retry — it won't help
+    if (dayRemaining !== null && parseInt(dayRemaining) <= 0) {
+      throw new Error('Xero daily API limit reached (5,000/day). Data will refresh after midnight UTC.')
+    }
+
+    // Per-minute limit: wait 15s and retry once
     if (!options.retried) {
-      await new Promise(resolve => setTimeout(resolve, 10000))
+      await new Promise(resolve => setTimeout(resolve, 15000))
       return xeroFetch<T>(path, { ...options, retried: true })
     }
     throw new Error('Xero rate limit exceeded. Please wait a moment and try again.')
@@ -631,10 +637,21 @@ export async function getEnrichedOverdueInvoices(forceRefresh = false): Promise<
   }
 
   // Fetch invoices and chase stages (credit summary is cache-only to save rate limit)
-  const [invoices, chaseStages] = await Promise.all([
-    getAllOverdueInvoices(),
-    getAllChaseStages(),
-  ])
+  let invoices: XeroInvoice[]
+  try {
+    invoices = await getAllOverdueInvoices()
+  } catch (err) {
+    // If Xero fails (rate limit, etc), try to serve stale cache
+    const staleCache = await redis.get(REDIS_KEYS.invoicesCache) as EnrichedInvoice[] | null
+    if (staleCache && staleCache.length > 0) {
+      console.warn('Xero API failed, serving stale cache:', err)
+      const chaseStages = await getAllChaseStages()
+      return staleCache.map(inv => ({ ...inv, chaseStage: chaseStages[inv.InvoiceID] || undefined }))
+    }
+    throw err // No cache at all, propagate the error
+  }
+
+  const chaseStages = await getAllChaseStages()
 
   // Credit summary — only use if already cached, don't make extra API calls
   let creditSummary = new Map<string, number>()
@@ -783,42 +800,45 @@ export async function getPaymentPlanInvoices(): Promise<PaymentPlanInvoice[]> {
   const cached = await redis.get(cacheKey) as PaymentPlanInvoice[] | null
   if (cached) return cached
 
-  // Get AUTHORISED invoices with partial payments (AmountPaid > 0 AND AmountDue > 0)
-  const where = encodeURIComponent('Status=="AUTHORISED"&&AmountPaid>0&&AmountDue>0&&Type=="ACCREC"')
-  const data = await xeroFetch<{ Invoices: XeroInvoice[] }>(
-    `/Invoices?where=${where}&order=DueDate&page=1`
-  )
+  try {
+    // Get AUTHORISED invoices with partial payments (AmountPaid > 0 AND AmountDue > 0)
+    const where = encodeURIComponent('Status=="AUTHORISED"&&AmountPaid>0&&AmountDue>0&&Type=="ACCREC"')
+    const data = await xeroFetch<{ Invoices: XeroInvoice[] }>(
+      `/Invoices?where=${where}&order=DueDate&page=1`
+    )
 
-  const invoices = data.Invoices || []
+    const invoices = data.Invoices || []
 
-  // Batch fetch contact emails
-  const contactIds = [...new Set(invoices.map(inv => inv.Contact.ContactID))]
-  const contactEmails = await batchGetContactEmails(contactIds)
+    // Batch fetch contact emails
+    const contactIds = [...new Set(invoices.map(inv => inv.Contact.ContactID))]
+    const contactEmails = await batchGetContactEmails(contactIds)
 
-  const plans: PaymentPlanInvoice[] = invoices.map(inv => {
-    const contactInfo = contactEmails.get(inv.Contact.ContactID)
-    const parsedDueDate = parseXeroDate(inv.DueDate)
-    const parsedDate = parseXeroDate(inv.Date)
-    return {
-      invoiceId: inv.InvoiceID,
-      invoiceNumber: inv.InvoiceNumber,
-      contactName: inv.Contact.Name,
-      contactEmail: contactInfo?.email || '',
-      total: inv.Total,
-      amountPaid: inv.AmountPaid,
-      amountDue: inv.AmountDue,
-      percentagePaid: inv.Total > 0 ? Math.round((inv.AmountPaid / inv.Total) * 100) : 0,
-      dueDate: parsedDueDate,
-      date: parsedDate,
-      reference: inv.Reference || '',
-    }
-  })
+    const plans: PaymentPlanInvoice[] = invoices.map(inv => {
+      const contactInfo = contactEmails.get(inv.Contact.ContactID)
+      const parsedDueDate = parseXeroDate(inv.DueDate)
+      const parsedDate = parseXeroDate(inv.Date)
+      return {
+        invoiceId: inv.InvoiceID,
+        invoiceNumber: inv.InvoiceNumber,
+        contactName: inv.Contact.Name,
+        contactEmail: contactInfo?.email || '',
+        total: inv.Total,
+        amountPaid: inv.AmountPaid,
+        amountDue: inv.AmountDue,
+        percentagePaid: inv.Total > 0 ? Math.round((inv.AmountPaid / inv.Total) * 100) : 0,
+        dueDate: parsedDueDate,
+        date: parsedDate,
+        reference: inv.Reference || '',
+      }
+    })
 
-  // Sort by percentage paid ascending (least progress first)
-  plans.sort((a, b) => a.percentagePaid - b.percentagePaid)
-
-  await redis.set(cacheKey, plans, { ex: 300 }) // 5 min cache
-  return plans
+    plans.sort((a, b) => a.percentagePaid - b.percentagePaid)
+    await redis.set(cacheKey, plans, { ex: 300 })
+    return plans
+  } catch {
+    // If Xero fails, return empty rather than crashing
+    return []
+  }
 }
 
 // ── Credit Summary per Contact (for enrichment) ──
