@@ -38,7 +38,6 @@ const REDIS_KEYS = {
   bankAccounts: 'xero:bank_accounts',
   oauthState: (state: string) => `xero:oauth_state:${state}`,
   invoicesCache: 'xero:invoices_cache',
-  overviewCache: 'xero:overview_cache',
 }
 
 // ── Xero Date Parser ──
@@ -79,6 +78,10 @@ function getRedis(): Redis {
 // ── In-Memory Token Cache ──
 
 let cachedTokens: XeroOrgTokens | null = null
+
+// Mutex to prevent concurrent token refreshes (Xero rotates refresh tokens,
+// so two simultaneous refreshes will cause the second to fail)
+let refreshPromise: Promise<XeroOrgTokens> | null = null
 
 // ── OAuth Helpers ──
 
@@ -178,6 +181,22 @@ export async function disconnectXero(): Promise<void> {
 // ── Token Management ──
 
 async function refreshTokens(): Promise<XeroOrgTokens> {
+  // If a refresh is already in progress, wait for it instead of starting another
+  // This prevents race conditions where two concurrent requests both try to refresh,
+  // and the second fails because Xero already rotated the refresh token
+  if (refreshPromise) {
+    return refreshPromise
+  }
+
+  refreshPromise = doRefreshTokens()
+  try {
+    return await refreshPromise
+  } finally {
+    refreshPromise = null
+  }
+}
+
+async function doRefreshTokens(): Promise<XeroOrgTokens> {
   const redis = getRedis()
   const stored = await redis.get(REDIS_KEYS.orgTokens) as XeroOrgTokens | null
 
@@ -317,12 +336,17 @@ export async function getOverdueInvoices(page = 1): Promise<XeroInvoice[]> {
 export async function getAllOverdueInvoices(): Promise<XeroInvoice[]> {
   const allInvoices: XeroInvoice[] = []
   let page = 1
+  const MAX_PAGES = 10 // Safety limit: max 1,000 invoices (10 pages × 100 per page)
 
-  while (true) {
+  while (page <= MAX_PAGES) {
     const invoices = await getOverdueInvoices(page)
     allInvoices.push(...invoices)
     if (invoices.length < 100) break // Last page
     page++
+  }
+
+  if (page > MAX_PAGES) {
+    console.warn(`getAllOverdueInvoices hit page limit (${MAX_PAGES}). Total fetched: ${allInvoices.length}`)
   }
 
   return allInvoices
@@ -360,16 +384,6 @@ export async function getContact(contactId: string): Promise<XeroContact> {
   await redis.set(REDIS_KEYS.contactCache(contactId), contact, { ex: 3600 })
 
   return contact
-}
-
-export async function getContactsWithOverdue(): Promise<XeroContact[]> {
-  const where = encodeURIComponent('IsCustomer==true')
-  const data = await xeroFetch<{ Contacts: XeroContact[] }>(
-    `/Contacts?where=${where}&includeArchived=false`
-  )
-  return (data.Contacts || []).filter(
-    c => c.Balances?.AccountsReceivable?.Overdue && c.Balances.AccountsReceivable.Overdue > 0
-  )
 }
 
 // Batch fetch contact emails for a list of contact IDs
@@ -802,12 +816,23 @@ export async function getPaymentPlanInvoices(): Promise<PaymentPlanInvoice[]> {
 
   try {
     // Get AUTHORISED invoices with partial payments (AmountPaid > 0 AND AmountDue > 0)
+    // Paginate to get all results (max 5 pages = 500 invoices)
     const where = encodeURIComponent('Status=="AUTHORISED"&&AmountPaid>0&&AmountDue>0&&Type=="ACCREC"')
-    const data = await xeroFetch<{ Invoices: XeroInvoice[] }>(
-      `/Invoices?where=${where}&order=DueDate&page=1`
-    )
+    const allInvoices: XeroInvoice[] = []
+    let page = 1
+    const MAX_PAGES = 5
 
-    const invoices = data.Invoices || []
+    while (page <= MAX_PAGES) {
+      const data = await xeroFetch<{ Invoices: XeroInvoice[] }>(
+        `/Invoices?where=${where}&order=DueDate&page=${page}`
+      )
+      const pageInvoices = data.Invoices || []
+      allInvoices.push(...pageInvoices)
+      if (pageInvoices.length < 100) break
+      page++
+    }
+
+    const invoices = allInvoices
 
     // Batch fetch contact emails
     const contactIds = [...new Set(invoices.map(inv => inv.Contact.ContactID))]

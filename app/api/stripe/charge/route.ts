@@ -33,11 +33,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Amount must be positive' }, { status: 400 })
     }
 
+    if (amount > 100000) {
+      return NextResponse.json({ error: 'Amount exceeds maximum (£100,000)' }, { status: 400 })
+    }
+
     const session = decodeSession(request.cookies.get('beyond_ai_session')?.value || '')
     const userEmail = session?.user?.email || 'unknown'
 
     // Convert pounds to pence
     const amountPence = Math.round(amount * 100)
+
+    // Deterministic idempotency key: same invoice + amount + payment method = same key
+    // Prevents double-charges from double-clicks or retries
+    // Changes if amount or card is different (legitimate new attempt)
+    const idempotencyKey = `charge-${invoiceId}-${amountPence}-${paymentMethodId}`
 
     // Charge the card via Stripe
     const result = await chargeCustomerCard({
@@ -47,7 +56,7 @@ export async function POST(request: NextRequest) {
       currency: 'gbp',
       description: `Invoice ${invoiceNumber} - ${contactName}`,
       invoiceReference: invoiceNumber,
-      idempotencyKey: `charge-${invoiceId}-${Date.now()}`,
+      idempotencyKey,
     })
 
     if (!result.success) {

@@ -24,6 +24,19 @@ export async function POST(
       return NextResponse.json({ error: 'Missing required fields: invoiceId, amount, date' }, { status: 400 })
     }
 
+    if (amount <= 0) {
+      return NextResponse.json({ error: 'Amount must be positive' }, { status: 400 })
+    }
+
+    if (amount > 1000000) {
+      return NextResponse.json({ error: 'Amount exceeds maximum' }, { status: 400 })
+    }
+
+    // Validate date format (YYYY-MM-DD)
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return NextResponse.json({ error: 'Invalid date format. Use YYYY-MM-DD' }, { status: 400 })
+    }
+
     const session = decodeSession(request.cookies.get('beyond_ai_session')?.value || '')
     const userEmail = session?.user?.email || 'unknown'
 

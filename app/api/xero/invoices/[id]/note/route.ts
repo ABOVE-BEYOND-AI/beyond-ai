@@ -20,15 +20,22 @@ export async function POST(
       return NextResponse.json({ error: 'Note text required' }, { status: 400 })
     }
 
+    const MAX_NOTE_LENGTH = 1000
+    const sanitizedNote = note.trim().slice(0, MAX_NOTE_LENGTH)
+
+    if (sanitizedNote.length === 0) {
+      return NextResponse.json({ error: 'Note text required' }, { status: 400 })
+    }
+
     const session = decodeSession(request.cookies.get('beyond_ai_session')?.value || '')
     const userEmail = session?.user?.email || 'unknown'
 
     // Add to both Xero History and local Redis activity log
     await Promise.all([
-      addInvoiceNote(id, note.trim()),
+      addInvoiceNote(id, sanitizedNote),
       addChaseActivity(id, {
         action: 'note',
-        detail: note.trim(),
+        detail: sanitizedNote,
         user: userEmail,
       }),
     ])
