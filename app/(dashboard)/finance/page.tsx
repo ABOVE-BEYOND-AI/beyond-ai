@@ -35,10 +35,10 @@ import type {
 // ── Severity Tiers ──
 
 const SEVERITY_TIERS = [
-  { min: 1, max: 30, key: "warning", label: "1-30d", borderColor: "border-l-amber-500", badgeBg: "bg-amber-500/15", badgeText: "text-amber-400", rowTint: "bg-amber-500/[0.03]", barColor: "bg-amber-500" },
-  { min: 31, max: 90, key: "escalation", label: "31-90d", borderColor: "border-l-orange-500", badgeBg: "bg-orange-500/15", badgeText: "text-orange-400", rowTint: "bg-orange-500/[0.04]", barColor: "bg-orange-500" },
-  { min: 91, max: 365, key: "critical", label: "91d-1yr", borderColor: "border-l-red-500", badgeBg: "bg-red-500/15", badgeText: "text-red-400", rowTint: "bg-red-500/[0.05]", barColor: "bg-red-500" },
-  { min: 366, max: Infinity, key: "writeoff", label: "1yr+", borderColor: "border-l-red-900", badgeBg: "bg-red-900/25", badgeText: "text-red-300", rowTint: "bg-red-900/[0.06]", barColor: "bg-red-800" },
+  { min: 1, max: 30, key: "warning", label: "1-30d", borderColor: "border-l-amber-500", badgeBg: "bg-amber-100 dark:bg-amber-500/15", badgeText: "text-amber-700 dark:text-amber-400", rowTint: "bg-amber-50/50 dark:bg-amber-500/[0.03]", barColor: "bg-amber-500" },
+  { min: 31, max: 90, key: "escalation", label: "31-90d", borderColor: "border-l-orange-500", badgeBg: "bg-orange-100 dark:bg-orange-500/15", badgeText: "text-orange-700 dark:text-orange-400", rowTint: "bg-orange-50/50 dark:bg-orange-500/[0.04]", barColor: "bg-orange-500" },
+  { min: 91, max: 365, key: "critical", label: "91d-1yr", borderColor: "border-l-red-500", badgeBg: "bg-red-100 dark:bg-red-500/15", badgeText: "text-red-700 dark:text-red-400", rowTint: "bg-red-50/50 dark:bg-red-500/[0.05]", barColor: "bg-red-500" },
+  { min: 366, max: Infinity, key: "writeoff", label: "1yr+", borderColor: "border-l-red-800 dark:border-l-red-900", badgeBg: "bg-red-200 dark:bg-red-900/25", badgeText: "text-red-900 dark:text-red-300", rowTint: "bg-red-100/50 dark:bg-red-900/[0.06]", barColor: "bg-red-800" },
 ] as const;
 
 function getSeverityTier(daysOverdue: number) {
@@ -48,14 +48,14 @@ function getSeverityTier(daysOverdue: number) {
 // ── Chase Stage Config ──
 
 const CHASE_STAGES: ChaseStageConfig[] = [
-  { key: "1-3_days_xero_reminder", label: "1-3 days Xero Reminder", color: "bg-green-500/15", textColor: "text-green-400", description: "Automated Xero reminder sent" },
-  { key: "3-5_days_finance_email", label: "3-5 days Finance Email", color: "bg-blue-500/15", textColor: "text-blue-400", description: "Finance team sends manual email" },
-  { key: "8_days_process_email", label: "8 days Process + Email", color: "bg-orange-500/15", textColor: "text-orange-400", description: "Attempt to take payment + email" },
-  { key: "10_days_process_email", label: "10 days Process + Email", color: "bg-purple-500/15", textColor: "text-purple-400", description: "Second attempt to process + email" },
-  { key: "daily_chaser", label: "Daily Chaser", color: "bg-amber-500/15", textColor: "text-amber-400", description: "Daily follow-up" },
-  { key: "final_warning", label: "Final Warning", color: "bg-red-500/15", textColor: "text-red-400", description: "Last warning before cancellation" },
-  { key: "cancellation_terms", label: "Cancellation Terms", color: "bg-red-500/20", textColor: "text-red-300", description: "Cancellation terms issued" },
-  { key: "bolt_on", label: "BOLT ON", color: "bg-emerald-500/15", textColor: "text-emerald-400", description: "Bolt-on / resolved" },
+  { key: "1-3_days_xero_reminder", label: "1-3 days Xero Reminder", color: "bg-green-100 dark:bg-green-500/15", textColor: "text-green-700 dark:text-green-400", description: "Automated Xero reminder sent" },
+  { key: "3-5_days_finance_email", label: "3-5 days Finance Email", color: "bg-blue-100 dark:bg-blue-500/15", textColor: "text-blue-700 dark:text-blue-400", description: "Finance team sends manual email" },
+  { key: "8_days_process_email", label: "8 days Process + Email", color: "bg-orange-100 dark:bg-orange-500/15", textColor: "text-orange-700 dark:text-orange-400", description: "Attempt to take payment + email" },
+  { key: "10_days_process_email", label: "10 days Process + Email", color: "bg-purple-100 dark:bg-purple-500/15", textColor: "text-purple-700 dark:text-purple-400", description: "Second attempt to process + email" },
+  { key: "daily_chaser", label: "Daily Chaser", color: "bg-amber-100 dark:bg-amber-500/15", textColor: "text-amber-700 dark:text-amber-400", description: "Daily follow-up" },
+  { key: "final_warning", label: "Final Warning", color: "bg-red-100 dark:bg-red-500/15", textColor: "text-red-700 dark:text-red-400", description: "Last warning before cancellation" },
+  { key: "cancellation_terms", label: "Cancellation Terms", color: "bg-red-200 dark:bg-red-500/20", textColor: "text-red-800 dark:text-red-300", description: "Cancellation terms issued" },
+  { key: "bolt_on", label: "BOLT ON", color: "bg-emerald-100 dark:bg-emerald-500/15", textColor: "text-emerald-700 dark:text-emerald-400", description: "Bolt-on / resolved" },
 ];
 
 const getStageConfig = (key: string): ChaseStageConfig | undefined =>
@@ -385,15 +385,17 @@ export default function FinancePage() {
               {/* ── OVERDUE QUEUE ── */}
               {activeTab === "overdue" && (
                 <div className="space-y-4">
-                  {/* Stat Cards */}
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                    <StatCard label="Total Overdue" value={formatCurrency(totalOverdueAmount)} subText={`${invoices.length} invoice${invoices.length !== 1 ? "s" : ""}`} color="text-red-400" />
-                    <StatCard label="Avg Days Overdue" value={`${avgDaysOverdue}d`} subText={`Median: ${medianDaysOverdue}d`} color="text-foreground" />
-                    <StatCard label="Unassigned" value={String(unassignedCount)} subText={`of ${invoices.length} total`} color={unassignedCount > 0 ? "text-amber-400" : "text-foreground"} />
-                    <StatCard label="30+ Days Overdue" value={String(over30Count)}
-                      color={over30Count > 0 ? "text-red-400" : "text-foreground"}
-                      subText={over30Count === 0 ? "All clear" : formatCurrency(invoices.filter(i => i.daysOverdue > 30).reduce((s, i) => s + i.AmountDue, 0))}
-                      subColor={over30Count === 0 ? "text-emerald-500" : undefined} />
+                  {/* Summary Panel */}
+                  <div className="rounded-2xl bg-card border border-border overflow-hidden">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-border/50">
+                      <StatCell label="Total Overdue" value={formatCurrency(totalOverdueAmount)} subText={`${invoices.length} invoice${invoices.length !== 1 ? "s" : ""}`} color="text-red-600 dark:text-red-400" />
+                      <StatCell label="Avg Days Overdue" value={`${avgDaysOverdue}d`} subText={`Median: ${medianDaysOverdue}d`} color="text-foreground" />
+                      <StatCell label="Unassigned" value={String(unassignedCount)} subText={`of ${invoices.length} total`} color={unassignedCount > 0 ? "text-amber-600 dark:text-amber-400" : "text-foreground"} />
+                      <StatCell label="30+ Days Overdue" value={String(over30Count)}
+                        color={over30Count > 0 ? "text-red-600 dark:text-red-400" : "text-foreground"}
+                        subText={over30Count === 0 ? "All clear" : formatCurrency(invoices.filter(i => i.daysOverdue > 30).reduce((s, i) => s + i.AmountDue, 0))}
+                        subColor={over30Count === 0 ? "text-emerald-600 dark:text-emerald-500" : undefined} />
+                    </div>
                   </div>
 
                   {/* Aging Bar */}
@@ -488,7 +490,19 @@ export default function FinancePage() {
   );
 }
 
-// ── Stat Card ──
+// ── Stat Cell (inside unified panel) ──
+
+function StatCell({ label, value, subText, color, subColor }: { label: string; value: string; subText?: string; color: string; subColor?: string }) {
+  return (
+    <div className="px-5 py-4 first:pl-6 last:pr-6">
+      <p className="text-[11px] font-medium text-muted-foreground/70 tracking-wide mb-1.5">{label}</p>
+      <p className={`text-[22px] font-bold tabular-nums leading-none ${color}`}>{value}</p>
+      {subText && <p className={`text-[11px] mt-1.5 ${subColor || "text-muted-foreground/60"}`}>{subText}</p>}
+    </div>
+  );
+}
+
+// ── Stat Card (for overview tab) ──
 
 function StatCard({ label, value, subText, color, subColor }: { label: string; value: string; subText?: string; color: string; subColor?: string }) {
   return (
@@ -578,7 +592,7 @@ function InvoiceRow({ invoice, isExpanded, onToggle, copiedEmail, onCopyEmail, s
 
         {/* Amount */}
         <div className="text-right shrink-0 w-24 ml-auto">
-          <p className="text-[13px] font-bold tabular-nums text-red-400">{formatCurrencyPrecise(invoice.AmountDue)}</p>
+          <p className="text-[13px] font-bold tabular-nums text-red-600 dark:text-red-400">{formatCurrencyPrecise(invoice.AmountDue)}</p>
           {invoice.Total > invoice.AmountDue && <p className="text-[10px] text-muted-foreground/50">of {formatCurrency(invoice.Total)}</p>}
         </div>
 
@@ -598,83 +612,86 @@ function InvoiceRow({ invoice, isExpanded, onToggle, copiedEmail, onCopyEmail, s
       <AnimatePresence>
         {isExpanded && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
-            <div className="px-4 pb-4 pt-3 border-t border-border/30 space-y-3">
-              {/* Action Bar */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <button onClick={() => setShowSendConfirm(invoice.InvoiceID)} disabled={sendingEmail === invoice.InvoiceID || !invoice.contactEmail}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-40">
-                  {sendingEmail === invoice.InvoiceID ? <Spinner className="size-3.5 animate-spin" /> : <PaperPlaneTilt className="size-3.5" />} Send Reminder
-                </button>
-                <button onClick={() => onOpenPayment(invoice.InvoiceID, invoice.AmountDue)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-card border border-border hover:bg-accent transition-colors">
-                  <CurrencyGbp className="size-3.5" /> Record Payment
-                </button>
-                <button onClick={() => onCopyEmail(invoice.contactEmail, invoice.InvoiceID)} disabled={!invoice.contactEmail}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30">
-                  <CopySimple className="size-3.5" /> Copy Email
-                </button>
-
-                {/* Stage */}
-                {stage && <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${stage.color} ${stage.textColor}`}><Tag className="size-3" />{stage.label}</span>}
-
-                <div className="relative ml-auto">
-                  <select value={invoice.chaseStage?.stage || ""} onChange={e => { if (e.target.value) onStageChange(invoice.InvoiceID, e.target.value as ChaseStageKey); }} disabled={changingStage === invoice.InvoiceID}
-                    className="pl-7 pr-6 py-1.5 text-xs font-medium rounded-lg bg-card border border-border appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50">
-                    <option value="">Set Stage...</option>
-                    {CHASE_STAGES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-                  </select>
-                  <Tag className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground/50" />
-                </div>
-              </div>
-
-              {/* Two Column Layout */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {/* Left: Details + Note */}
-                <div className="space-y-2">
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-                    <CompactDetail label="Invoice Date" value={formatDate(invoice.Date)} />
-                    <CompactDetail label="Due Date" value={formatDate(invoice.DueDate)} />
-                    <CompactDetail label="Reference" value={invoice.Reference || "—"} />
-                    <CompactDetail label="Days Overdue" value={`${invoice.daysOverdue} days`} />
-                    <CompactDetail label="Total" value={formatCurrencyPrecise(invoice.Total)} />
-                    <CompactDetail label="Paid" value={formatCurrencyPrecise(invoice.AmountPaid)} />
+            <div className="px-5 pb-5 pt-4 border-t border-border/30 space-y-4">
+              {/* Details + Activity (two column) */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                {/* Left: Invoice Details */}
+                <div className="space-y-3">
+                  <div className="rounded-lg bg-muted/30 dark:bg-muted/20 p-3.5">
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-2.5">
+                      <CompactDetail label="Invoice Date" value={formatDate(invoice.Date)} />
+                      <CompactDetail label="Due Date" value={formatDate(invoice.DueDate)} />
+                      <CompactDetail label="Reference" value={invoice.Reference || "—"} />
+                      <CompactDetail label="Days Overdue" value={`${invoice.daysOverdue} days`} highlight={invoice.daysOverdue > 90} />
+                      <CompactDetail label="Total" value={formatCurrencyPrecise(invoice.Total)} />
+                      <CompactDetail label="Paid" value={formatCurrencyPrecise(invoice.AmountPaid)} />
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 pt-1">
+
+                  {/* Note Input */}
+                  <div className="flex items-center gap-2">
                     <div className="relative flex-1">
-                      <ChatText className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground/40" />
+                      <ChatText className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground/40" />
                       <input type="text" value={noteText} onChange={e => onNoteTextChange(e.target.value)} placeholder="Add a note..."
-                        className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-background border border-border text-xs placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/20"
+                        className="w-full pl-9 pr-3 py-2 rounded-lg bg-background border border-border text-sm placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/20"
                         onKeyDown={e => { if (e.key === "Enter" && noteText.trim()) onAddNote(invoice.InvoiceID); }} />
                     </div>
                     <button onClick={() => onAddNote(invoice.InvoiceID)} disabled={!noteText.trim() || addingNote === invoice.InvoiceID}
-                      className="px-2.5 py-1.5 text-xs font-medium rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors disabled:opacity-30">
+                      className="px-3 py-2 text-xs font-medium rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors disabled:opacity-30">
                       {addingNote === invoice.InvoiceID ? <Spinner className="size-3.5 animate-spin" /> : "Add"}
                     </button>
                   </div>
                 </div>
 
-                {/* Right: Activity */}
+                {/* Right: Activity Timeline */}
                 <div>
                   {loadingActivities ? (
-                    <div className="flex items-center gap-2 py-4 text-muted-foreground/40"><Spinner className="size-3.5 animate-spin" /><span className="text-xs">Loading...</span></div>
+                    <div className="flex items-center gap-2 py-6 text-muted-foreground/40"><Spinner className="size-3.5 animate-spin" /><span className="text-sm">Loading...</span></div>
                   ) : activities.length === 0 ? (
-                    <div className="flex items-center gap-2 py-3 text-muted-foreground/40">
-                      <Clock className="size-3.5" /><span className="text-xs">No chase activity — send first reminder</span>
+                    <div className="flex items-center gap-2.5 py-5 px-3 rounded-lg bg-muted/20 text-muted-foreground/50">
+                      <Clock className="size-4 shrink-0" /><span className="text-sm">No chase activity — send first reminder</span>
                     </div>
                   ) : (
-                    <div className="space-y-1 max-h-40 overflow-y-auto scrollbar-hide">
-                      <p className="text-[11px] font-medium text-muted-foreground mb-1">{activities.length} activit{activities.length !== 1 ? "ies" : "y"}</p>
+                    <div className="space-y-1.5 max-h-44 overflow-y-auto scrollbar-hide">
+                      <p className="text-[11px] font-medium text-muted-foreground/60 mb-2">{activities.length} activit{activities.length !== 1 ? "ies" : "y"}</p>
                       {activities.map(act => (
-                        <div key={act.id} className="flex items-start gap-2 text-xs py-1 border-l-2 border-border/50 pl-2.5">
+                        <div key={act.id} className="flex items-start gap-2.5 py-1.5 border-l-2 border-border/40 pl-3">
                           <ActivityIcon action={act.action} />
                           <div className="flex-1 min-w-0">
-                            <p className="text-foreground/80 text-[11px] leading-snug">{act.detail}</p>
-                            <p className="text-muted-foreground/40 text-[10px]">{act.user} · {formatTimestamp(act.timestamp)}</p>
+                            <p className="text-foreground/80 text-[12px] leading-snug">{act.detail}</p>
+                            <p className="text-muted-foreground/40 text-[11px] mt-0.5">{act.user} · {formatTimestamp(act.timestamp)}</p>
                           </div>
                         </div>
                       ))}
                     </div>
                   )}
+                </div>
+              </div>
+
+              {/* Action Bar (below details) */}
+              <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-border/20">
+                <button onClick={() => setShowSendConfirm(invoice.InvoiceID)} disabled={sendingEmail === invoice.InvoiceID || !invoice.contactEmail}
+                  className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-40">
+                  {sendingEmail === invoice.InvoiceID ? <Spinner className="size-3.5 animate-spin" /> : <PaperPlaneTilt className="size-3.5" />} Send Reminder
+                </button>
+                <button onClick={() => onOpenPayment(invoice.InvoiceID, invoice.AmountDue)}
+                  className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg bg-card border border-border hover:bg-accent transition-colors">
+                  <CurrencyGbp className="size-3.5" /> Record Payment
+                </button>
+                <button onClick={() => onCopyEmail(invoice.contactEmail, invoice.InvoiceID)} disabled={!invoice.contactEmail}
+                  className="flex items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30">
+                  <CopySimple className="size-3.5" /> Copy Email
+                </button>
+
+                {stage && <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold ${stage.color} ${stage.textColor}`}><Tag className="size-3" />{stage.label}</span>}
+
+                <div className="relative ml-auto">
+                  <select value={invoice.chaseStage?.stage || ""} onChange={e => { if (e.target.value) onStageChange(invoice.InvoiceID, e.target.value as ChaseStageKey); }} disabled={changingStage === invoice.InvoiceID}
+                    className="pl-7 pr-6 py-2 text-xs font-medium rounded-lg bg-card border border-border appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50">
+                    <option value="">Set Stage...</option>
+                    {CHASE_STAGES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                  </select>
+                  <Tag className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground/50" />
                 </div>
               </div>
             </div>
@@ -687,11 +704,11 @@ function InvoiceRow({ invoice, isExpanded, onToggle, copiedEmail, onCopyEmail, s
 
 // ── Compact Detail ──
 
-function CompactDetail({ label, value }: { label: string; value: string }) {
+function CompactDetail({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
     <div className="flex items-baseline justify-between gap-2">
-      <span className="text-[11px] text-muted-foreground/60">{label}</span>
-      <span className="text-[12px] font-medium text-foreground tabular-nums">{value}</span>
+      <span className="text-[12px] text-muted-foreground/60">{label}</span>
+      <span className={`text-[13px] font-medium tabular-nums ${highlight ? "text-red-400" : "text-foreground"}`}>{value}</span>
     </div>
   );
 }
