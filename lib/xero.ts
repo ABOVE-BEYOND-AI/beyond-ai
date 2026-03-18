@@ -275,6 +275,14 @@ async function xeroFetch<T>(
   }
 
   if (res.status === 429) {
+    // Check remaining limits from headers
+    const minRemaining = res.headers.get('X-MinLimit-Remaining')
+    console.warn(`Xero rate limit hit. MinLimit-Remaining: ${minRemaining}. Path: ${path}`)
+    // Wait 10 seconds and retry once
+    if (!options.retried) {
+      await new Promise(resolve => setTimeout(resolve, 10000))
+      return xeroFetch<T>(path, { ...options, retried: true })
+    }
     throw new Error('Xero rate limit exceeded. Please wait a moment and try again.')
   }
 
@@ -622,12 +630,19 @@ export async function getEnrichedOverdueInvoices(forceRefresh = false): Promise<
     }
   }
 
-  // Fetch invoices, chase stages, and credit summary in parallel
-  const [invoices, chaseStages, creditSummary] = await Promise.all([
+  // Fetch invoices and chase stages (credit summary is cache-only to save rate limit)
+  const [invoices, chaseStages] = await Promise.all([
     getAllOverdueInvoices(),
     getAllChaseStages(),
-    getCreditSummaryByContact().catch(() => new Map<string, number>()),
   ])
+
+  // Credit summary — only use if already cached, don't make extra API calls
+  let creditSummary = new Map<string, number>()
+  try {
+    const redis2 = getRedis()
+    const cachedCredits = await redis2.get('xero:credit_summary_cache') as Record<string, number> | null
+    if (cachedCredits) creditSummary = new Map(Object.entries(cachedCredits))
+  } catch { /* ignore */ }
 
   // Collect unique contact IDs
   const contactIds = [...new Set(invoices.map(inv => inv.Contact.ContactID))]
@@ -672,8 +687,8 @@ export async function getEnrichedOverdueInvoices(forceRefresh = false): Promise<
   // Sort by days overdue (most overdue first)
   enriched.sort((a, b) => b.daysOverdue - a.daysOverdue)
 
-  // Cache for 3 minutes to avoid rate limiting
-  await redis.set(REDIS_KEYS.invoicesCache, enriched, { ex: 180 })
+  // Cache for 5 minutes to avoid rate limiting (60 calls/min Xero limit)
+  await redis.set(REDIS_KEYS.invoicesCache, enriched, { ex: 300 })
 
   return enriched
 }
@@ -824,9 +839,14 @@ export async function getCreditSummaryByContact(): Promise<Map<string, number>> 
     summary.set(contactId, existing + cn.RemainingCredit)
   }
 
-  // Cache for 5 minutes
-  await redis.set(cacheKey, Object.fromEntries(summary), { ex: 300 })
+  // Cache for 10 minutes (longer to reduce API calls)
+  await redis.set(cacheKey, Object.fromEntries(summary), { ex: 600 })
   return summary
+}
+
+// Warm the credit cache in background — called from a separate endpoint, not on every page load
+export async function warmCreditCache(): Promise<void> {
+  await getCreditSummaryByContact()
 }
 
 // ── Connection Check ──
