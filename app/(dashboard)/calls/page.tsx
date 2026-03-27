@@ -979,11 +979,107 @@ function DigestCopyButton({ digest, eventRecap }: { digest: DailyDigest; eventRe
 
 // ── Gap Rep Row (Dial Pace leaderboard) ──
 
-function GapRepRow({
+// ── Pace Ring Chart (SVG Donut) ──
+
+function PaceRingChart({
+  reps,
+  teamAvg,
+}: {
+  reps: { avg_gap_seconds: number; gap_count: number }[];
+  teamAvg: number;
+}) {
+  const RADIUS = 76;
+  const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+
+  const buckets = [
+    { label: "< 2min", min: 0, max: 120, count: 0, color: "#10b981" },
+    { label: "2–5min", min: 120, max: 300, count: 0, color: "#f59e0b" },
+    { label: "> 5min", min: 300, max: Infinity, count: 0, color: "#ef4444" },
+  ];
+
+  const activeReps = reps.filter((r) => r.gap_count > 0);
+  for (const rep of activeReps) {
+    for (const bucket of buckets) {
+      if (rep.avg_gap_seconds >= bucket.min && rep.avg_gap_seconds < bucket.max) {
+        bucket.count++;
+        break;
+      }
+    }
+  }
+
+  const total = activeReps.length || 1;
+  let cumulativeOffset = 0;
+
+  return (
+    <div className="flex flex-col items-center">
+      <div className="relative">
+        <svg viewBox="0 0 200 200" className="w-44 h-44 -rotate-90">
+          <circle cx="100" cy="100" r={RADIUS} fill="none" stroke="hsl(var(--muted))" strokeWidth="22" strokeOpacity="0.2" />
+          {buckets.map((bucket) => {
+            const fraction = bucket.count / total;
+            const dashLength = fraction * CIRCUMFERENCE;
+            const gapLength = CIRCUMFERENCE - dashLength;
+            const offset = -cumulativeOffset;
+            cumulativeOffset += dashLength;
+            if (bucket.count === 0) return null;
+            return (
+              <motion.circle
+                key={bucket.label}
+                cx="100" cy="100" r={RADIUS}
+                fill="none"
+                stroke={bucket.color}
+                strokeWidth="22"
+                strokeLinecap="butt"
+                strokeDasharray={`${dashLength} ${gapLength}`}
+                strokeDashoffset={offset}
+                initial={{ strokeDasharray: `0 ${CIRCUMFERENCE}` }}
+                animate={{ strokeDasharray: `${dashLength} ${gapLength}` }}
+                transition={{ duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94] }}
+              />
+            );
+          })}
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <p className={`text-xl font-bold tabular-nums ${gapColorClass(teamAvg)}`}>
+            {formatGapShort(teamAvg)}
+          </p>
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider mt-0.5">Team Avg</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-4 mt-3">
+        {buckets.map((b) => (
+          <div key={b.label} className="flex items-center gap-1.5">
+            <span className="size-2 rounded-full" style={{ backgroundColor: b.color }} />
+            <span className="text-[11px] text-muted-foreground">
+              {b.label} <span className="font-semibold text-foreground">{b.count}</span>
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Inline Metric Chip ──
+
+function MetricChip({ label, value, colorClass }: { label: string; value: string; colorClass?: string }) {
+  return (
+    <div className="flex items-baseline gap-2">
+      <span className={`text-base font-bold tabular-nums ${colorClass || "text-foreground"}`}>{value}</span>
+      <span className="text-[11px] text-muted-foreground uppercase tracking-wider">{label}</span>
+    </div>
+  );
+}
+
+// ── Accordion Rep Row (Leaderboard + inline drill-down) ──
+
+function GapRepRowAccordion({
   rep,
   index,
-  isSelected,
-  onClick,
+  isExpanded,
+  onToggle,
+  gapDetail,
+  gapDetailLoading,
 }: {
   rep: {
     aircall_user_id: number;
@@ -991,6 +1087,7 @@ function GapRepRow({
     current_idle_seconds: number;
     avg_gap_seconds: number;
     max_gap_seconds: number;
+    min_gap_seconds: number;
     gap_count: number;
     gaps_over_5min: number;
     total_calls: number;
@@ -998,10 +1095,14 @@ function GapRepRow({
     last_call_ended_at: number;
   };
   index: number;
-  isSelected: boolean;
-  onClick: () => void;
+  isExpanded: boolean;
+  onToggle: () => void;
+  gapDetail: {
+    gaps: { previous_call_ended_at: number; current_call_started_at: number; gap_seconds: number }[];
+    summary: { avg_gap_seconds: number; max_gap_seconds: number; min_gap_seconds: number } | null;
+  } | null;
+  gapDetailLoading: boolean;
 }) {
-  // Live idle counter — ticks up locally between API polls
   const [liveIdle, setLiveIdle] = useState(rep.current_idle_seconds);
 
   useEffect(() => {
@@ -1010,121 +1111,142 @@ function GapRepRow({
 
   useEffect(() => {
     if (rep.last_call_ended_at === 0 || liveIdle === 0) return;
-    const interval = setInterval(() => {
-      setLiveIdle((prev) => prev + 1);
-    }, 1000);
+    const interval = setInterval(() => setLiveIdle((prev) => prev + 1), 1000);
     return () => clearInterval(interval);
-    // Only restart interval when the server value changes (every 30s poll), not on every tick
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rep.last_call_ended_at]);
 
   const showIdle = liveIdle > 0 && liveIdle < 3600;
 
   return (
-    <motion.button
-      initial={{ opacity: 0, x: -12 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: index * 0.04 }}
-      onClick={onClick}
-      className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors text-left ${
-        isSelected ? "bg-primary/[0.08] border border-primary/20" : "hover:bg-foreground/[0.03]"
-      }`}
-    >
-      <div
-        className={`size-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${
-          index === 0
-            ? "bg-gradient-to-br from-yellow-300 to-yellow-500 text-yellow-900 shadow-lg shadow-yellow-500/20"
-            : index === 1
-              ? "bg-gradient-to-br from-gray-200 to-gray-400 text-gray-700"
-              : index === 2
-                ? "bg-gradient-to-br from-amber-500 to-amber-700 text-amber-100"
-                : "bg-muted/60 text-muted-foreground"
+    <div>
+      <button
+        onClick={onToggle}
+        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors text-left ${
+          isExpanded ? "bg-white/[0.06]" : "hover:bg-foreground/[0.03]"
         }`}
       >
-        {index + 1}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <p className="text-sm font-semibold truncate">{rep.rep_name}</p>
-          {showIdle && (
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium tabular-nums ${gapBgClass(liveIdle)}`}>
-              Idle: {formatGapShort(liveIdle)}
-            </span>
-          )}
+        <div className={`size-6 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${
+          index === 0 ? "bg-gradient-to-br from-yellow-300 to-yellow-500 text-yellow-900"
+          : index === 1 ? "bg-gradient-to-br from-gray-200 to-gray-400 text-gray-700"
+          : index === 2 ? "bg-gradient-to-br from-amber-500 to-amber-700 text-amber-100"
+          : "bg-muted/60 text-muted-foreground"
+        }`}>
+          {index + 1}
         </div>
-        <div className="flex items-center gap-3 mt-0.5">
-          <span className="text-xs text-muted-foreground/60 tabular-nums">
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold truncate leading-tight">{rep.rep_name}</p>
+          <p className="text-[10px] text-muted-foreground/60 tabular-nums">
             {rep.total_calls} calls · {rep.gap_count} gaps
-          </span>
-          {rep.gaps_over_5min > 0 && (
-            <span className="text-[10px] text-red-500 font-medium">
-              {rep.gaps_over_5min} over 5m
-            </span>
-          )}
+            {rep.gaps_over_5min > 0 && <span className="text-red-500 ml-1">{rep.gaps_over_5min} over 5m</span>}
+          </p>
         </div>
-      </div>
-      <div className="text-right shrink-0">
-        <p className={`text-sm font-bold tabular-nums ${rep.gap_count > 0 ? gapColorClass(rep.avg_gap_seconds) : "text-muted-foreground"}`}>
-          {rep.gap_count > 0 ? formatGapShort(rep.avg_gap_seconds) : "—"}
-        </p>
-        <p className="text-[10px] text-muted-foreground/50">avg gap</p>
-      </div>
-    </motion.button>
+        {showIdle && (
+          <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium tabular-nums ${gapBgClass(liveIdle)}`}>
+            {formatGapShort(liveIdle)}
+          </span>
+        )}
+        <div className="text-right shrink-0 w-14">
+          <p className={`text-sm font-bold tabular-nums ${rep.gap_count > 0 ? gapColorClass(rep.avg_gap_seconds) : "text-muted-foreground"}`}>
+            {rep.gap_count > 0 ? formatGapShort(rep.avg_gap_seconds) : "—"}
+          </p>
+        </div>
+        <CaretDown className={`size-3.5 text-muted-foreground/40 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+      </button>
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] }}
+            className="overflow-hidden"
+          >
+            <div className="px-3 pb-3 pt-1 ml-8 border-l border-border/30">
+              {gapDetailLoading ? (
+                <div className="py-3 flex justify-center">
+                  <SpinnerGap className="size-4 text-primary animate-spin" />
+                </div>
+              ) : gapDetail && gapDetail.gaps.length > 0 ? (
+                <>
+                  {gapDetail.summary && (
+                    <div className="flex items-center gap-4 mb-2 py-1.5">
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-[10px] text-muted-foreground">Avg</span>
+                        <span className={`text-xs font-bold tabular-nums ${gapColorClass(gapDetail.summary.avg_gap_seconds)}`}>{formatGapShort(gapDetail.summary.avg_gap_seconds)}</span>
+                      </div>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-[10px] text-muted-foreground">Max</span>
+                        <span className="text-xs font-bold tabular-nums text-red-500">{formatGapShort(gapDetail.summary.max_gap_seconds)}</span>
+                      </div>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-[10px] text-muted-foreground">Min</span>
+                        <span className="text-xs font-bold tabular-nums text-emerald-500">{formatGapShort(gapDetail.summary.min_gap_seconds)}</span>
+                      </div>
+                    </div>
+                  )}
+                  <div className="space-y-0.5">
+                    {gapDetail.gaps.map((gap, i) => (
+                      <div key={i} className="flex items-center gap-2 py-0.5 text-xs">
+                        <div className={`size-1.5 rounded-full shrink-0 ${
+                          gap.gap_seconds <= 120 ? "bg-emerald-500" : gap.gap_seconds <= 300 ? "bg-amber-500" : "bg-red-500"
+                        }`} />
+                        <span className="text-muted-foreground/60 tabular-nums">
+                          {formatTime(gap.previous_call_ended_at)} → {formatTime(gap.current_call_started_at)}
+                        </span>
+                        <span className={`font-bold tabular-nums ml-auto ${gapColorClass(gap.gap_seconds)}`}>
+                          {formatGapShort(gap.gap_seconds)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <p className="text-xs text-muted-foreground py-2">No gaps recorded</p>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
-// ── Gap Distribution Chart ──
+// ── Live Rep Status Row ──
 
-function GapDistributionChart({ reps }: { reps: { avg_gap_seconds: number; gap_count: number; total_idle_time: number; aircall_user_id: number }[] }) {
-  // Collect all avg gaps and bucket them
-  const buckets = [
-    { label: "0–30s", min: 0, max: 30, count: 0, color: "bg-emerald-500/70" },
-    { label: "30s–1m", min: 30, max: 60, count: 0, color: "bg-emerald-500/50" },
-    { label: "1–2m", min: 60, max: 120, count: 0, color: "bg-emerald-500/30" },
-    { label: "2–5m", min: 120, max: 300, count: 0, color: "bg-amber-500/50" },
-    { label: "5–10m", min: 300, max: 600, count: 0, color: "bg-red-500/40" },
-    { label: "10m+", min: 600, max: Infinity, count: 0, color: "bg-red-500/60" },
-  ];
+function LiveRepStatus({ rep }: { rep: { aircall_user_id: number; rep_name: string; current_idle_seconds: number; last_call_ended_at: number } }) {
+  const [idle, setIdle] = useState(rep.current_idle_seconds);
 
-  // Use avg gap per rep to bucket (one per rep, not per individual gap)
-  for (const rep of reps) {
-    if (rep.gap_count === 0) continue;
-    const avg = rep.avg_gap_seconds;
-    for (const bucket of buckets) {
-      if (avg >= bucket.min && avg < bucket.max) {
-        bucket.count++;
-        break;
-      }
-    }
-  }
+  useEffect(() => {
+    setIdle(rep.current_idle_seconds);
+  }, [rep.current_idle_seconds]);
 
-  const maxCount = Math.max(...buckets.map((b) => b.count), 1);
+  useEffect(() => {
+    if (rep.last_call_ended_at === 0 || idle === 0) return;
+    const interval = setInterval(() => setIdle((prev) => prev + 1), 1000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rep.last_call_ended_at]);
+
+  const isOnCall = idle === 0;
+  const needsAttention = idle > 300;
 
   return (
-    <div className="flex items-end gap-2 h-32">
-      {buckets.map((bucket) => {
-        const heightPct = (bucket.count / maxCount) * 100;
-        return (
-          <div key={bucket.label} className="flex-1 flex flex-col items-center gap-1.5 group relative">
-            <motion.div
-              initial={{ height: 0 }}
-              animate={{ height: `${Math.max(heightPct, bucket.count > 0 ? 4 : 0)}%` }}
-              transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
-              className={`w-full rounded-t-sm ${bucket.color}`}
-              style={{ minHeight: bucket.count > 0 ? 4 : 0 }}
-            />
-            <span className="text-[10px] text-muted-foreground/50 tabular-nums font-medium whitespace-nowrap">
-              {bucket.label}
-            </span>
-            {bucket.count > 0 && (
-              <div className="absolute bottom-full mb-2 px-2 py-1 bg-card border border-border rounded-lg text-xs shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 whitespace-nowrap">
-                <span className="font-semibold">{bucket.count}</span>
-                <span className="text-muted-foreground ml-1">{bucket.count === 1 ? "rep" : "reps"}</span>
-              </div>
-            )}
-          </div>
-        );
-      })}
+    <div className={`flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors ${needsAttention ? "bg-red-500/[0.05]" : ""}`}>
+      <div className="relative">
+        <div className={`size-2 rounded-full ${isOnCall ? "bg-emerald-500" : idle <= 120 ? "bg-emerald-400" : idle <= 300 ? "bg-amber-400" : "bg-red-500"}`} />
+        {isOnCall && <div className="absolute inset-0 size-2 rounded-full bg-emerald-500 animate-ping" />}
+      </div>
+      <p className="text-sm font-medium truncate flex-1">{rep.rep_name}</p>
+      {isOnCall ? (
+        <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">
+          On Call
+        </span>
+      ) : (
+        <span className={`text-xs font-bold tabular-nums ${gapColorClass(idle)}`}>
+          {formatGapShort(idle)}
+        </span>
+      )}
     </div>
   );
 }
@@ -1666,88 +1788,65 @@ export default function CallsPage() {
       <div className="min-h-dvh bg-gradient-to-br from-background to-muted/20 p-6 pl-24 lg:p-8 lg:pl-24">
         <div className="max-w-7xl mx-auto space-y-5">
 
-          {/* ═══ Section 1: Command Bar Header ═══ */}
+          {/* ═══ Unified Header: Title + Tabs + Period ═══ */}
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4 }}
-            className="bg-card/80 backdrop-blur-sm border border-border/50 rounded-2xl px-6 py-4 flex items-center justify-between gap-4"
+            className="bg-card/80 backdrop-blur-sm border border-border/50 rounded-2xl px-4 py-2.5 flex items-center justify-between gap-3"
           >
             {/* Left: Title */}
-            <div className="flex items-center gap-3">
-              <Phone className="size-6 text-foreground" weight="bold" />
-              <h1 className="text-2xl font-bold tracking-tight">Calls</h1>
+            <div className="flex items-center gap-2.5 shrink-0">
+              <Phone className="size-5 text-foreground" weight="bold" />
+              <h1 className="text-lg font-bold tracking-tight">Calls</h1>
             </div>
 
-            {/* Center: Period Selector (inline segmented) */}
-            <div className="bg-muted/60 rounded-xl p-1 flex relative border border-border/40">
-              {PERIODS.map((p) => (
-                <button
-                  key={p.key}
-                  onClick={() => setPeriod(p.key)}
-                  className={`relative z-10 px-5 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
-                    period === p.key
-                      ? "bg-background text-foreground shadow-md border border-border/50"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
-                    {period === p.key && periodLoading && (
-                      <SpinnerGap className="size-3.5 animate-spin" />
-                    )}
-                    {p.label}
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            {/* Right: Live indicator + refresh */}
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1.5">
-                <span className="relative flex size-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full size-2 bg-green-500" />
-                </span>
-                <span className="text-xs text-muted-foreground font-medium">Live</span>
-              </div>
-              {lastUpdated && (
-                <span className="text-xs text-muted-foreground/50 tabular-nums">
-                  {lastUpdated.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
-                </span>
-              )}
-              <button
-                onClick={() => fetchCallData(true)}
-                disabled={isRefreshing}
-                className="p-1.5 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted/50 transition-colors"
-                aria-label="Refresh data"
-              >
-                <ArrowsClockwise className={`size-4 ${isRefreshing ? "animate-spin" : ""}`} />
-              </button>
-            </div>
-          </motion.div>
-
-          {/* ═══ Tab Bar ═══ */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.1 }}
-            className="flex"
-          >
-            <div className="flex bg-muted/60 rounded-xl p-1 border border-border/40">
+            {/* Center: Tab pills */}
+            <div className="flex bg-muted/40 rounded-lg p-0.5 border border-border/30 overflow-x-auto scrollbar-hide">
               {TABS.map((tab) => (
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all duration-200 whitespace-nowrap ${
                     activeTab === tab.key
-                      ? "bg-background text-foreground shadow-md border border-border/50"
+                      ? "bg-white text-gray-900 shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  <tab.icon className="size-4" weight={activeTab === tab.key ? "fill" : "regular"} />
+                  <tab.icon className="size-3.5" weight={activeTab === tab.key ? "fill" : "regular"} />
                   {tab.label}
                 </button>
               ))}
+            </div>
+
+            {/* Right: Period selector + refresh */}
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="flex bg-muted/40 rounded-md p-0.5 border border-border/30">
+                {PERIODS.map((p) => (
+                  <button
+                    key={p.key}
+                    onClick={() => setPeriod(p.key)}
+                    className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded transition-all duration-200 ${
+                      period === p.key
+                        ? "bg-white text-gray-900 shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {period === p.key && periodLoading && (
+                      <SpinnerGap className="size-3 animate-spin" />
+                    )}
+                    {p.key === "today" ? "Today" : p.key === "week" ? "Week" : "Month"}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => fetchCallData(true)}
+                disabled={isRefreshing}
+                className="p-1.5 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted/50 transition-colors"
+                aria-label="Refresh"
+              >
+                <ArrowsClockwise className={`size-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
+              </button>
             </div>
           </motion.div>
 
@@ -2739,33 +2838,12 @@ export default function CallsPage() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.2 }}
-                className="space-y-5"
+                className="space-y-4"
               >
-                {/* Header */}
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                >
-                  <div className="flex items-center gap-3">
-                    <h2 className="text-xl font-bold tracking-tight">Dial Pace</h2>
-                    {gapData && gapData.team_total_gaps > 0 && (
-                      <span className={`text-xs px-2.5 py-1 rounded-full border font-semibold tabular-nums ${gapBgClass(gapData.team_avg_gap_seconds)}`}>
-                        Team avg: {formatGapShort(gapData.team_avg_gap_seconds)}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Time between consecutive calls per rep — measures dialing rhythm and idle time
-                  </p>
-                </motion.div>
-
                 {gapLoading && !gapData ? (
                   <div className="text-center py-16">
-                    <SpinnerGap className="size-10 text-primary mx-auto mb-4 animate-spin" />
-                    <p className="text-base font-semibold mb-1">Loading dial pace data...</p>
-                    <p className="text-sm text-muted-foreground">
-                      Fetching gap metrics from today&apos;s calls
-                    </p>
+                    <SpinnerGap className="size-8 text-primary mx-auto mb-4 animate-spin" />
+                    <p className="text-sm font-semibold">Loading dial pace data...</p>
                   </div>
                 ) : !gapData || gapData.reps.length === 0 ? (
                   <motion.div
@@ -2781,172 +2859,130 @@ export default function CallsPage() {
                   </motion.div>
                 ) : (
                   <>
-                    {/* ═══ KPI Summary Cards ═══ */}
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    {/* ═══ Inline Metrics Strip ═══ */}
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="flex items-center gap-5 px-5 py-3 rounded-xl bg-card/60 border border-border/30"
+                    >
+                      <MetricChip
+                        label="Team Avg"
+                        value={formatGapShort(gapData.team_avg_gap_seconds)}
+                        colorClass={gapColorClass(gapData.team_avg_gap_seconds)}
+                      />
+                      <div className="h-4 w-px bg-border/40" />
+                      <MetricChip label="Gaps" value={String(gapData.team_total_gaps)} />
+                      <div className="h-4 w-px bg-border/40" />
+                      <MetricChip label="Reps" value={String(gapData.team_total_reps)} />
+                      <div className="h-4 w-px bg-border/40" />
+                      <MetricChip
+                        label="Over 5min"
+                        value={String(gapData.reps.reduce((s, r) => s + r.gaps_over_5min, 0))}
+                        colorClass={gapData.reps.reduce((s, r) => s + r.gaps_over_5min, 0) > 0 ? "text-red-500" : undefined}
+                      />
+                    </motion.div>
+
+                    {/* ═══ 3-Column Layout ═══ */}
+                    <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.1fr_0.9fr] gap-4">
+
+                      {/* Column 1: Pace Ring */}
                       <motion.div
                         initial={{ opacity: 0, y: 12 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.1 }}
-                        className="rounded-xl bg-card border border-border/50 p-4"
+                        className="rounded-2xl bg-card border border-border/50 p-5"
                       >
-                        <p className={`text-2xl font-bold tabular-nums ${gapColorClass(gapData.team_avg_gap_seconds)}`}>
-                          {formatGapShort(gapData.team_avg_gap_seconds)}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">Team Avg Gap</p>
+                        <div className="flex items-center gap-2 mb-4">
+                          <Gauge className="size-4 text-muted-foreground" />
+                          <h3 className="text-sm font-semibold">Pace Distribution</h3>
+                        </div>
+                        <PaceRingChart reps={gapData.reps} teamAvg={gapData.team_avg_gap_seconds} />
+                        {/* Mini stats below ring */}
+                        <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-border/30">
+                          <div className="text-center">
+                            <p className="text-xs font-bold tabular-nums text-emerald-500">
+                              {formatGapShort(Math.min(...gapData.reps.filter(r => r.gap_count > 0).map(r => r.avg_gap_seconds), 0))}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">Fastest</p>
+                          </div>
+                          <div className="text-center">
+                            <p className={`text-xs font-bold tabular-nums ${gapColorClass(gapData.team_avg_gap_seconds)}`}>
+                              {formatGapShort(gapData.team_avg_gap_seconds)}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">Team Avg</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-xs font-bold tabular-nums text-red-500">
+                              {formatGapShort(Math.max(...gapData.reps.filter(r => r.gap_count > 0).map(r => r.avg_gap_seconds), 0))}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">Slowest</p>
+                          </div>
+                        </div>
                       </motion.div>
+
+                      {/* Column 2: Leaderboard with accordion drill-down */}
                       <motion.div
                         initial={{ opacity: 0, y: 12 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.15 }}
-                        className="rounded-xl bg-card border border-border/50 p-4"
-                      >
-                        <p className="text-2xl font-bold tabular-nums">{gapData.team_total_gaps}</p>
-                        <p className="text-xs text-muted-foreground mt-1">Total Gaps Tracked</p>
-                      </motion.div>
-                      <motion.div
-                        initial={{ opacity: 0, y: 12 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.2 }}
-                        className="rounded-xl bg-card border border-border/50 p-4"
-                      >
-                        <p className="text-2xl font-bold tabular-nums">{gapData.team_total_reps}</p>
-                        <p className="text-xs text-muted-foreground mt-1">Reps Active</p>
-                      </motion.div>
-                      <motion.div
-                        initial={{ opacity: 0, y: 12 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.25 }}
-                        className="rounded-xl bg-card border border-border/50 p-4"
-                      >
-                        <p className="text-2xl font-bold tabular-nums text-red-500">
-                          {gapData.reps.reduce((sum, r) => sum + r.gaps_over_5min, 0)}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">Gaps Over 5min</p>
-                      </motion.div>
-                    </div>
-
-                    {/* ═══ Gap Distribution Chart ═══ */}
-                    <motion.div
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.3 }}
-                      className="rounded-2xl bg-card border border-border/50 overflow-hidden"
-                    >
-                      <div className="px-5 py-4 border-b border-border/50 flex items-center gap-3">
-                        <Gauge className="size-[18px] text-muted-foreground" />
-                        <h2 className="text-base font-semibold">Gap Distribution</h2>
-                        <span className="text-xs text-muted-foreground">today</span>
-                      </div>
-                      <div className="p-5">
-                        <GapDistributionChart reps={gapData.reps} />
-                      </div>
-                    </motion.div>
-
-                    {/* ═══ Rep Leaderboard + Drill-down ═══ */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                      {/* Leaderboard */}
-                      <motion.div
-                        initial={{ opacity: 0, y: 12 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.35 }}
                         className="rounded-2xl bg-card border border-border/50 overflow-hidden"
                       >
-                        <div className="px-5 py-4 border-b border-border/50 flex items-center gap-3">
-                          <Timer className="size-[18px] text-muted-foreground" />
-                          <h2 className="text-base font-semibold">Dial Pace Ranking</h2>
-                          <span className="text-xs text-muted-foreground">fastest first</span>
+                        <div className="px-4 py-3 border-b border-border/30 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <FontAwesomeIcon icon={faTrophy} className="h-3.5 w-3.5 text-yellow-500" />
+                            <h3 className="text-sm font-semibold">Pace Ranking</h3>
+                          </div>
+                          <span className="text-[10px] text-muted-foreground uppercase tracking-wider">fastest first</span>
                         </div>
-                        <div className="p-3 max-h-[520px] overflow-y-auto scrollbar-hide">
+                        <div className="p-1.5 max-h-[540px] overflow-y-auto scrollbar-hide">
                           {gapData.reps.map((rep, i) => (
-                            <GapRepRow
+                            <GapRepRowAccordion
                               key={rep.aircall_user_id}
                               rep={rep}
                               index={i}
-                              isSelected={selectedGapRep === rep.aircall_user_id}
-                              onClick={() => fetchGapDetail(rep.aircall_user_id)}
+                              isExpanded={selectedGapRep === rep.aircall_user_id}
+                              onToggle={() => {
+                                if (selectedGapRep === rep.aircall_user_id) {
+                                  setSelectedGapRep(null);
+                                } else {
+                                  fetchGapDetail(rep.aircall_user_id);
+                                }
+                              }}
+                              gapDetail={selectedGapRep === rep.aircall_user_id ? gapDetail : null}
+                              gapDetailLoading={selectedGapRep === rep.aircall_user_id && gapDetailLoading}
                             />
                           ))}
                         </div>
                       </motion.div>
 
-                      {/* Drill-down */}
+                      {/* Column 3: Live Activity Feed */}
                       <motion.div
                         initial={{ opacity: 0, y: 12 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.4 }}
+                        transition={{ delay: 0.2 }}
                         className="rounded-2xl bg-card border border-border/50 overflow-hidden"
                       >
-                        <div className="px-5 py-4 border-b border-border/50 flex items-center gap-3">
-                          <Eye className="size-[18px] text-muted-foreground" />
-                          <h2 className="text-base font-semibold">Gap Detail</h2>
-                          {gapDetail?.summary && (
-                            <span className="text-xs text-muted-foreground">{gapDetail.summary.rep_name}</span>
-                          )}
+                        <div className="px-4 py-3 border-b border-border/30 flex items-center gap-2">
+                          <Pulse className="size-4 text-muted-foreground" />
+                          <h3 className="text-sm font-semibold">Live Status</h3>
+                          <span className="relative flex size-1.5 ml-auto">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full size-1.5 bg-green-500" />
+                          </span>
                         </div>
-                        <div className="p-4 max-h-[520px] overflow-y-auto scrollbar-hide">
-                          {gapDetailLoading ? (
-                            <div className="text-center py-12">
-                              <SpinnerGap className="size-8 text-primary mx-auto mb-3 animate-spin" />
-                              <p className="text-sm text-muted-foreground">Loading gaps...</p>
-                            </div>
-                          ) : !selectedGapRep ? (
-                            <div className="text-center py-12 text-muted-foreground">
-                              <Eye className="size-10 mx-auto mb-3 opacity-30" />
-                              <p className="text-sm">Click a rep to see their individual gaps</p>
-                            </div>
-                          ) : gapDetail && gapDetail.gaps.length > 0 ? (
-                            <div className="space-y-2">
-                              {/* Summary bar */}
-                              {gapDetail.summary && (
-                                <div className="grid grid-cols-3 gap-2 mb-4">
-                                  <div className="text-center p-2.5 rounded-lg bg-muted/40">
-                                    <p className={`text-sm font-bold tabular-nums ${gapColorClass(gapDetail.summary.avg_gap_seconds)}`}>
-                                      {formatGapShort(gapDetail.summary.avg_gap_seconds)}
-                                    </p>
-                                    <p className="text-[10px] text-muted-foreground">Avg Gap</p>
-                                  </div>
-                                  <div className="text-center p-2.5 rounded-lg bg-muted/40">
-                                    <p className="text-sm font-bold tabular-nums text-red-500">
-                                      {formatGapShort(gapDetail.summary.max_gap_seconds)}
-                                    </p>
-                                    <p className="text-[10px] text-muted-foreground">Longest</p>
-                                  </div>
-                                  <div className="text-center p-2.5 rounded-lg bg-muted/40">
-                                    <p className="text-sm font-bold tabular-nums text-emerald-500">
-                                      {formatGapShort(gapDetail.summary.min_gap_seconds)}
-                                    </p>
-                                    <p className="text-[10px] text-muted-foreground">Shortest</p>
-                                  </div>
-                                </div>
-                              )}
-                              {/* Individual gaps */}
-                              {gapDetail.gaps.map((gap, i) => (
-                                <div
-                                  key={i}
-                                  className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-foreground/[0.03] transition-colors"
-                                >
-                                  <div className={`size-2 rounded-full shrink-0 ${
-                                    gap.gap_seconds <= 120 ? "bg-emerald-500" : gap.gap_seconds <= 300 ? "bg-amber-500" : "bg-red-500"
-                                  }`} />
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-xs text-muted-foreground tabular-nums">
-                                      {new Date(gap.previous_call_ended_at * 1000).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
-                                      {" → "}
-                                      {new Date(gap.current_call_started_at * 1000).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
-                                    </p>
-                                  </div>
-                                  <span className={`text-sm font-bold tabular-nums ${gapColorClass(gap.gap_seconds)}`}>
-                                    {formatGapShort(gap.gap_seconds)}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="text-center py-12 text-muted-foreground">
-                              <Timer className="size-10 mx-auto mb-3 opacity-30" />
-                              <p className="text-sm">No gaps recorded yet for this rep</p>
-                            </div>
-                          )}
+                        <div className="p-1.5 max-h-[540px] overflow-y-auto scrollbar-hide">
+                          {(() => {
+                            const sorted = [...gapData.reps]
+                              .filter((r) => r.last_call_ended_at > 0)
+                              .sort((a, b) => b.current_idle_seconds - a.current_idle_seconds);
+                            return sorted.length > 0 ? (
+                              sorted.map((rep) => (
+                                <LiveRepStatus key={rep.aircall_user_id} rep={rep} />
+                              ))
+                            ) : (
+                              <p className="text-xs text-muted-foreground text-center py-8">No active reps</p>
+                            );
+                          })()}
                         </div>
                       </motion.div>
                     </div>
