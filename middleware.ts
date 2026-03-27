@@ -36,6 +36,7 @@ const PUBLIC_API_ROUTES = [
   '/api/sales/slack-events',       // Slack webhook
   '/api/sales/data',               // TV dashboard data endpoint
   '/api/tv/verify',                // TV screen verification
+  '/api/webhooks/aircall',         // Aircall webhook (call.created, call.ended)
 ]
 
 export async function middleware(request: NextRequest) {

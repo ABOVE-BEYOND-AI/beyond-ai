@@ -33,6 +33,8 @@ import {
   CaretDown,
   CaretUp,
   Eye,
+  Timer,
+  Gauge,
 } from "@phosphor-icons/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faLightbulb, faTrophy } from "@fortawesome/free-solid-svg-icons";
@@ -44,7 +46,7 @@ import NumberFlow from "@number-flow/react";
 
 // ── Types ──
 
-type Tab = "overview" | "intelligence" | "digest" | "transcripts";
+type Tab = "overview" | "intelligence" | "digest" | "transcripts" | "dial-pace";
 type CallPeriod = "today" | "week" | "month";
 type FullscreenView = null | "reps" | "calls";
 
@@ -193,6 +195,7 @@ const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: "intelligence", label: "Call Intelligence", icon: Brain },
   { key: "digest", label: "AI Digest", icon: MagicWand },
   { key: "transcripts", label: "Transcript Search", icon: MagnifyingGlass },
+  { key: "dial-pace", label: "Dial Pace", icon: Timer },
 ];
 
 const PERIODS: { key: CallPeriod; label: string; shortLabel: string }[] = [
@@ -242,6 +245,29 @@ function timeAgo(unixTimestamp: number): string {
 
 function periodLabel(period: CallPeriod): string {
   return PERIODS.find((p) => p.key === period)?.shortLabel || "today";
+}
+
+function formatGapShort(seconds: number): string {
+  if (!seconds || seconds === 0) return "—";
+  if (seconds < 60) return `${seconds}s`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  if (m < 60) return s > 0 ? `${m}m ${s}s` : `${m}m`;
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  return rm > 0 ? `${h}h ${rm}m` : `${h}h`;
+}
+
+function gapColorClass(seconds: number): string {
+  if (seconds <= 120) return "text-emerald-500";
+  if (seconds <= 300) return "text-amber-500";
+  return "text-red-500";
+}
+
+function gapBgClass(seconds: number): string {
+  if (seconds <= 120) return "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400";
+  if (seconds <= 300) return "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400";
+  return "bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400";
 }
 
 // ── Highlight keyword in excerpt ──
@@ -951,6 +977,156 @@ function DigestCopyButton({ digest, eventRecap }: { digest: DailyDigest; eventRe
 
 // ── Metric Card ──
 
+// ── Gap Rep Row (Dial Pace leaderboard) ──
+
+function GapRepRow({
+  rep,
+  index,
+  isSelected,
+  onClick,
+}: {
+  rep: {
+    aircall_user_id: number;
+    rep_name: string;
+    current_idle_seconds: number;
+    avg_gap_seconds: number;
+    max_gap_seconds: number;
+    gap_count: number;
+    gaps_over_5min: number;
+    total_calls: number;
+    total_idle_time: number;
+    last_call_ended_at: number;
+  };
+  index: number;
+  isSelected: boolean;
+  onClick: () => void;
+}) {
+  // Live idle counter — ticks up locally between API polls
+  const [liveIdle, setLiveIdle] = useState(rep.current_idle_seconds);
+
+  useEffect(() => {
+    setLiveIdle(rep.current_idle_seconds);
+  }, [rep.current_idle_seconds]);
+
+  useEffect(() => {
+    if (rep.last_call_ended_at === 0 || rep.current_idle_seconds === 0) return;
+    const interval = setInterval(() => {
+      setLiveIdle((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [rep.last_call_ended_at, rep.current_idle_seconds]);
+
+  const showIdle = liveIdle > 0 && liveIdle < 3600;
+
+  return (
+    <motion.button
+      initial={{ opacity: 0, x: -12 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: index * 0.04 }}
+      onClick={onClick}
+      className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors text-left ${
+        isSelected ? "bg-primary/[0.08] border border-primary/20" : "hover:bg-foreground/[0.03]"
+      }`}
+    >
+      <div
+        className={`size-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${
+          index === 0
+            ? "bg-gradient-to-br from-yellow-300 to-yellow-500 text-yellow-900 shadow-lg shadow-yellow-500/20"
+            : index === 1
+              ? "bg-gradient-to-br from-gray-200 to-gray-400 text-gray-700"
+              : index === 2
+                ? "bg-gradient-to-br from-amber-500 to-amber-700 text-amber-100"
+                : "bg-muted/60 text-muted-foreground"
+        }`}
+      >
+        {index + 1}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-semibold truncate">{rep.rep_name}</p>
+          {showIdle && (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium tabular-nums ${gapBgClass(liveIdle)}`}>
+              Idle: {formatGapShort(liveIdle)}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-3 mt-0.5">
+          <span className="text-xs text-muted-foreground/60 tabular-nums">
+            {rep.total_calls} calls · {rep.gap_count} gaps
+          </span>
+          {rep.gaps_over_5min > 0 && (
+            <span className="text-[10px] text-red-500 font-medium">
+              {rep.gaps_over_5min} over 5m
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="text-right shrink-0">
+        <p className={`text-sm font-bold tabular-nums ${rep.gap_count > 0 ? gapColorClass(rep.avg_gap_seconds) : "text-muted-foreground"}`}>
+          {rep.gap_count > 0 ? formatGapShort(rep.avg_gap_seconds) : "—"}
+        </p>
+        <p className="text-[10px] text-muted-foreground/50">avg gap</p>
+      </div>
+    </motion.button>
+  );
+}
+
+// ── Gap Distribution Chart ──
+
+function GapDistributionChart({ reps }: { reps: { avg_gap_seconds: number; gap_count: number; total_idle_time: number; aircall_user_id: number }[] }) {
+  // Collect all avg gaps and bucket them
+  const buckets = [
+    { label: "0–30s", min: 0, max: 30, count: 0, color: "bg-emerald-500/70" },
+    { label: "30s–1m", min: 30, max: 60, count: 0, color: "bg-emerald-500/50" },
+    { label: "1–2m", min: 60, max: 120, count: 0, color: "bg-emerald-500/30" },
+    { label: "2–5m", min: 120, max: 300, count: 0, color: "bg-amber-500/50" },
+    { label: "5–10m", min: 300, max: 600, count: 0, color: "bg-red-500/40" },
+    { label: "10m+", min: 600, max: Infinity, count: 0, color: "bg-red-500/60" },
+  ];
+
+  // Use avg gap per rep to bucket (one per rep, not per individual gap)
+  for (const rep of reps) {
+    if (rep.gap_count === 0) continue;
+    const avg = rep.avg_gap_seconds;
+    for (const bucket of buckets) {
+      if (avg >= bucket.min && avg < bucket.max) {
+        bucket.count++;
+        break;
+      }
+    }
+  }
+
+  const maxCount = Math.max(...buckets.map((b) => b.count), 1);
+
+  return (
+    <div className="flex items-end gap-2 h-32">
+      {buckets.map((bucket) => {
+        const heightPct = (bucket.count / maxCount) * 100;
+        return (
+          <div key={bucket.label} className="flex-1 flex flex-col items-center gap-1.5 group relative">
+            <motion.div
+              initial={{ height: 0 }}
+              animate={{ height: `${Math.max(heightPct, bucket.count > 0 ? 4 : 0)}%` }}
+              transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
+              className={`w-full rounded-t-sm ${bucket.color}`}
+              style={{ minHeight: bucket.count > 0 ? 4 : 0 }}
+            />
+            <span className="text-[10px] text-muted-foreground/50 tabular-nums font-medium whitespace-nowrap">
+              {bucket.label}
+            </span>
+            {bucket.count > 0 && (
+              <div className="absolute bottom-full mb-2 px-2 py-1 bg-card border border-border rounded-lg text-xs shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 whitespace-nowrap">
+                <span className="font-semibold">{bucket.count}</span>
+                <span className="text-muted-foreground ml-1">{bucket.count === 1 ? "rep" : "reps"}</span>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function MetricCard({
   label,
   value,
@@ -1065,6 +1241,34 @@ export default function CallsPage() {
   const [transcriptDirection, setTranscriptDirection] = useState<"" | "inbound" | "outbound">("");
   const [hasSearched, setHasSearched] = useState(false);
 
+  // Dial Pace tab state
+  const [gapData, setGapData] = useState<{
+    reps: {
+      aircall_user_id: number;
+      rep_name: string;
+      last_call_ended_at: number;
+      current_idle_seconds: number;
+      avg_gap_seconds: number;
+      max_gap_seconds: number;
+      min_gap_seconds: number;
+      gap_count: number;
+      gaps_over_5min: number;
+      total_idle_time: number;
+      total_calls: number;
+    }[];
+    team_avg_gap_seconds: number;
+    team_total_reps: number;
+    team_total_gaps: number;
+  } | null>(null);
+  const [gapLoading, setGapLoading] = useState(false);
+  const [selectedGapRep, setSelectedGapRep] = useState<number | null>(null);
+  const [gapDetail, setGapDetail] = useState<{
+    gaps: { previous_call_id: number; previous_call_ended_at: number; previous_call_direction: string; current_call_id: number; current_call_started_at: number; current_call_direction: string; gap_seconds: number }[];
+    summary: { rep_name: string; avg_gap_seconds: number; max_gap_seconds: number; min_gap_seconds: number; gap_count: number; total_idle_time: number; total_calls: number } | null;
+  } | null>(null);
+  const [gapDetailLoading, setGapDetailLoading] = useState(false);
+  const gapPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hasFetchedOnce = useRef(false);
   const previousPeriodRef = useRef<CallPeriod | null>(null);
@@ -1134,6 +1338,11 @@ export default function CallsPage() {
     previousPeriodRef.current = period;
     fetchCallData(hasFetchedOnce.current);
 
+    // Also fetch gap data for Overview KPI card
+    if (activeTab === "overview") {
+      fetchGapData();
+    }
+
     // Restore cached digest for this period
     try {
       const cached = sessionStorage.getItem(`calls_digest_${period}`);
@@ -1148,6 +1357,53 @@ export default function CallsPage() {
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, [user, fetchCallData]);
+
+  // ── Fetch gap data (Dial Pace tab) ──
+
+  const fetchGapData = useCallback(async () => {
+    try {
+      const res = await fetch("/api/calls/gaps");
+      if (!res.ok) return;
+      const result = await res.json();
+      if (result.success) {
+        setGapData(result.data);
+      }
+    } catch (err) {
+      console.error("Error fetching gap data:", err);
+    }
+  }, []);
+
+  // Fetch gap data when switching to dial-pace tab, poll every 30s
+  useEffect(() => {
+    if (!user || activeTab !== "dial-pace") {
+      if (gapPollRef.current) clearInterval(gapPollRef.current);
+      return;
+    }
+    setGapLoading(true);
+    fetchGapData().finally(() => setGapLoading(false));
+    gapPollRef.current = setInterval(fetchGapData, 30_000);
+    return () => {
+      if (gapPollRef.current) clearInterval(gapPollRef.current);
+    };
+  }, [user, activeTab, fetchGapData]);
+
+  const fetchGapDetail = useCallback(async (userId: number) => {
+    setSelectedGapRep(userId);
+    setGapDetailLoading(true);
+    setGapDetail(null);
+    try {
+      const res = await fetch(`/api/calls/gaps/detail?user_id=${userId}`);
+      if (!res.ok) return;
+      const result = await res.json();
+      if (result.success) {
+        setGapDetail(result.data);
+      }
+    } catch (err) {
+      console.error("Error fetching gap detail:", err);
+    } finally {
+      setGapDetailLoading(false);
+    }
+  }, []);
 
   // ── Analyse a single call ──
 
@@ -1527,7 +1783,7 @@ export default function CallsPage() {
                 className="space-y-5"
               >
                 {/* ═══ Section 2: Metric Cards ═══ */}
-                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
                   <MetricCard
                     label="Total Calls"
                     value={stats?.total_calls || 0}
@@ -1563,6 +1819,15 @@ export default function CallsPage() {
                     isText={formatDuration(stats?.total_talk_time || 0)}
                     loading={initialLoading}
                     delay={0.35}
+                  />
+                  <MetricCard
+                    label="Team Avg Gap"
+                    value={0}
+                    isText={gapData ? formatGapShort(gapData.team_avg_gap_seconds) : "—"}
+                    highlight={gapData && gapData.team_total_gaps > 0 ? `${gapData.team_total_gaps} gaps` : undefined}
+                    highlightColor={gapData && gapData.team_avg_gap_seconds > 300 ? "red" : "green"}
+                    loading={initialLoading}
+                    delay={0.4}
                   />
                 </div>
 
@@ -2457,6 +2722,230 @@ export default function CallsPage() {
                       </p>
                     )}
                   </motion.div>
+                )}
+              </motion.div>
+            )}
+
+            {/* ═══════════════ DIAL PACE TAB ═══════════════ */}
+            {activeTab === "dial-pace" && (
+              <motion.div
+                key="dial-pace"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-5"
+              >
+                {/* Header */}
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                >
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-xl font-bold tracking-tight">Dial Pace</h2>
+                    {gapData && gapData.team_total_gaps > 0 && (
+                      <span className={`text-xs px-2.5 py-1 rounded-full border font-semibold tabular-nums ${gapBgClass(gapData.team_avg_gap_seconds)}`}>
+                        Team avg: {formatGapShort(gapData.team_avg_gap_seconds)}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Time between consecutive calls per rep — measures dialing rhythm and idle time
+                  </p>
+                </motion.div>
+
+                {gapLoading && !gapData ? (
+                  <div className="text-center py-16">
+                    <SpinnerGap className="size-10 text-primary mx-auto mb-4 animate-spin" />
+                    <p className="text-base font-semibold mb-1">Loading dial pace data...</p>
+                    <p className="text-sm text-muted-foreground">
+                      Fetching gap metrics from today&apos;s calls
+                    </p>
+                  </div>
+                ) : !gapData || gapData.reps.length === 0 ? (
+                  <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="text-center py-16 text-muted-foreground"
+                  >
+                    <Timer className="size-12 mx-auto mb-4 opacity-20" />
+                    <p className="text-lg font-semibold mb-1">No dial pace data yet</p>
+                    <p className="text-sm max-w-md mx-auto">
+                      Gap tracking starts when Aircall webhooks fire. Once reps start making calls, their pace data will appear here automatically.
+                    </p>
+                  </motion.div>
+                ) : (
+                  <>
+                    {/* ═══ KPI Summary Cards ═══ */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                      <motion.div
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.1 }}
+                        className="rounded-xl bg-card border border-border/50 p-4"
+                      >
+                        <p className={`text-2xl font-bold tabular-nums ${gapColorClass(gapData.team_avg_gap_seconds)}`}>
+                          {formatGapShort(gapData.team_avg_gap_seconds)}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">Team Avg Gap</p>
+                      </motion.div>
+                      <motion.div
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.15 }}
+                        className="rounded-xl bg-card border border-border/50 p-4"
+                      >
+                        <p className="text-2xl font-bold tabular-nums">{gapData.team_total_gaps}</p>
+                        <p className="text-xs text-muted-foreground mt-1">Total Gaps Tracked</p>
+                      </motion.div>
+                      <motion.div
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2 }}
+                        className="rounded-xl bg-card border border-border/50 p-4"
+                      >
+                        <p className="text-2xl font-bold tabular-nums">{gapData.team_total_reps}</p>
+                        <p className="text-xs text-muted-foreground mt-1">Reps Active</p>
+                      </motion.div>
+                      <motion.div
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.25 }}
+                        className="rounded-xl bg-card border border-border/50 p-4"
+                      >
+                        <p className="text-2xl font-bold tabular-nums text-red-500">
+                          {gapData.reps.reduce((sum, r) => sum + r.gaps_over_5min, 0)}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">Gaps Over 5min</p>
+                      </motion.div>
+                    </div>
+
+                    {/* ═══ Gap Distribution Chart ═══ */}
+                    <motion.div
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 }}
+                      className="rounded-2xl bg-card border border-border/50 overflow-hidden"
+                    >
+                      <div className="px-5 py-4 border-b border-border/50 flex items-center gap-3">
+                        <Gauge className="size-[18px] text-muted-foreground" />
+                        <h2 className="text-base font-semibold">Gap Distribution</h2>
+                        <span className="text-xs text-muted-foreground">today</span>
+                      </div>
+                      <div className="p-5">
+                        <GapDistributionChart reps={gapData.reps} />
+                      </div>
+                    </motion.div>
+
+                    {/* ═══ Rep Leaderboard + Drill-down ═══ */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                      {/* Leaderboard */}
+                      <motion.div
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.35 }}
+                        className="rounded-2xl bg-card border border-border/50 overflow-hidden"
+                      >
+                        <div className="px-5 py-4 border-b border-border/50 flex items-center gap-3">
+                          <Timer className="size-[18px] text-muted-foreground" />
+                          <h2 className="text-base font-semibold">Dial Pace Ranking</h2>
+                          <span className="text-xs text-muted-foreground">fastest first</span>
+                        </div>
+                        <div className="p-3 max-h-[520px] overflow-y-auto scrollbar-hide">
+                          {gapData.reps.map((rep, i) => (
+                            <GapRepRow
+                              key={rep.aircall_user_id}
+                              rep={rep}
+                              index={i}
+                              isSelected={selectedGapRep === rep.aircall_user_id}
+                              onClick={() => fetchGapDetail(rep.aircall_user_id)}
+                            />
+                          ))}
+                        </div>
+                      </motion.div>
+
+                      {/* Drill-down */}
+                      <motion.div
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.4 }}
+                        className="rounded-2xl bg-card border border-border/50 overflow-hidden"
+                      >
+                        <div className="px-5 py-4 border-b border-border/50 flex items-center gap-3">
+                          <Eye className="size-[18px] text-muted-foreground" />
+                          <h2 className="text-base font-semibold">Gap Detail</h2>
+                          {gapDetail?.summary && (
+                            <span className="text-xs text-muted-foreground">{gapDetail.summary.rep_name}</span>
+                          )}
+                        </div>
+                        <div className="p-4 max-h-[520px] overflow-y-auto scrollbar-hide">
+                          {gapDetailLoading ? (
+                            <div className="text-center py-12">
+                              <SpinnerGap className="size-8 text-primary mx-auto mb-3 animate-spin" />
+                              <p className="text-sm text-muted-foreground">Loading gaps...</p>
+                            </div>
+                          ) : !selectedGapRep ? (
+                            <div className="text-center py-12 text-muted-foreground">
+                              <Eye className="size-10 mx-auto mb-3 opacity-30" />
+                              <p className="text-sm">Click a rep to see their individual gaps</p>
+                            </div>
+                          ) : gapDetail && gapDetail.gaps.length > 0 ? (
+                            <div className="space-y-2">
+                              {/* Summary bar */}
+                              {gapDetail.summary && (
+                                <div className="grid grid-cols-3 gap-2 mb-4">
+                                  <div className="text-center p-2.5 rounded-lg bg-muted/40">
+                                    <p className={`text-sm font-bold tabular-nums ${gapColorClass(gapDetail.summary.avg_gap_seconds)}`}>
+                                      {formatGapShort(gapDetail.summary.avg_gap_seconds)}
+                                    </p>
+                                    <p className="text-[10px] text-muted-foreground">Avg Gap</p>
+                                  </div>
+                                  <div className="text-center p-2.5 rounded-lg bg-muted/40">
+                                    <p className="text-sm font-bold tabular-nums text-red-500">
+                                      {formatGapShort(gapDetail.summary.max_gap_seconds)}
+                                    </p>
+                                    <p className="text-[10px] text-muted-foreground">Longest</p>
+                                  </div>
+                                  <div className="text-center p-2.5 rounded-lg bg-muted/40">
+                                    <p className="text-sm font-bold tabular-nums text-emerald-500">
+                                      {formatGapShort(gapDetail.summary.min_gap_seconds)}
+                                    </p>
+                                    <p className="text-[10px] text-muted-foreground">Shortest</p>
+                                  </div>
+                                </div>
+                              )}
+                              {/* Individual gaps */}
+                              {gapDetail.gaps.map((gap, i) => (
+                                <div
+                                  key={i}
+                                  className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-foreground/[0.03] transition-colors"
+                                >
+                                  <div className={`size-2 rounded-full shrink-0 ${
+                                    gap.gap_seconds <= 120 ? "bg-emerald-500" : gap.gap_seconds <= 300 ? "bg-amber-500" : "bg-red-500"
+                                  }`} />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs text-muted-foreground tabular-nums">
+                                      {new Date(gap.previous_call_ended_at * 1000).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                                      {" → "}
+                                      {new Date(gap.current_call_started_at * 1000).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                                    </p>
+                                  </div>
+                                  <span className={`text-sm font-bold tabular-nums ${gapColorClass(gap.gap_seconds)}`}>
+                                    {formatGapShort(gap.gap_seconds)}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-center py-12 text-muted-foreground">
+                              <Timer className="size-10 mx-auto mb-3 opacity-30" />
+                              <p className="text-sm">No gaps recorded yet for this rep</p>
+                            </div>
+                          )}
+                        </div>
+                      </motion.div>
+                    </div>
+                  </>
                 )}
               </motion.div>
             )}

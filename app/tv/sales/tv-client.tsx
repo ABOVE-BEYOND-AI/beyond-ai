@@ -240,6 +240,25 @@ export default function TVSalesClient({ initialData }: { initialData: DashboardR
     return () => clearInterval(cycleRef.current);
   }, [fetchPeriod]);
 
+  // ── Dial Pace data ──
+  const [gapReps, setGapReps] = useState<{ rep_name: string; avg_gap_seconds: number; current_idle_seconds: number; gap_count: number; total_calls: number }[]>([]);
+
+  useEffect(() => {
+    const fetchGaps = async () => {
+      try {
+        const res = await fetch("/api/calls/gaps");
+        if (!res.ok) return;
+        const json = await res.json();
+        if (json.success && json.data?.reps) {
+          setGapReps(json.data.reps);
+        }
+      } catch {}
+    };
+    fetchGaps();
+    const interval = setInterval(fetchGaps, 30_000);
+    return () => clearInterval(interval);
+  }, []);
+
   // ── Derived values — all from cache ──
   const periodData = cache[displayPeriod];
   const totals = useMemo<PeriodTotals>(
@@ -412,6 +431,48 @@ export default function TVSalesClient({ initialData }: { initialData: DashboardR
           </div>
         </div>
       </div>
+
+      {/* ── Dial Pace Strip ── */}
+      {gapReps.length > 0 && (
+        <div className="shrink-0" style={{ paddingTop: "0.8vh" }}>
+          <div className="flex items-center border-t border-border/20 overflow-x-auto scrollbar-hide" style={{ gap: "clamp(8px, 1vw, 16px)", paddingTop: "clamp(6px, 0.8vh, 12px)" }}>
+            <div className="flex items-center shrink-0" style={{ gap: "clamp(4px, 0.4vw, 8px)" }}>
+              <span className="uppercase tracking-widest text-muted-foreground/40 font-bold" style={{ fontSize: "clamp(0.5rem, 0.6vw, 0.7rem)" }}>
+                DIAL PACE
+              </span>
+            </div>
+            {gapReps.filter(r => r.gap_count > 0).slice(0, 8).map((rep) => {
+              const colorClass = rep.avg_gap_seconds <= 120
+                ? "text-emerald-400"
+                : rep.avg_gap_seconds <= 300
+                  ? "text-amber-400"
+                  : "text-red-400";
+              const dotClass = rep.avg_gap_seconds <= 120
+                ? "bg-emerald-400"
+                : rep.avg_gap_seconds <= 300
+                  ? "bg-amber-400"
+                  : "bg-red-400";
+              const fmtGap = (s: number) => {
+                if (s < 60) return `${s}s`;
+                const m = Math.floor(s / 60);
+                const sec = s % 60;
+                return sec > 0 ? `${m}m ${sec}s` : `${m}m`;
+              };
+              return (
+                <div key={rep.rep_name} className="flex items-center shrink-0" style={{ gap: "clamp(4px, 0.3vw, 8px)" }}>
+                  <span className={`rounded-full ${dotClass}`} style={{ width: 5, height: 5, display: "inline-block" }} />
+                  <span className="text-muted-foreground/60 font-medium" style={{ fontSize: "clamp(0.55rem, 0.65vw, 0.8rem)" }}>
+                    {rep.rep_name.split(" ")[0]}
+                  </span>
+                  <span className={`font-bold tabular-nums ${colorClass}`} style={{ fontSize: "clamp(0.6rem, 0.7vw, 0.85rem)" }}>
+                    {fmtGap(rep.avg_gap_seconds)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── Bottom Stats ── */}
       {allTotals && (
