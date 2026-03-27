@@ -19,11 +19,11 @@
   }
 
   :root {
-    /* Light mode - Ultra refined, Shopify/Vercel inspired */
-    --background: 0 0% 99%; /* Extremely clean off-white */
-    --foreground: 0 0% 7%; /* Very deep gray, not pure black */
-    
-    --card: 0 0% 100%;
+    /* Light mode - Subtle depth: warm gray background, white cards with shadow */
+    --background: 220 14% 96%; /* Cool gray background — cards pop against this */
+    --foreground: 0 0% 7%;
+
+    --card: 0 0% 100%; /* Pure white cards */
     --card-foreground: 0 0% 7%;
     
     --popover: 0 0% 100%;
@@ -51,11 +51,11 @@
   }
 
   .dark {
-    /* Dark mode - Deep, sharp, sophisticated */
-    --background: 240 10% 4%; /* Deep space black */
+    /* Dark mode - Deep bg, lighter card surfaces for visible depth */
+    --background: 240 10% 3.5%; /* Deep space black */
     --foreground: 0 0% 98%;
-    
-    --card: 240 10% 6%;
+
+    --card: 240 6% 9%; /* Noticeably lighter than bg — cards float */
     --card-foreground: 0 0% 98%;
     
     --popover: 240 10% 6%;

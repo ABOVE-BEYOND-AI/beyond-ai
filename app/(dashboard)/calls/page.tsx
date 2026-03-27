@@ -1793,7 +1793,7 @@ export default function CallsPage() {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4 }}
-            className="bg-card/80 backdrop-blur-sm border border-border/50 rounded-2xl px-5 py-3.5 flex items-center justify-between gap-4"
+            className="bg-card border border-border/60 shadow-sm dark:shadow-none rounded-2xl px-5 py-3.5 flex items-center justify-between gap-4"
           >
             {/* Left: Title */}
             <div className="flex items-center gap-2.5 shrink-0">
@@ -1802,15 +1802,15 @@ export default function CallsPage() {
             </div>
 
             {/* Center: Tab pills */}
-            <div className="flex bg-black/30 rounded-xl p-1 border border-white/[0.06] overflow-x-auto scrollbar-hide shadow-[inset_0_1px_2px_rgba(0,0,0,0.3)]">
+            <div className="flex rounded-xl p-1 overflow-x-auto scrollbar-hide bg-gray-100 dark:bg-white/[0.04] border border-gray-200/60 dark:border-white/[0.06] shadow-[inset_0_1px_3px_rgba(0,0,0,0.06)] dark:shadow-[inset_0_1px_3px_rgba(0,0,0,0.4)]">
               {TABS.map((tab) => (
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
-                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all duration-250 whitespace-nowrap ${
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all duration-200 whitespace-nowrap ${
                     activeTab === tab.key
-                      ? "bg-white text-gray-900 shadow-[0_1px_3px_rgba(0,0,0,0.2),0_4px_12px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.9)] translate-y-[-0.5px]"
-                      : "text-muted-foreground hover:text-foreground hover:bg-white/[0.04]"
+                      ? "bg-white dark:bg-white text-gray-900 shadow-[0_1px_2px_rgba(0,0,0,0.06),0_2px_8px_rgba(0,0,0,0.04)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.3),0_4px_14px_rgba(0,0,0,0.2)] ring-1 ring-black/[0.04] dark:ring-white/[0.08]"
+                      : "text-muted-foreground hover:text-foreground hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
                   }`}
                 >
                   <tab.icon className="size-3.5" weight={activeTab === tab.key ? "fill" : "regular"} />
@@ -1821,15 +1821,15 @@ export default function CallsPage() {
 
             {/* Right: Period selector + refresh */}
             <div className="flex items-center gap-2.5 shrink-0">
-              <div className="flex bg-black/30 rounded-lg p-0.5 border border-white/[0.06] shadow-[inset_0_1px_2px_rgba(0,0,0,0.3)]">
+              <div className="flex rounded-lg p-0.5 bg-gray-100 dark:bg-white/[0.04] border border-gray-200/60 dark:border-white/[0.06] shadow-[inset_0_1px_3px_rgba(0,0,0,0.06)] dark:shadow-[inset_0_1px_3px_rgba(0,0,0,0.4)]">
                 {PERIODS.map((p) => (
                   <button
                     key={p.key}
                     onClick={() => setPeriod(p.key)}
-                    className={`flex items-center gap-1 px-3 py-1.5 text-[11px] font-semibold rounded-md transition-all duration-250 ${
+                    className={`flex items-center gap-1 px-3 py-1.5 text-[11px] font-semibold rounded-md transition-all duration-200 ${
                       period === p.key
-                        ? "bg-white text-gray-900 shadow-[0_1px_3px_rgba(0,0,0,0.2),0_4px_12px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.9)] translate-y-[-0.5px]"
-                        : "text-muted-foreground hover:text-foreground hover:bg-white/[0.04]"
+                        ? "bg-white dark:bg-white text-gray-900 shadow-[0_1px_2px_rgba(0,0,0,0.06),0_2px_8px_rgba(0,0,0,0.04)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.3),0_4px_14px_rgba(0,0,0,0.2)] ring-1 ring-black/[0.04] dark:ring-white/[0.08]"
+                        : "text-muted-foreground hover:text-foreground hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
                     }`}
                   >
                     {period === p.key && periodLoading && (
@@ -2859,63 +2859,70 @@ export default function CallsPage() {
                   </motion.div>
                 ) : (
                   <>
-                    {/* ═══ Inline Metrics Strip ═══ */}
-                    <motion.div
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="flex items-center gap-5 px-5 py-3 rounded-xl bg-card/60 border border-border/30"
-                    >
-                      <MetricChip
-                        label="Team Avg"
-                        value={formatGapShort(gapData.team_avg_gap_seconds)}
-                        colorClass={gapColorClass(gapData.team_avg_gap_seconds)}
-                      />
-                      <div className="h-4 w-px bg-border/40" />
-                      <MetricChip label="Gaps" value={String(gapData.team_total_gaps)} />
-                      <div className="h-4 w-px bg-border/40" />
-                      <MetricChip label="Reps" value={String(gapData.team_total_reps)} />
-                      <div className="h-4 w-px bg-border/40" />
-                      <MetricChip
-                        label="Over 5min"
-                        value={String(gapData.reps.reduce((s, r) => s + r.gaps_over_5min, 0))}
-                        colorClass={gapData.reps.reduce((s, r) => s + r.gaps_over_5min, 0) > 0 ? "text-red-500" : undefined}
-                      />
-                    </motion.div>
-
                     {/* ═══ 3-Column Layout ═══ */}
                     <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.1fr_0.9fr] gap-4">
 
-                      {/* Column 1: Pace Ring */}
+                      {/* Column 1: Pace Overview — metrics at top, donut at bottom */}
                       <motion.div
                         initial={{ opacity: 0, y: 12 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.1 }}
-                        className="rounded-2xl bg-card border border-border/50 p-5"
+                        className="rounded-2xl bg-card border border-border/50 shadow-sm dark:shadow-none overflow-hidden flex flex-col"
                       >
-                        <div className="flex items-center gap-2 mb-4">
+                        {/* Header */}
+                        <div className="px-4 py-3 border-b border-border/30 flex items-center gap-2">
                           <Gauge className="size-4 text-muted-foreground" />
-                          <h3 className="text-sm font-semibold">Pace Distribution</h3>
+                          <h3 className="text-sm font-semibold">Pace Overview</h3>
                         </div>
-                        <PaceRingChart reps={gapData.reps} teamAvg={gapData.team_avg_gap_seconds} />
-                        {/* Mini stats below ring */}
-                        <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-border/30">
-                          <div className="text-center">
+
+                        {/* Metrics grid */}
+                        <div className="grid grid-cols-2 gap-px bg-border/30">
+                          <div className="bg-card p-3.5">
+                            <p className={`text-lg font-bold tabular-nums ${gapColorClass(gapData.team_avg_gap_seconds)}`}>
+                              {formatGapShort(gapData.team_avg_gap_seconds)}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider mt-0.5">Team Avg</p>
+                          </div>
+                          <div className="bg-card p-3.5">
+                            <p className="text-lg font-bold tabular-nums">{gapData.team_total_gaps}</p>
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider mt-0.5">Gaps</p>
+                          </div>
+                          <div className="bg-card p-3.5">
+                            <p className="text-lg font-bold tabular-nums">{gapData.team_total_reps}</p>
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider mt-0.5">Reps Active</p>
+                          </div>
+                          <div className="bg-card p-3.5">
+                            <p className={`text-lg font-bold tabular-nums ${gapData.reps.reduce((s, r) => s + r.gaps_over_5min, 0) > 0 ? "text-red-500" : ""}`}>
+                              {gapData.reps.reduce((s, r) => s + r.gaps_over_5min, 0)}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider mt-0.5">Over 5min</p>
+                          </div>
+                        </div>
+
+                        {/* Donut chart */}
+                        <div className="flex-1 flex flex-col items-center justify-center p-5">
+                          <PaceRingChart reps={gapData.reps} teamAvg={gapData.team_avg_gap_seconds} />
+                        </div>
+
+                        {/* Fastest / Avg / Slowest strip */}
+                        <div className="grid grid-cols-3 gap-px bg-border/30 border-t border-border/30">
+                          <div className="bg-card p-2.5 text-center">
                             <p className="text-xs font-bold tabular-nums text-emerald-500">
                               {formatGapShort(Math.min(...gapData.reps.filter(r => r.gap_count > 0).map(r => r.avg_gap_seconds), 0))}
                             </p>
-                            <p className="text-[10px] text-muted-foreground">Fastest</p>
+                            <p className="text-[9px] text-muted-foreground uppercase tracking-wider">Fastest</p>
                           </div>
-                          <div className="text-center">
+                          <div className="bg-card p-2.5 text-center">
                             <p className={`text-xs font-bold tabular-nums ${gapColorClass(gapData.team_avg_gap_seconds)}`}>
                               {formatGapShort(gapData.team_avg_gap_seconds)}
                             </p>
-                            <p className="text-[10px] text-muted-foreground">Team Avg</p>
+                            <p className="text-[9px] text-muted-foreground uppercase tracking-wider">Team Avg</p>
                           </div>
-                          <div className="text-center">
+                          <div className="bg-card p-2.5 text-center">
                             <p className="text-xs font-bold tabular-nums text-red-500">
                               {formatGapShort(Math.max(...gapData.reps.filter(r => r.gap_count > 0).map(r => r.avg_gap_seconds), 0))}
                             </p>
-                            <p className="text-[10px] text-muted-foreground">Slowest</p>
+                            <p className="text-[9px] text-muted-foreground uppercase tracking-wider">Slowest</p>
                           </div>
                         </div>
                       </motion.div>
@@ -2925,7 +2932,7 @@ export default function CallsPage() {
                         initial={{ opacity: 0, y: 12 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.15 }}
-                        className="rounded-2xl bg-card border border-border/50 overflow-hidden"
+                        className="rounded-2xl bg-card border border-border/50 shadow-sm dark:shadow-none overflow-hidden"
                       >
                         <div className="px-4 py-3 border-b border-border/30 flex items-center justify-between">
                           <div className="flex items-center gap-2">
@@ -2960,7 +2967,7 @@ export default function CallsPage() {
                         initial={{ opacity: 0, y: 12 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.2 }}
-                        className="rounded-2xl bg-card border border-border/50 overflow-hidden"
+                        className="rounded-2xl bg-card border border-border/50 shadow-sm dark:shadow-none overflow-hidden"
                       >
                         <div className="px-4 py-3 border-b border-border/30 flex items-center gap-2">
                           <Pulse className="size-4 text-muted-foreground" />
