@@ -21,15 +21,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'user_id is required' }, { status: 400 })
     }
 
+    const parsedId = parseInt(userId, 10)
+    if (isNaN(parsedId)) {
+      return NextResponse.json({ error: 'user_id must be a number' }, { status: 400 })
+    }
+
     // Default to today if no date specified
     const targetDate = date || new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' })
 
-    const { gaps, summary } = await getRepGapDetail(parseInt(userId, 10), targetDate)
+    const { gaps, summary } = await getRepGapDetail(parsedId, targetDate)
 
     return NextResponse.json({
       success: true,
       data: {
-        user_id: parseInt(userId, 10),
+        user_id: parsedId,
         date: targetDate,
         gaps,
         summary,

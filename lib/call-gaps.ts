@@ -72,17 +72,23 @@ const KEYS = {
   dailyGaps: (userId: number, date: string) => `gap:daily:${userId}:${date}`,
   dailySummary: (userId: number, date: string) => `gap:summary:${userId}:${date}`,
   callEvent: (userId: number, date: string) => `gap:events:${userId}:${date}`,
-  // Set of all user IDs that have gap data for a given date
+  // Set of all user IDs that have gap data for a given date — keyed by ID only
   activeReps: (date: string) => `gap:active_reps:${date}`,
+  // Separate hash for rep name lookup (avoids colon-in-name parsing issues)
+  repName: (userId: number) => `gap:rep_name:${userId}`,
 }
 
-// ── Redis Client ──
+// ── Redis Client (singleton) ──
+
+let redisInstance: Redis | null = null
 
 function getRedis(): Redis | null {
+  if (redisInstance) return redisInstance
   const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL
   const token = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN
   if (!url || !token) return null
-  return new Redis({ url, token })
+  redisInstance = new Redis({ url, token })
+  return redisInstance
 }
 
 // ── Core Logic ──
@@ -90,6 +96,9 @@ function getRedis(): Redis | null {
 /**
  * Record that a call ended for a given user.
  * Stores the timestamp so we can calculate the gap when the next call starts.
+ * Uses atomic pipeline — no read-modify-write race conditions for non-summary fields.
+ * Summary is read then written, but concurrent webhooks for the same rep are rare
+ * (a rep can only be on one call at a time) so the risk is minimal.
  */
 export async function recordCallEnded(
   aircallUserId: number,
@@ -102,67 +111,76 @@ export async function recordCallEnded(
   const redis = getRedis()
   if (!redis) return
 
-  const date = toDateString(endedAt)
+  try {
+    const date = toDateString(endedAt)
 
-  const lastEnded: LastCallEnded = {
-    call_id: callId,
-    ended_at: endedAt,
-    direction,
-    rep_name: repName,
-  }
-
-  const pipeline = redis.pipeline()
-
-  // Store last call ended for this user (for gap calculation)
-  pipeline.set(KEYS.lastCallEnded(aircallUserId), lastEnded, { ex: 86400 }) // 24h TTL
-
-  // Track this rep as active today
-  pipeline.sadd(KEYS.activeReps(date), `${aircallUserId}:${repName}`)
-  pipeline.expire(KEYS.activeReps(date), 172800) // 48h TTL
-
-  // Store call event for detail view
-  const event = {
-    type: 'call_ended' as const,
-    call_id: callId,
-    timestamp: endedAt,
-    direction,
-    duration,
-  }
-  pipeline.rpush(KEYS.callEvent(aircallUserId, date), JSON.stringify(event))
-  pipeline.expire(KEYS.callEvent(aircallUserId, date), 7776000) // 90 days
-
-  // Update daily summary call counts
-  const summaryKey = KEYS.dailySummary(aircallUserId, date)
-  const existingSummary = await redis.get<RepDailySummary>(summaryKey)
-
-  if (existingSummary) {
-    existingSummary.total_calls += 1
-    if (direction === 'outbound') existingSummary.outbound_calls += 1
-    else existingSummary.inbound_calls += 1
-    existingSummary.total_talk_time += duration
-    existingSummary.updated_at = new Date().toISOString()
-    pipeline.set(summaryKey, existingSummary, { ex: 7776000 })
-  } else {
-    const summary: RepDailySummary = {
-      aircall_user_id: aircallUserId,
+    const lastEnded: LastCallEnded = {
+      call_id: callId,
+      ended_at: endedAt,
+      direction,
       rep_name: repName,
-      date,
-      total_calls: 1,
-      outbound_calls: direction === 'outbound' ? 1 : 0,
-      inbound_calls: direction === 'inbound' ? 1 : 0,
-      total_talk_time: duration,
-      total_idle_time: 0,
-      avg_gap_seconds: 0,
-      max_gap_seconds: 0,
-      min_gap_seconds: 0,
-      gap_count: 0,
-      gaps_over_5min: 0,
-      updated_at: new Date().toISOString(),
     }
-    pipeline.set(summaryKey, summary, { ex: 7776000 })
-  }
 
-  await pipeline.exec()
+    // Read summary first (outside pipeline)
+    const summaryKey = KEYS.dailySummary(aircallUserId, date)
+    const existingSummary = await redis.get<RepDailySummary>(summaryKey)
+
+    // Build pipeline with all writes
+    const pipeline = redis.pipeline()
+
+    // Store last call ended for this user (for gap calculation)
+    pipeline.set(KEYS.lastCallEnded(aircallUserId), lastEnded, { ex: 86400 })
+
+    // Track this rep as active today (by ID only — no colon parsing issues)
+    pipeline.sadd(KEYS.activeReps(date), aircallUserId.toString())
+    pipeline.expire(KEYS.activeReps(date), 172800)
+
+    // Store rep name separately
+    pipeline.set(KEYS.repName(aircallUserId), repName, { ex: 172800 })
+
+    // Store call event for detail view
+    const event = {
+      type: 'call_ended' as const,
+      call_id: callId,
+      timestamp: endedAt,
+      direction,
+      duration,
+    }
+    pipeline.rpush(KEYS.callEvent(aircallUserId, date), JSON.stringify(event))
+    pipeline.expire(KEYS.callEvent(aircallUserId, date), 7776000)
+
+    // Update daily summary
+    if (existingSummary) {
+      existingSummary.total_calls += 1
+      if (direction === 'outbound') existingSummary.outbound_calls += 1
+      else existingSummary.inbound_calls += 1
+      existingSummary.total_talk_time += duration
+      existingSummary.updated_at = new Date().toISOString()
+      pipeline.set(summaryKey, existingSummary, { ex: 7776000 })
+    } else {
+      const summary: RepDailySummary = {
+        aircall_user_id: aircallUserId,
+        rep_name: repName,
+        date,
+        total_calls: 1,
+        outbound_calls: direction === 'outbound' ? 1 : 0,
+        inbound_calls: direction === 'inbound' ? 1 : 0,
+        total_talk_time: duration,
+        total_idle_time: 0,
+        avg_gap_seconds: 0,
+        max_gap_seconds: 0,
+        min_gap_seconds: 0,
+        gap_count: 0,
+        gaps_over_5min: 0,
+        updated_at: new Date().toISOString(),
+      }
+      pipeline.set(summaryKey, summary, { ex: 7776000 })
+    }
+
+    await pipeline.exec()
+  } catch (error) {
+    console.error('❌ recordCallEnded Redis error:', error)
+  }
 }
 
 /**
@@ -179,50 +197,57 @@ export async function recordCallStarted(
   const redis = getRedis()
   if (!redis) return null
 
-  const date = toDateString(startedAt)
+  try {
+    const date = toDateString(startedAt)
 
-  // Track this rep as active today
-  await redis.sadd(KEYS.activeReps(date), `${aircallUserId}:${repName}`)
-  await redis.expire(KEYS.activeReps(date), 172800)
+    // Track rep and store event in a pipeline
+    const setupPipeline = redis.pipeline()
+    setupPipeline.sadd(KEYS.activeReps(date), aircallUserId.toString())
+    setupPipeline.expire(KEYS.activeReps(date), 172800)
+    setupPipeline.set(KEYS.repName(aircallUserId), repName, { ex: 172800 })
+    setupPipeline.rpush(KEYS.callEvent(aircallUserId, date), JSON.stringify({
+      type: 'call_started' as const,
+      call_id: callId,
+      timestamp: startedAt,
+      direction,
+    }))
+    setupPipeline.expire(KEYS.callEvent(aircallUserId, date), 7776000)
+    await setupPipeline.exec()
 
-  // Store call event
-  const event = {
-    type: 'call_started' as const,
-    call_id: callId,
-    timestamp: startedAt,
-    direction,
+    // Look up previous call ended
+    const lastEnded = await redis.get<LastCallEnded>(KEYS.lastCallEnded(aircallUserId))
+    if (!lastEnded) return null // First call of the day or no previous data
+
+    const gapSeconds = startedAt - lastEnded.ended_at
+
+    // Validate gap
+    if (gapSeconds <= 0) return null // Overlapping calls
+    if (gapSeconds > MAX_GAP_THRESHOLD) return null // Overnight / lunch break
+
+    const gap: CallGap = {
+      previous_call_id: lastEnded.call_id,
+      previous_call_ended_at: lastEnded.ended_at,
+      previous_call_direction: lastEnded.direction,
+      current_call_id: callId,
+      current_call_started_at: startedAt,
+      current_call_direction: direction,
+      gap_seconds: gapSeconds,
+    }
+
+    // Store gap and update summary in a pipeline
+    const gapPipeline = redis.pipeline()
+    gapPipeline.rpush(KEYS.dailyGaps(aircallUserId, date), JSON.stringify(gap))
+    gapPipeline.expire(KEYS.dailyGaps(aircallUserId, date), 31536000)
+    await gapPipeline.exec()
+
+    // Update daily summary with new gap
+    await updateDailySummaryWithGap(redis, aircallUserId, repName, date, gapSeconds)
+
+    return gap
+  } catch (error) {
+    console.error('❌ recordCallStarted Redis error:', error)
+    return null
   }
-  await redis.rpush(KEYS.callEvent(aircallUserId, date), JSON.stringify(event))
-  await redis.expire(KEYS.callEvent(aircallUserId, date), 7776000)
-
-  // Look up previous call ended
-  const lastEnded = await redis.get<LastCallEnded>(KEYS.lastCallEnded(aircallUserId))
-  if (!lastEnded) return null // First call of the day or no previous data
-
-  const gapSeconds = startedAt - lastEnded.ended_at
-
-  // Validate gap
-  if (gapSeconds <= 0) return null // Overlapping calls
-  if (gapSeconds > MAX_GAP_THRESHOLD) return null // Overnight / lunch break
-
-  const gap: CallGap = {
-    previous_call_id: lastEnded.call_id,
-    previous_call_ended_at: lastEnded.ended_at,
-    previous_call_direction: lastEnded.direction,
-    current_call_id: callId,
-    current_call_started_at: startedAt,
-    current_call_direction: direction,
-    gap_seconds: gapSeconds,
-  }
-
-  // Store the gap
-  await redis.rpush(KEYS.dailyGaps(aircallUserId, date), JSON.stringify(gap))
-  await redis.expire(KEYS.dailyGaps(aircallUserId, date), 31536000) // 12 months
-
-  // Update daily summary with new gap
-  await updateDailySummaryWithGap(redis, aircallUserId, repName, date, gapSeconds)
-
-  return gap
 }
 
 /**
@@ -235,38 +260,42 @@ async function updateDailySummaryWithGap(
   date: string,
   gapSeconds: number
 ): Promise<void> {
-  const summaryKey = KEYS.dailySummary(aircallUserId, date)
-  const existing = await redis.get<RepDailySummary>(summaryKey)
+  try {
+    const summaryKey = KEYS.dailySummary(aircallUserId, date)
+    const existing = await redis.get<RepDailySummary>(summaryKey)
 
-  if (existing) {
-    existing.gap_count += 1
-    existing.total_idle_time += gapSeconds
-    existing.avg_gap_seconds = Math.round(existing.total_idle_time / existing.gap_count)
-    existing.max_gap_seconds = Math.max(existing.max_gap_seconds, gapSeconds)
-    existing.min_gap_seconds = existing.min_gap_seconds === 0
-      ? gapSeconds
-      : Math.min(existing.min_gap_seconds, gapSeconds)
-    if (gapSeconds > 300) existing.gaps_over_5min += 1
-    existing.updated_at = new Date().toISOString()
-    await redis.set(summaryKey, existing, { ex: 7776000 })
-  } else {
-    const summary: RepDailySummary = {
-      aircall_user_id: aircallUserId,
-      rep_name: repName,
-      date,
-      total_calls: 0,
-      outbound_calls: 0,
-      inbound_calls: 0,
-      total_talk_time: 0,
-      total_idle_time: gapSeconds,
-      avg_gap_seconds: gapSeconds,
-      max_gap_seconds: gapSeconds,
-      min_gap_seconds: gapSeconds,
-      gap_count: 1,
-      gaps_over_5min: gapSeconds > 300 ? 1 : 0,
-      updated_at: new Date().toISOString(),
+    if (existing) {
+      existing.gap_count += 1
+      existing.total_idle_time += gapSeconds
+      existing.avg_gap_seconds = Math.round(existing.total_idle_time / existing.gap_count)
+      existing.max_gap_seconds = Math.max(existing.max_gap_seconds, gapSeconds)
+      existing.min_gap_seconds = existing.min_gap_seconds === 0
+        ? gapSeconds
+        : Math.min(existing.min_gap_seconds, gapSeconds)
+      if (gapSeconds > 300) existing.gaps_over_5min += 1
+      existing.updated_at = new Date().toISOString()
+      await redis.set(summaryKey, existing, { ex: 7776000 })
+    } else {
+      const summary: RepDailySummary = {
+        aircall_user_id: aircallUserId,
+        rep_name: repName,
+        date,
+        total_calls: 0,
+        outbound_calls: 0,
+        inbound_calls: 0,
+        total_talk_time: 0,
+        total_idle_time: gapSeconds,
+        avg_gap_seconds: gapSeconds,
+        max_gap_seconds: gapSeconds,
+        min_gap_seconds: gapSeconds,
+        gap_count: 1,
+        gaps_over_5min: gapSeconds > 300 ? 1 : 0,
+        updated_at: new Date().toISOString(),
+      }
+      await redis.set(summaryKey, summary, { ex: 7776000 })
     }
-    await redis.set(summaryKey, summary, { ex: 7776000 })
+  } catch (error) {
+    console.error('❌ updateDailySummaryWithGap Redis error:', error)
   }
 }
 
@@ -279,48 +308,53 @@ export async function getGapsToday(): Promise<LiveRepGap[]> {
   const redis = getRedis()
   if (!redis) return []
 
-  const date = todayDateString()
-  const members = await redis.smembers(KEYS.activeReps(date))
-  if (!members || members.length === 0) return []
+  try {
+    const date = todayDateString()
+    const members = await redis.smembers(KEYS.activeReps(date))
+    if (!members || members.length === 0) return []
 
-  const now = Math.floor(Date.now() / 1000)
-  const results: LiveRepGap[] = []
+    const now = Math.floor(Date.now() / 1000)
+    const results: LiveRepGap[] = []
 
-  for (const member of members) {
-    const [userIdStr, ...nameParts] = (member as string).split(':')
-    const userId = parseInt(userIdStr, 10)
-    const repName = nameParts.join(':')
+    for (const member of members) {
+      const userId = parseInt(member as string, 10)
+      if (isNaN(userId)) continue // Skip malformed entries
 
-    const [summary, lastEnded] = await Promise.all([
-      redis.get<RepDailySummary>(KEYS.dailySummary(userId, date)),
-      redis.get<LastCallEnded>(KEYS.lastCallEnded(userId)),
-    ])
+      const [summary, lastEnded, storedName] = await Promise.all([
+        redis.get<RepDailySummary>(KEYS.dailySummary(userId, date)),
+        redis.get<LastCallEnded>(KEYS.lastCallEnded(userId)),
+        redis.get<string>(KEYS.repName(userId)),
+      ])
 
-    const currentIdleSeconds = lastEnded ? Math.max(0, now - lastEnded.ended_at) : 0
+      const repName = storedName || summary?.rep_name || lastEnded?.rep_name || 'Unknown'
+      const currentIdleSeconds = lastEnded ? Math.max(0, now - lastEnded.ended_at) : 0
 
-    results.push({
-      aircall_user_id: userId,
-      rep_name: repName || summary?.rep_name || 'Unknown',
-      last_call_ended_at: lastEnded?.ended_at || 0,
-      current_idle_seconds: currentIdleSeconds > MAX_GAP_THRESHOLD ? 0 : currentIdleSeconds,
-      avg_gap_seconds: summary?.avg_gap_seconds || 0,
-      max_gap_seconds: summary?.max_gap_seconds || 0,
-      min_gap_seconds: summary?.min_gap_seconds || 0,
-      gap_count: summary?.gap_count || 0,
-      gaps_over_5min: summary?.gaps_over_5min || 0,
-      total_idle_time: summary?.total_idle_time || 0,
-      total_calls: summary?.total_calls || 0,
+      results.push({
+        aircall_user_id: userId,
+        rep_name: repName,
+        last_call_ended_at: lastEnded?.ended_at || 0,
+        current_idle_seconds: currentIdleSeconds > MAX_GAP_THRESHOLD ? 0 : currentIdleSeconds,
+        avg_gap_seconds: summary?.avg_gap_seconds || 0,
+        max_gap_seconds: summary?.max_gap_seconds || 0,
+        min_gap_seconds: summary?.min_gap_seconds || 0,
+        gap_count: summary?.gap_count || 0,
+        gaps_over_5min: summary?.gaps_over_5min || 0,
+        total_idle_time: summary?.total_idle_time || 0,
+        total_calls: summary?.total_calls || 0,
+      })
+    }
+
+    // Sort by avg_gap ascending (fastest pace first)
+    return results.sort((a, b) => {
+      if (a.gap_count === 0 && b.gap_count === 0) return b.total_calls - a.total_calls
+      if (a.gap_count === 0) return 1
+      if (b.gap_count === 0) return -1
+      return a.avg_gap_seconds - b.avg_gap_seconds
     })
+  } catch (error) {
+    console.error('❌ getGapsToday Redis error:', error)
+    return []
   }
-
-  // Sort by avg_gap ascending (fastest pace first)
-  return results.sort((a, b) => {
-    // Reps with gaps first, then by avg gap ascending
-    if (a.gap_count === 0 && b.gap_count === 0) return b.total_calls - a.total_calls
-    if (a.gap_count === 0) return 1
-    if (b.gap_count === 0) return -1
-    return a.avg_gap_seconds - b.avg_gap_seconds
-  })
 }
 
 /**
@@ -330,33 +364,40 @@ export async function getLiveIdleData(): Promise<{ aircall_user_id: number; rep_
   const redis = getRedis()
   if (!redis) return []
 
-  const date = todayDateString()
-  const members = await redis.smembers(KEYS.activeReps(date))
-  if (!members || members.length === 0) return []
+  try {
+    const date = todayDateString()
+    const members = await redis.smembers(KEYS.activeReps(date))
+    if (!members || members.length === 0) return []
 
-  const now = Math.floor(Date.now() / 1000)
-  const results: { aircall_user_id: number; rep_name: string; idle_seconds: number; last_call_ended_at: number }[] = []
+    const now = Math.floor(Date.now() / 1000)
+    const results: { aircall_user_id: number; rep_name: string; idle_seconds: number; last_call_ended_at: number }[] = []
 
-  for (const member of members) {
-    const [userIdStr, ...nameParts] = (member as string).split(':')
-    const userId = parseInt(userIdStr, 10)
-    const repName = nameParts.join(':')
+    for (const member of members) {
+      const userId = parseInt(member as string, 10)
+      if (isNaN(userId)) continue
 
-    const lastEnded = await redis.get<LastCallEnded>(KEYS.lastCallEnded(userId))
-    if (!lastEnded) continue
+      const [lastEnded, storedName] = await Promise.all([
+        redis.get<LastCallEnded>(KEYS.lastCallEnded(userId)),
+        redis.get<string>(KEYS.repName(userId)),
+      ])
+      if (!lastEnded) continue
 
-    const idleSeconds = Math.max(0, now - lastEnded.ended_at)
-    if (idleSeconds > MAX_GAP_THRESHOLD) continue // Skip if idle too long (not working)
+      const idleSeconds = Math.max(0, now - lastEnded.ended_at)
+      if (idleSeconds > MAX_GAP_THRESHOLD) continue
 
-    results.push({
-      aircall_user_id: userId,
-      rep_name: repName || lastEnded.rep_name,
-      idle_seconds: idleSeconds,
-      last_call_ended_at: lastEnded.ended_at,
-    })
+      results.push({
+        aircall_user_id: userId,
+        rep_name: storedName || lastEnded.rep_name,
+        idle_seconds: idleSeconds,
+        last_call_ended_at: lastEnded.ended_at,
+      })
+    }
+
+    return results.sort((a, b) => a.idle_seconds - b.idle_seconds)
+  } catch (error) {
+    console.error('❌ getLiveIdleData Redis error:', error)
+    return []
   }
-
-  return results.sort((a, b) => a.idle_seconds - b.idle_seconds)
 }
 
 /**
@@ -369,24 +410,29 @@ export async function getRepGapDetail(
   const redis = getRedis()
   if (!redis) return { gaps: [], summary: null }
 
-  const [rawGaps, summary] = await Promise.all([
-    redis.lrange(KEYS.dailyGaps(aircallUserId, date), 0, -1),
-    redis.get<RepDailySummary>(KEYS.dailySummary(aircallUserId, date)),
-  ])
+  try {
+    const [rawGaps, summary] = await Promise.all([
+      redis.lrange(KEYS.dailyGaps(aircallUserId, date), 0, -1),
+      redis.get<RepDailySummary>(KEYS.dailySummary(aircallUserId, date)),
+    ])
 
-  const gaps: CallGap[] = rawGaps.map((raw) => {
-    if (typeof raw === 'string') return JSON.parse(raw)
-    return raw as CallGap
-  })
+    const gaps: CallGap[] = rawGaps.map((raw) => {
+      if (typeof raw === 'string') return JSON.parse(raw)
+      return raw as CallGap
+    })
 
-  return { gaps, summary }
+    return { gaps, summary }
+  } catch (error) {
+    console.error('❌ getRepGapDetail Redis error:', error)
+    return { gaps: [], summary: null }
+  }
 }
 
 /**
- * Get team-wide average gap for today.
+ * Compute team-wide average gap from an already-fetched reps array.
+ * Avoids double-fetching getGapsToday().
  */
-export async function getTeamAvgGap(): Promise<{ avg_gap_seconds: number; total_reps: number; total_gaps: number }> {
-  const reps = await getGapsToday()
+export function computeTeamAvgGap(reps: LiveRepGap[]): { avg_gap_seconds: number; total_reps: number; total_gaps: number } {
   const repsWithGaps = reps.filter(r => r.gap_count > 0)
 
   if (repsWithGaps.length === 0) return { avg_gap_seconds: 0, total_reps: 0, total_gaps: 0 }
@@ -404,7 +450,6 @@ export async function getTeamAvgGap(): Promise<{ avg_gap_seconds: number; total_
 // ── Helpers ──
 
 function toDateString(unixTimestamp: number): string {
-  // Use UK timezone for date grouping
   return new Date(unixTimestamp * 1000).toLocaleDateString('en-CA', { timeZone: 'Europe/London' })
 }
 
@@ -423,6 +468,7 @@ export function formatGapDuration(seconds: number): string {
 }
 
 export function formatGapShort(seconds: number): string {
+  if (!seconds || seconds === 0) return '—'
   if (seconds < 60) return `${seconds}s`
   const m = Math.floor(seconds / 60)
   const s = seconds % 60

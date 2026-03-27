@@ -1009,12 +1009,14 @@ function GapRepRow({
   }, [rep.current_idle_seconds]);
 
   useEffect(() => {
-    if (rep.last_call_ended_at === 0 || rep.current_idle_seconds === 0) return;
+    if (rep.last_call_ended_at === 0 || liveIdle === 0) return;
     const interval = setInterval(() => {
       setLiveIdle((prev) => prev + 1);
     }, 1000);
     return () => clearInterval(interval);
-  }, [rep.last_call_ended_at, rep.current_idle_seconds]);
+    // Only restart interval when the server value changes (every 30s poll), not on every tick
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rep.last_call_ended_at]);
 
   const showIdle = liveIdle > 0 && liveIdle < 3600;
 
@@ -1338,11 +1340,6 @@ export default function CallsPage() {
     previousPeriodRef.current = period;
     fetchCallData(hasFetchedOnce.current);
 
-    // Also fetch gap data for Overview KPI card
-    if (activeTab === "overview") {
-      fetchGapData();
-    }
-
     // Restore cached digest for this period
     try {
       const cached = sessionStorage.getItem(`calls_digest_${period}`);
@@ -1373,18 +1370,26 @@ export default function CallsPage() {
     }
   }, []);
 
-  // Fetch gap data when switching to dial-pace tab, poll every 30s
+  // Fetch gap data — poll on dial-pace tab, one-shot on overview tab
   useEffect(() => {
-    if (!user || activeTab !== "dial-pace") {
-      if (gapPollRef.current) clearInterval(gapPollRef.current);
-      return;
+    if (!user) return;
+
+    if (activeTab === "dial-pace") {
+      setGapLoading(true);
+      fetchGapData().finally(() => setGapLoading(false));
+      gapPollRef.current = setInterval(fetchGapData, 30_000);
+      return () => {
+        if (gapPollRef.current) clearInterval(gapPollRef.current);
+      };
     }
-    setGapLoading(true);
-    fetchGapData().finally(() => setGapLoading(false));
-    gapPollRef.current = setInterval(fetchGapData, 30_000);
-    return () => {
-      if (gapPollRef.current) clearInterval(gapPollRef.current);
-    };
+
+    if (activeTab === "overview") {
+      // One-shot fetch for the Team Avg Gap KPI card (no polling)
+      fetchGapData();
+    }
+
+    // Cleanup polling if switching away from dial-pace
+    if (gapPollRef.current) clearInterval(gapPollRef.current);
   }, [user, activeTab, fetchGapData]);
 
   const fetchGapDetail = useCallback(async (userId: number) => {

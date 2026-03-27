@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getGapsToday, getTeamAvgGap, getLiveIdleData } from '@/lib/call-gaps'
+import { getGapsToday, computeTeamAvgGap, getLiveIdleData } from '@/lib/call-gaps'
 import { apiErrorResponse, requireApiUser } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
@@ -28,10 +28,9 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    const [reps, teamAvg] = await Promise.all([
-      getGapsToday(),
-      getTeamAvgGap(),
-    ])
+    // Fetch reps once, compute team avg from the same data (no double fetch)
+    const reps = await getGapsToday()
+    const teamAvg = computeTeamAvgGap(reps)
 
     return NextResponse.json({
       success: true,
