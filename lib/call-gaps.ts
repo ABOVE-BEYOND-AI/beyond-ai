@@ -315,10 +315,13 @@ export async function getGapsToday(): Promise<LiveRepGap[]> {
 
     const now = Math.floor(Date.now() / 1000)
     const results: LiveRepGap[] = []
+    const seenUserIds = new Set<number>()
 
     for (const member of members) {
       const userId = parseInt(member as string, 10)
-      if (isNaN(userId)) continue // Skip malformed entries
+      if (isNaN(userId)) continue
+      if (seenUserIds.has(userId)) continue // Deduplicate (old format "id:name" + new format "id")
+      seenUserIds.add(userId)
 
       const [summary, lastEnded, storedName] = await Promise.all([
         redis.get<RepDailySummary>(KEYS.dailySummary(userId, date)),
@@ -371,10 +374,13 @@ export async function getLiveIdleData(): Promise<{ aircall_user_id: number; rep_
 
     const now = Math.floor(Date.now() / 1000)
     const results: { aircall_user_id: number; rep_name: string; idle_seconds: number; last_call_ended_at: number }[] = []
+    const seenUserIds = new Set<number>()
 
     for (const member of members) {
       const userId = parseInt(member as string, 10)
       if (isNaN(userId)) continue
+      if (seenUserIds.has(userId)) continue
+      seenUserIds.add(userId)
 
       const [lastEnded, storedName] = await Promise.all([
         redis.get<LastCallEnded>(KEYS.lastCallEnded(userId)),

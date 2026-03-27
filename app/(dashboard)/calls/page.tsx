@@ -1793,7 +1793,7 @@ export default function CallsPage() {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4 }}
-            className="bg-card/80 backdrop-blur-sm border border-border/50 rounded-2xl px-4 py-2.5 flex items-center justify-between gap-3"
+            className="bg-card/80 backdrop-blur-sm border border-border/50 rounded-2xl px-5 py-3.5 flex items-center justify-between gap-4"
           >
             {/* Left: Title */}
             <div className="flex items-center gap-2.5 shrink-0">
@@ -1802,15 +1802,15 @@ export default function CallsPage() {
             </div>
 
             {/* Center: Tab pills */}
-            <div className="flex bg-muted/40 rounded-lg p-0.5 border border-border/30 overflow-x-auto scrollbar-hide">
+            <div className="flex bg-black/30 rounded-xl p-1 border border-white/[0.06] overflow-x-auto scrollbar-hide shadow-[inset_0_1px_2px_rgba(0,0,0,0.3)]">
               {TABS.map((tab) => (
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all duration-200 whitespace-nowrap ${
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all duration-250 whitespace-nowrap ${
                     activeTab === tab.key
-                      ? "bg-white text-gray-900 shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
+                      ? "bg-white text-gray-900 shadow-[0_1px_3px_rgba(0,0,0,0.2),0_4px_12px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.9)] translate-y-[-0.5px]"
+                      : "text-muted-foreground hover:text-foreground hover:bg-white/[0.04]"
                   }`}
                 >
                   <tab.icon className="size-3.5" weight={activeTab === tab.key ? "fill" : "regular"} />
@@ -1820,20 +1820,20 @@ export default function CallsPage() {
             </div>
 
             {/* Right: Period selector + refresh */}
-            <div className="flex items-center gap-2 shrink-0">
-              <div className="flex bg-muted/40 rounded-md p-0.5 border border-border/30">
+            <div className="flex items-center gap-2.5 shrink-0">
+              <div className="flex bg-black/30 rounded-lg p-0.5 border border-white/[0.06] shadow-[inset_0_1px_2px_rgba(0,0,0,0.3)]">
                 {PERIODS.map((p) => (
                   <button
                     key={p.key}
                     onClick={() => setPeriod(p.key)}
-                    className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded transition-all duration-200 ${
+                    className={`flex items-center gap-1 px-3 py-1.5 text-[11px] font-semibold rounded-md transition-all duration-250 ${
                       period === p.key
-                        ? "bg-white text-gray-900 shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
+                        ? "bg-white text-gray-900 shadow-[0_1px_3px_rgba(0,0,0,0.2),0_4px_12px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.9)] translate-y-[-0.5px]"
+                        : "text-muted-foreground hover:text-foreground hover:bg-white/[0.04]"
                     }`}
                   >
                     {period === p.key && periodLoading && (
-                      <SpinnerGap className="size-3 animate-spin" />
+                      <SpinnerGap className="size-3 animate-spin text-gray-900" />
                     )}
                     {p.key === "today" ? "Today" : p.key === "week" ? "Week" : "Month"}
                   </button>
