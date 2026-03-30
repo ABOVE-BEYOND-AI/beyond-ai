@@ -30,7 +30,7 @@ export async function GET() {
           const url = cached[i]
           if (url) {
             // Attach as a virtual field — not in Salesforce, just for the frontend
-            ;(needsImage[i] as Record<string, unknown>).Serper_Image__c = url
+            ;(needsImage[i] as unknown as Record<string, unknown>).Serper_Image__c = url
           }
         }
       } catch {
