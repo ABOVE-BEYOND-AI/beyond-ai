@@ -88,10 +88,12 @@ const BASE_URL = 'https://api.aircall.io/v1'
 let rateLimitRemaining = 60
 let rateLimitReset = 0
 
-async function aircallFetch<T>(path: string, options?: RequestInit): Promise<T> {
+async function aircallFetch<T>(path: string, options?: RequestInit, _retryCount = 0): Promise<T> {
+  const MAX_RETRIES = 3
+
   // Only throttle when we're actually close to the limit
   if (rateLimitRemaining <= 2 && Date.now() / 1000 < rateLimitReset) {
-    const waitMs = (rateLimitReset - Date.now() / 1000) * 1000 + 500
+    const waitMs = Math.min((rateLimitReset - Date.now() / 1000) * 1000 + 500, 15000)
     console.log(`⏳ Aircall rate limit: waiting ${Math.round(waitMs)}ms`)
     await new Promise(resolve => setTimeout(resolve, waitMs))
   }
@@ -114,11 +116,16 @@ async function aircallFetch<T>(path: string, options?: RequestInit): Promise<T> 
   if (reset) rateLimitReset = parseInt(reset, 10)
 
   if (response.status === 429) {
-    // Rate limited — wait and retry
-    const retryAfter = rateLimitReset > 0 ? (rateLimitReset - Date.now() / 1000) * 1000 + 1000 : 5000
-    console.warn(`⚠️ Aircall rate limited. Retrying in ${Math.round(retryAfter)}ms`)
+    if (_retryCount >= MAX_RETRIES) {
+      throw new Error(`Aircall API rate limited after ${MAX_RETRIES} retries`)
+    }
+    const retryAfter = Math.min(
+      rateLimitReset > 0 ? (rateLimitReset - Date.now() / 1000) * 1000 + 1000 : 5000,
+      15000 // Cap at 15 seconds
+    )
+    console.warn(`⚠️ Aircall rate limited (${_retryCount + 1}/${MAX_RETRIES}). Retrying in ${Math.round(retryAfter)}ms`)
     await new Promise(resolve => setTimeout(resolve, retryAfter))
-    return aircallFetch(path, options)
+    return aircallFetch(path, options, _retryCount + 1)
   }
 
   if (!response.ok) {

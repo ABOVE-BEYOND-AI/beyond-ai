@@ -43,7 +43,13 @@ import { useGoogleAuth } from "@/components/google-auth-provider-clean";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback, useRef } from "react";
 import NumberFlow from "@number-flow/react";
-import { BarChart, SparkAreaChart, CategoryBar } from "@tremor/react";
+import { Area, AreaChart, CartesianGrid, XAxis } from "recharts";
+import {
+  type ChartConfig,
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -298,45 +304,82 @@ function highlightExcerpt(excerpt: string, keyword: string): React.ReactNode {
   );
 }
 
-// ── Activity Bar Chart (Tremor) ──
+// ── Activity Area Chart (shadcn + Recharts) ──
+
+const activityChartConfig = {
+  outbound: { label: "Outbound", color: "hsl(217, 91%, 60%)" },         // bright blue
+  inbound: { label: "Inbound", color: "hsl(var(--muted-foreground))" },  // grey
+} satisfies ChartConfig;
 
 function ActivityChart({ data }: { data: HourlyData }) {
   const hours = Object.keys(data).map(Number).sort((a, b) => a - b);
   const chartData = hours.map((h) => ({
     hour: `${h.toString().padStart(2, "0")}:00`,
-    Outbound: data[h]?.outbound || 0,
-    Inbound: data[h]?.inbound || 0,
+    outbound: data[h]?.outbound || 0,
+    inbound: data[h]?.inbound || 0,
   }));
 
-  // Trend summary
-  const totalOut = chartData.reduce((s, d) => s + d.Outbound, 0);
-  const totalIn = chartData.reduce((s, d) => s + d.Inbound, 0);
+  const totalOut = chartData.reduce((s, d) => s + d.outbound, 0);
+  const totalIn = chartData.reduce((s, d) => s + d.inbound, 0);
   const totalAll = totalOut + totalIn;
-  const peakHour = chartData.reduce((peak, d, _i, arr) => {
-    const total = d.Outbound + d.Inbound;
-    const peakTotal = peak.Outbound + peak.Inbound;
+  const peakHour = chartData.reduce((peak, d) => {
+    const total = d.outbound + d.inbound;
+    const peakTotal = peak.outbound + peak.inbound;
     return total > peakTotal ? d : peak;
-  }, chartData[0] || { hour: "—", Outbound: 0, Inbound: 0 });
+  }, chartData[0] || { hour: "—", outbound: 0, inbound: 0 });
 
   return (
     <div>
-      <BarChart
-        data={chartData}
-        index="hour"
-        categories={["Outbound", "Inbound"]}
-        colors={["blue", "violet"]}
-        stack={true}
-        showLegend={false}
-        showGridLines={false}
-        showYAxis={false}
-        className="h-44"
-        barCategoryGap="20%"
-      />
+      <ChartContainer config={activityChartConfig} className="h-[200px] w-full">
+        <AreaChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
+          <defs>
+            <linearGradient id="fillOutbound" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--color-outbound)" stopOpacity={0.25} />
+              <stop offset="100%" stopColor="var(--color-outbound)" stopOpacity={0.01} />
+            </linearGradient>
+            <linearGradient id="fillInbound" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--color-inbound)" stopOpacity={0.08} />
+              <stop offset="100%" stopColor="var(--color-inbound)" stopOpacity={0.01} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.4} />
+          <XAxis
+            dataKey="hour"
+            axisLine={false}
+            tickLine={false}
+            tickMargin={10}
+            tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+          />
+          <ChartTooltip
+            content={<ChartTooltipContent indicator="dot" />}
+            cursor={{ stroke: "hsl(var(--muted-foreground))", strokeWidth: 1, strokeOpacity: 0.3 }}
+          />
+          <Area
+            type="monotone"
+            dataKey="outbound"
+            stroke="var(--color-outbound)"
+            strokeWidth={2}
+            fill="url(#fillOutbound)"
+            dot={false}
+            activeDot={{ r: 4, strokeWidth: 2, fill: "hsl(var(--card))" }}
+          />
+          <Area
+            type="monotone"
+            dataKey="inbound"
+            stroke="var(--color-inbound)"
+            strokeWidth={1.5}
+            strokeOpacity={0.5}
+            fill="url(#fillInbound)"
+            dot={false}
+            activeDot={{ r: 3, strokeWidth: 2, fill: "hsl(var(--card))" }}
+          />
+        </AreaChart>
+      </ChartContainer>
       {totalAll > 0 && (
-        <p className="text-[10px] text-muted-foreground/50 px-1 mt-1 tabular-nums">
-          Peak: {peakHour.hour} ({peakHour.Outbound + peakHour.Inbound} calls)
+        <p className="text-[10px] text-muted-foreground/40 px-1 mt-1.5 tabular-nums">
+          Peak: {peakHour.hour} ({peakHour.outbound + peakHour.inbound} calls)
           {" · "}
-          {totalAll > 0 && `${Math.round((totalOut / totalAll) * 100)}% outbound`}
+          {Math.round((totalOut / totalAll) * 100)}% outbound
         </p>
       )}
     </div>
@@ -357,65 +400,52 @@ function RepRow({
   large?: boolean;
 }) {
   const barWidth = maxCalls > 0 ? (rep.total_calls / maxCalls) * 100 : 0;
-  const rankSize = large ? "size-12 text-lg" : "size-8 text-sm";
+  const answerRate = rep.total_calls > 0 ? Math.round((rep.answered_calls / rep.total_calls) * 100) : 0;
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: -12 }}
+      initial={{ opacity: 0, x: -8 }}
       animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: index * 0.04 }}
-      className={`flex items-center gap-4 ${large ? "p-5" : "p-3"} rounded-xl transition-colors hover:bg-foreground/[0.03]`}
+      transition={{ delay: index * 0.03 }}
+      className={`flex items-center gap-3 ${large ? "px-4 py-3.5" : "px-3 py-2.5"} rounded-lg transition-colors hover:bg-foreground/[0.03] group`}
     >
-      <div
-        className={`${rankSize} rounded-full flex items-center justify-center font-bold shrink-0 ${
-          index === 0
-            ? "bg-gradient-to-br from-yellow-300 to-yellow-500 text-yellow-900 shadow-lg shadow-yellow-500/20"
-            : index === 1
-              ? "bg-gradient-to-br from-gray-200 to-gray-400 text-gray-700 shadow-lg shadow-gray-400/20"
-              : index === 2
-                ? "bg-gradient-to-br from-amber-500 to-amber-700 text-amber-100 shadow-lg shadow-amber-600/20"
-                : "bg-muted/60 text-muted-foreground"
-        }`}
-      >
+      {/* Rank */}
+      <span className={`${large ? "text-base w-7" : "text-xs w-5"} font-semibold tabular-nums text-muted-foreground/50 text-right shrink-0`}>
         {index + 1}
+      </span>
+
+      {/* Volume bar (background) + Name */}
+      <div className="flex-1 min-w-0 relative">
+        {/* Background bar showing relative volume */}
+        <div
+          className="absolute inset-y-0 left-0 rounded bg-blue-500/[0.07] dark:bg-blue-400/[0.08] transition-all duration-500"
+          style={{ width: `${barWidth}%` }}
+        />
+        <div className="relative flex items-center justify-between gap-2">
+          <p className={`font-medium truncate ${large ? "text-sm" : "text-[13px]"}`}>{rep.name}</p>
+          <span className={`font-bold tabular-nums shrink-0 ${large ? "text-base" : "text-sm"}`}>{rep.total_calls}</span>
+        </div>
       </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between mb-1">
-          <p className={`font-semibold truncate ${large ? "text-base" : "text-sm"}`}>{rep.name}</p>
-          <span className={`font-bold tabular-nums ${large ? "text-lg" : "text-sm"}`}>{rep.total_calls}</span>
-        </div>
-        <div className="w-full bg-foreground/[0.06] rounded-full h-1.5 overflow-hidden">
-          <motion.div
-            initial={{ width: 0 }}
-            animate={{ width: `${barWidth}%` }}
-            transition={{ duration: 0.6, delay: index * 0.04 }}
-            className="h-full rounded-full bg-foreground/20"
-          />
-        </div>
-        <div className="flex items-center gap-3 mt-1">
-          <span className={`text-muted-foreground/60 tabular-nums ${large ? "text-sm" : "text-xs"}`}>
-            {rep.outbound_calls} out · {rep.inbound_calls} in
-          </span>
-          <span className={`text-muted-foreground/40 tabular-nums ${large ? "text-sm" : "text-xs"}`}>
-            {formatDurationShort(Math.round(rep.avg_duration))} avg
-          </span>
-          {rep.total_calls > 0 && (
-            <span className={`text-muted-foreground/40 tabular-nums ${large ? "text-sm" : "text-xs"}`}>
-              {Math.round((rep.answered_calls / rep.total_calls) * 100)}% ans
-            </span>
-          )}
-        </div>
-        {rep.total_calls > 2 && (
-          <CategoryBar
-            values={[
-              Math.round((rep.answered_calls / rep.total_calls) * 100),
-              Math.round(((rep.total_calls - rep.answered_calls) / rep.total_calls) * 100),
-            ]}
-            colors={["emerald", "red"]}
-            showLabels={false}
-            className="mt-1.5 h-1"
-          />
-        )}
+
+      {/* Stats chips */}
+      <div className={`flex items-center gap-1.5 shrink-0 ${large ? "" : ""}`}>
+        <span className="text-[10px] text-muted-foreground/50 tabular-nums hidden sm:inline">
+          {rep.outbound_calls}↑ {rep.inbound_calls}↓
+        </span>
+        <span className="text-[10px] text-muted-foreground/40 tabular-nums hidden lg:inline">
+          {formatDurationShort(Math.round(rep.avg_duration))}
+        </span>
+        <span
+          className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset tabular-nums ${
+            answerRate >= 80
+              ? "bg-emerald-500/10 text-emerald-600 ring-emerald-500/20 dark:text-emerald-400 dark:ring-emerald-400/20"
+              : answerRate >= 60
+                ? "bg-amber-500/10 text-amber-600 ring-amber-500/20 dark:text-amber-400 dark:ring-amber-400/20"
+                : "bg-red-500/10 text-red-600 ring-red-500/20 dark:text-red-400 dark:ring-red-400/20"
+          }`}
+        >
+          {answerRate}%
+        </span>
       </div>
     </motion.div>
   );
@@ -1141,6 +1171,138 @@ function GapSparkline({ gaps, avgGap }: { gaps: { gap_seconds: number }[]; avgGa
   );
 }
 
+// ── Excluded reps (non-sales) ──
+
+const EXCLUDED_REPS = new Set([
+  "Jess Roberts",
+  "Rebecca Rayment",
+  "Molly Quelch",
+  "Lucy Wood",
+]);
+
+// ── Line colours for multi-rep chart ──
+
+const REP_COLORS = [
+  "#3b82f6", // blue
+  "#10b981", // emerald
+  "#f59e0b", // amber
+  "#ef4444", // red
+  "#8b5cf6", // violet
+  "#ec4899", // pink
+  "#06b6d4", // cyan
+  "#f97316", // orange
+  "#6366f1", // indigo
+  "#14b8a6", // teal
+  "#e11d48", // rose
+  "#84cc16", // lime
+];
+
+// ── Master Performance Chart — all reps, cumulative talk time or dials ──
+
+type PerfMetric = "talk_time" | "dials";
+
+function PerformanceChart({
+  reps,
+  metric,
+  onMetricChange,
+}: {
+  reps: { aircall_user_id: number; rep_name: string; total_calls: number; total_talk_time: number; gaps?: { previous_call_ended_at: number; current_call_started_at: number; gap_seconds: number }[] }[];
+  metric: PerfMetric;
+  onMetricChange: (m: PerfMetric) => void;
+}) {
+  const activeReps = reps.filter(r => r.gaps && r.gaps.length >= 2);
+  if (activeReps.length === 0) return null;
+
+  // Build hourly cumulative data per rep
+  const hours: number[] = [];
+  for (let h = 8; h <= 18; h++) hours.push(h);
+
+  const chartData = hours.map(h => {
+    const point: Record<string, string | number> = { hour: `${h.toString().padStart(2, "0")}:00` };
+    for (const rep of activeReps) {
+      const gaps = rep.gaps || [];
+      if (metric === "dials") {
+        // Count calls that started in or before this hour
+        const callCount = gaps.filter(g => {
+          const callHour = new Date(g.current_call_started_at * 1000).getHours();
+          return callHour <= h;
+        }).length + 1; // +1 for the first call (which has no preceding gap)
+        point[rep.rep_name] = callCount;
+      } else {
+        // Cumulative talk time: sum gap_seconds subtracted from total elapsed gives talk time
+        // Simpler: count calls up to this hour × avg duration
+        const callsUpToHour = gaps.filter(g => new Date(g.current_call_started_at * 1000).getHours() <= h).length + 1;
+        const avgDuration = rep.total_calls > 0 ? rep.total_talk_time / rep.total_calls : 0;
+        point[rep.rep_name] = Math.round((callsUpToHour * avgDuration) / 60); // minutes
+      }
+    }
+    return point;
+  });
+
+  const repNames = activeReps.map(r => r.rep_name);
+  const config: ChartConfig = {};
+  activeReps.forEach((rep, i) => {
+    config[rep.rep_name] = { label: rep.rep_name, color: REP_COLORS[i % REP_COLORS.length] };
+  });
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.25 }}
+      className="rounded-2xl bg-card border border-border/50 overflow-hidden"
+    >
+      <div className="px-5 py-3.5 border-b border-border/50 flex items-center justify-between">
+        <h3 className="text-sm font-semibold">Performance</h3>
+        <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-0.5">
+          <button
+            onClick={() => onMetricChange("talk_time")}
+            className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${metric === "talk_time" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            Talk Time
+          </button>
+          <button
+            onClick={() => onMetricChange("dials")}
+            className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${metric === "dials" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            Dials
+          </button>
+        </div>
+      </div>
+      <div className="px-4 pt-4 pb-2">
+        <ChartContainer config={config} className="h-[280px] w-full">
+          <AreaChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
+            <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.4} />
+            <XAxis dataKey="hour" axisLine={false} tickLine={false} tickMargin={10} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+            <ChartTooltip content={<ChartTooltipContent indicator="line" />} />
+            {repNames.map((name, i) => (
+              <Area
+                key={name}
+                type="monotone"
+                dataKey={name}
+                stroke={REP_COLORS[i % REP_COLORS.length]}
+                strokeWidth={2}
+                fill="none"
+                dot={false}
+                activeDot={{ r: 3, strokeWidth: 1.5, fill: "hsl(var(--card))" }}
+              />
+            ))}
+          </AreaChart>
+        </ChartContainer>
+        {/* Legend */}
+        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 px-1 pb-2">
+          {activeReps.map((rep, i) => (
+            <span key={rep.aircall_user_id} className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+              <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: REP_COLORS[i % REP_COLORS.length] }} />
+              {rep.rep_name}
+            </span>
+          ))}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 function GapRepRowAccordion({
   rep,
   index,
@@ -1361,58 +1523,68 @@ function LiveRepStatus({ rep }: { rep: { aircall_user_id: number; rep_name: stri
 function MetricCard({
   label,
   value,
-  suffix,
   isText,
   highlight,
   highlightColor,
-  sparkData,
-  sparkColor,
+  change,
+  changeType,
   loading,
   delay = 0,
 }: {
   label: string;
   value: number;
-  suffix?: string;
   isText?: string;
   highlight?: string;
   highlightColor?: "green" | "red";
-  sparkData?: { value: number }[];
-  sparkColor?: string;
+  change?: string;
+  changeType?: "positive" | "negative" | "neutral";
   loading: boolean;
   delay?: number;
 }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay }}
-      className="rounded-xl bg-card border border-border/50 p-4 overflow-hidden"
+      transition={{ duration: 0.35, delay }}
+      className="rounded-xl bg-card border border-border/50 p-4"
     >
       {loading ? (
-        <div className="space-y-2">
-          <Skeleton className="h-9 w-20" />
-          <Skeleton className="h-3 w-14" />
+        <div className="space-y-3">
+          <Skeleton className="h-3 w-20" />
+          <Skeleton className="h-8 w-16" />
         </div>
       ) : (
-        <div>
-          <div className="text-3xl font-bold tabular-nums tracking-tight">
-            {isText ? (
-              isText
-            ) : (
-              <>
+        <>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-muted-foreground font-medium truncate">{label}</p>
+            {change && (
+              <span
+                className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset tabular-nums shrink-0 ${
+                  changeType === "positive"
+                    ? "bg-emerald-500/10 text-emerald-600 ring-emerald-500/20 dark:text-emerald-400 dark:ring-emerald-400/20"
+                    : changeType === "negative"
+                      ? "bg-red-500/10 text-red-600 ring-red-500/20 dark:text-red-400 dark:ring-red-400/20"
+                      : "bg-muted text-muted-foreground ring-border"
+                }`}
+              >
+                {change}
+              </span>
+            )}
+          </div>
+          <div className="mt-2">
+            <span className="text-2xl font-bold tabular-nums tracking-tight">
+              {isText || (
                 <NumberFlow
                   value={value}
                   transformTiming={{ duration: 500, easing: "ease-out" }}
                   spinTiming={{ duration: 400, easing: "ease-out" }}
                 />
-                {suffix && <span className="text-xl text-muted-foreground/60 ml-0.5">{suffix}</span>}
-              </>
-            )}
+              )}
+            </span>
           </div>
-          <p className="text-xs text-muted-foreground uppercase tracking-wider mt-1 font-medium">{label}</p>
           {highlight && (
             <p
-              className={`text-sm font-semibold mt-0.5 ${
+              className={`text-[11px] font-medium mt-1 ${
                 highlightColor === "green"
                   ? "text-emerald-600 dark:text-emerald-400"
                   : highlightColor === "red"
@@ -1423,17 +1595,7 @@ function MetricCard({
               {highlight}
             </p>
           )}
-          {sparkData && sparkData.length > 1 && (
-            <SparkAreaChart
-              data={sparkData}
-              categories={["value"]}
-              index="value"
-              colors={[sparkColor || "blue"]}
-              className="h-8 w-full mt-2"
-              curveType="monotone"
-            />
-          )}
-        </div>
+        </>
       )}
     </motion.div>
   );
@@ -1511,6 +1673,7 @@ export default function CallsPage() {
     yesterday?: { team_avg_gap_seconds: number; reps: Record<string, number> } | null;
   } | null>(null);
   const [gapLoading, setGapLoading] = useState(false);
+  const [perfMetric, setPerfMetric] = useState<PerfMetric>("talk_time");
   const [selectedGapRep, setSelectedGapRep] = useState<number | null>(null);
   const [gapDetail, setGapDetail] = useState<{
     gaps: { previous_call_id: number; previous_call_ended_at: number; previous_call_direction: string; current_call_id: number; current_call_started_at: number; current_call_direction: string; gap_seconds: number }[];
@@ -2034,54 +2197,43 @@ export default function CallsPage() {
                 className="space-y-5"
               >
                 {/* ═══ Section 2: Metric Cards ═══ */}
-                <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                   <MetricCard
                     label="Total Calls"
                     value={stats?.total_calls || 0}
+                    highlight={stats ? `${stats.outbound_calls} out · ${stats.inbound_calls} in` : undefined}
                     loading={initialLoading}
-                    delay={0.15}
-                    sparkData={Object.keys(hourlyData).sort().map(h => ({ value: (hourlyData[Number(h)]?.inbound || 0) + (hourlyData[Number(h)]?.outbound || 0) }))}
-                    sparkColor="blue"
+                    delay={0.05}
                   />
                   <MetricCard
                     label="Answered"
                     value={stats?.answered_calls || 0}
-                    highlight={stats && stats.total_calls > 0 ? `${answerRate}% rate` : undefined}
-                    highlightColor="green"
+                    change={stats && stats.total_calls > 0 ? `${answerRate}%` : undefined}
+                    changeType={Number(answerRate) >= 70 ? "positive" : "negative"}
                     loading={initialLoading}
-                    delay={0.2}
-                    sparkColor="emerald"
+                    delay={0.08}
                   />
                   <MetricCard
                     label="Missed"
                     value={stats?.missed_calls || 0}
-                    highlight={stats && stats.missed_calls > 0 ? `${missRate}% rate` : undefined}
-                    highlightColor="red"
+                    change={stats && stats.missed_calls > 0 ? `${missRate}%` : undefined}
+                    changeType={Number(missRate) <= 15 ? "neutral" : "negative"}
                     loading={initialLoading}
-                    delay={0.25}
+                    delay={0.11}
                   />
                   <MetricCard
                     label="Avg Duration"
                     value={0}
                     isText={formatDurationShort(Math.round(stats?.avg_duration || 0))}
                     loading={initialLoading}
-                    delay={0.3}
+                    delay={0.14}
                   />
                   <MetricCard
                     label="Talk Time"
                     value={0}
                     isText={formatDuration(stats?.total_talk_time || 0)}
                     loading={initialLoading}
-                    delay={0.35}
-                  />
-                  <MetricCard
-                    label="Team Avg Gap"
-                    value={0}
-                    isText={gapData ? formatGapShort(gapData.team_avg_gap_seconds) : "—"}
-                    highlight={gapData && gapData.team_total_gaps > 0 ? `${gapData.team_total_gaps} gaps` : undefined}
-                    highlightColor={gapData && gapData.team_avg_gap_seconds > 300 ? "red" : "green"}
-                    loading={initialLoading}
-                    delay={0.4}
+                    delay={0.17}
                   />
                 </div>
 
@@ -2092,28 +2244,23 @@ export default function CallsPage() {
                   transition={{ delay: 0.3 }}
                   className="rounded-2xl bg-card border border-border/50 overflow-hidden"
                 >
-                  <div className="px-5 py-4 border-b border-border/50 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Pulse className="size-[18px] text-muted-foreground" />
-                      <h2 className="text-base font-semibold">Call Activity</h2>
-                    </div>
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                  <div className="px-5 py-3.5 border-b border-border/50 flex items-center justify-between">
+                    <h2 className="text-sm font-semibold">Call Activity</h2>
+                    <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
                       <span className="flex items-center gap-1.5">
-                        <span className="size-2.5 rounded-sm bg-blue-500/60 dark:bg-blue-400/50" />
+                        <span className="size-2 rounded-full" style={{ backgroundColor: "hsl(217, 91%, 60%)" }} />
                         Outbound
                       </span>
                       <span className="flex items-center gap-1.5">
-                        <span className="size-2.5 rounded-sm bg-violet-500/40 dark:bg-violet-400/35" />
+                        <span className="size-2 rounded-full bg-muted-foreground/40" />
                         Inbound
                       </span>
                     </div>
                   </div>
-                  <div className="p-5">
+                  <div className="px-4 pt-4 pb-3">
                     {initialLoading ? (
-                      <div className="h-44 flex items-end gap-2 px-1">
-                        {Array.from({ length: 11 }).map((_, i) => (
-                          <Skeleton key={i} className="flex-1" style={{ height: `${30 + (i % 3) * 25 + (i % 5) * 10}px` }} />
-                        ))}
+                      <div className="space-y-3 py-8">
+                        <Skeleton className="h-[200px] w-full" />
                       </div>
                     ) : (
                       <ActivityChart data={hourlyData} />
@@ -2130,44 +2277,86 @@ export default function CallsPage() {
                     transition={{ delay: 0.35 }}
                     className="rounded-2xl bg-card border border-border/50 overflow-hidden"
                   >
-                    <div className="flex items-center justify-between px-5 py-4 border-b border-border/50">
-                      <div className="flex items-center gap-3">
-                        <FontAwesomeIcon icon={faTrophy} className="h-[18px] w-[18px] text-yellow-500" />
-                        <h2 className="text-base font-semibold">Calls by Rep</h2>
-                        <span className="text-xs text-muted-foreground">{periodLabel(period)}</span>
+                    <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/50">
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-sm font-semibold">Calls by Rep</h2>
+                        <span className="text-[11px] text-muted-foreground">{periodLabel(period)}</span>
                       </div>
                       <button
                         onClick={() => setFullscreenView("reps")}
-                        className="p-2 rounded-lg hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
-                        aria-label="View rep leaderboard fullscreen"
+                        className="p-1.5 rounded-md hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
+                        aria-label="Expand"
                       >
-                        <ArrowsOut className="size-[18px]" />
+                        <ArrowsOut className="size-3.5" />
                       </button>
                     </div>
-                    <div className="p-3 max-h-[440px] overflow-y-auto scrollbar-hide">
+                    <div className="max-h-[460px] overflow-y-auto scrollbar-hide">
                       {initialLoading ? (
-                        <div className="space-y-2 p-1">
-                          {[1, 2, 3, 4].map((i) => (
-                            <div key={i} className="flex items-center gap-3 p-3 rounded-xl">
-                              <Skeleton className="size-8 rounded-full" />
-                              <div className="flex-1 space-y-2">
-                                <Skeleton className="h-3 w-24" />
-                                <Skeleton className="h-1.5 w-full" />
-                              </div>
+                        <div className="p-4 space-y-3">
+                          {[1, 2, 3, 4, 5].map((i) => (
+                            <div key={i} className="flex items-center gap-3">
+                              <Skeleton className="h-4 w-4" />
+                              <Skeleton className="h-4 w-24" />
+                              <Skeleton className="h-4 w-12 ml-auto" />
                             </div>
                           ))}
                         </div>
                       ) : repStats.length === 0 ? (
                         <div className="text-center py-12 text-muted-foreground">
-                          <Users className="size-10 mx-auto mb-3 opacity-30" />
-                          <p className="text-sm">No call data yet</p>
+                          <Users className="size-8 mx-auto mb-2 opacity-20" />
+                          <p className="text-xs">No call data yet</p>
                         </div>
                       ) : (
-                        <div className="space-y-0.5">
-                          {repStats.map((rep, i) => (
-                            <RepRow key={rep.user_id} rep={rep} index={i} maxCalls={maxRepCalls} />
-                          ))}
-                        </div>
+                        <Table>
+                          <TableHeader>
+                            <ShadcnTableRow className="border-border/30 hover:bg-transparent">
+                              <TableHead className="w-8 pl-4 pr-0 text-[10px]">#</TableHead>
+                              <TableHead className="text-[10px]">Rep</TableHead>
+                              <TableHead className="text-right text-[10px]">Calls</TableHead>
+                              <TableHead className="text-right text-[10px] hidden sm:table-cell">Out</TableHead>
+                              <TableHead className="text-right text-[10px] hidden sm:table-cell">In</TableHead>
+                              <TableHead className="text-right text-[10px] hidden md:table-cell">Avg</TableHead>
+                              <TableHead className="text-right text-[10px] pr-4">Rate</TableHead>
+                            </ShadcnTableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {repStats.map((rep, i) => {
+                              const ansRate = rep.total_calls > 0 ? Math.round((rep.answered_calls / rep.total_calls) * 100) : 0;
+                              const barW = maxRepCalls > 0 ? (rep.total_calls / maxRepCalls) * 100 : 0;
+                              return (
+                                <ShadcnTableRow key={rep.user_id} className="border-border/20 hover:bg-foreground/[0.02] group">
+                                  <TableCell className="pl-4 pr-0 py-2.5 text-xs text-muted-foreground/40 tabular-nums font-medium">{i + 1}</TableCell>
+                                  <TableCell className="py-2.5">
+                                    <div className="relative">
+                                      <div
+                                        className="absolute inset-y-[-6px] left-[-8px] rounded bg-blue-500/[0.06] dark:bg-blue-400/[0.07] transition-all duration-700"
+                                        style={{ width: `${barW}%` }}
+                                      />
+                                      <span className="relative text-[13px] font-medium">{rep.name}</span>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-right py-2.5 text-sm font-semibold tabular-nums">{rep.total_calls}</TableCell>
+                                  <TableCell className="text-right py-2.5 text-xs text-muted-foreground tabular-nums hidden sm:table-cell">{rep.outbound_calls}</TableCell>
+                                  <TableCell className="text-right py-2.5 text-xs text-muted-foreground tabular-nums hidden sm:table-cell">{rep.inbound_calls}</TableCell>
+                                  <TableCell className="text-right py-2.5 text-xs text-muted-foreground tabular-nums hidden md:table-cell">{formatDurationShort(Math.round(rep.avg_duration))}</TableCell>
+                                  <TableCell className="text-right py-2.5 pr-4">
+                                    <span
+                                      className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset tabular-nums ${
+                                        ansRate >= 80
+                                          ? "bg-emerald-500/10 text-emerald-600 ring-emerald-500/20 dark:text-emerald-400 dark:ring-emerald-400/20"
+                                          : ansRate >= 60
+                                            ? "bg-amber-500/10 text-amber-600 ring-amber-500/20 dark:text-amber-400 dark:ring-amber-400/20"
+                                            : "bg-red-500/10 text-red-600 ring-red-500/20 dark:text-red-400 dark:ring-red-400/20"
+                                      }`}
+                                    >
+                                      {ansRate}%
+                                    </span>
+                                  </TableCell>
+                                </ShadcnTableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
                       )}
                     </div>
                   </motion.div>
@@ -2179,20 +2368,17 @@ export default function CallsPage() {
                     transition={{ delay: 0.4 }}
                     className="rounded-2xl bg-card border border-border/50 overflow-hidden"
                   >
-                    <div className="flex items-center justify-between px-5 py-4 border-b border-border/50">
-                      <div className="flex items-center gap-3">
-                        <Phone className="size-[18px] text-muted-foreground" />
-                        <h2 className="text-base font-semibold">Recent Calls</h2>
-                        <span className="text-[10px] text-muted-foreground/40 uppercase tracking-wider">
-                          Click to analyse
-                        </span>
+                    <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/50">
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-sm font-semibold">Recent Calls</h2>
+                        <span className="text-[10px] text-muted-foreground/40">click to analyse</span>
                       </div>
                       <button
                         onClick={() => setFullscreenView("calls")}
-                        className="p-2 rounded-lg hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
-                        aria-label="View recent calls fullscreen"
+                        className="p-1.5 rounded-md hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
+                        aria-label="Expand"
                       >
-                        <ArrowsOut className="size-[18px]" />
+                        <ArrowsOut className="size-3.5" />
                       </button>
                     </div>
                     <div className="p-2 max-h-[440px] overflow-y-auto scrollbar-hide">
@@ -2991,7 +3177,10 @@ export default function CallsPage() {
                       Gap tracking starts when Aircall webhooks fire. Once reps start making calls, their pace data will appear here automatically.
                     </p>
                   </motion.div>
-                ) : (
+                ) : (() => {
+                  const activeReps = gapData.reps.filter(r => !EXCLUDED_REPS.has(r.rep_name));
+                  const allReps = gapData.reps;
+                  return (
                   <>
                     {/* ═══ 3-Column Layout ═══ */}
                     <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.1fr_0.9fr] gap-4">
@@ -3038,8 +3227,8 @@ export default function CallsPage() {
                             <p className="text-[10px] text-muted-foreground uppercase tracking-wider mt-0.5">Reps Active</p>
                           </div>
                           <div className="bg-card p-3.5">
-                            <p className={`text-lg font-bold tabular-nums ${gapData.reps.reduce((s, r) => s + r.gaps_over_5min, 0) > 0 ? "text-red-500" : ""}`}>
-                              {gapData.reps.reduce((s, r) => s + r.gaps_over_5min, 0)}
+                            <p className={`text-lg font-bold tabular-nums ${activeReps.reduce((s, r) => s + r.gaps_over_5min, 0) > 0 ? "text-red-500" : ""}`}>
+                              {activeReps.reduce((s, r) => s + r.gaps_over_5min, 0)}
                             </p>
                             <p className="text-[10px] text-muted-foreground uppercase tracking-wider mt-0.5">Over 5min</p>
                           </div>
@@ -3047,14 +3236,14 @@ export default function CallsPage() {
 
                         {/* Donut chart */}
                         <div className="flex-1 flex flex-col items-center justify-center p-5">
-                          <PaceRingChart reps={gapData.reps} teamAvg={gapData.team_avg_gap_seconds} />
+                          <PaceRingChart reps={activeReps} teamAvg={gapData.team_avg_gap_seconds} />
                         </div>
 
                         {/* Fastest / Avg / Slowest strip */}
                         <div className="grid grid-cols-3 gap-px bg-border/30 border-t border-border/30">
                           <div className="bg-card p-2.5 text-center">
                             <p className="text-xs font-bold tabular-nums text-emerald-500">
-                              {formatGapShort(Math.min(...gapData.reps.filter(r => r.gap_count > 0).map(r => r.avg_gap_seconds), 0))}
+                              {formatGapShort(Math.min(...activeReps.filter(r => r.gap_count > 0).map(r => r.avg_gap_seconds), 0))}
                             </p>
                             <p className="text-[9px] text-muted-foreground uppercase tracking-wider">Fastest</p>
                           </div>
@@ -3066,7 +3255,7 @@ export default function CallsPage() {
                           </div>
                           <div className="bg-card p-2.5 text-center">
                             <p className="text-xs font-bold tabular-nums text-red-500">
-                              {formatGapShort(Math.max(...gapData.reps.filter(r => r.gap_count > 0).map(r => r.avg_gap_seconds), 0))}
+                              {formatGapShort(Math.max(...activeReps.filter(r => r.gap_count > 0).map(r => r.avg_gap_seconds), 0))}
                             </p>
                             <p className="text-[9px] text-muted-foreground uppercase tracking-wider">Slowest</p>
                           </div>
@@ -3081,14 +3270,11 @@ export default function CallsPage() {
                         className="rounded-2xl bg-card border border-border/50 shadow-sm dark:shadow-none overflow-hidden"
                       >
                         <div className="px-4 py-3 border-b border-border/30 flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <FontAwesomeIcon icon={faTrophy} className="h-3.5 w-3.5 text-yellow-500" />
-                            <h3 className="text-sm font-semibold">Pace Ranking</h3>
-                          </div>
+                          <h3 className="text-sm font-semibold">Pace Ranking</h3>
                           <span className="text-[10px] text-muted-foreground uppercase tracking-wider">fastest first</span>
                         </div>
                         <div className="p-1.5 max-h-[540px] overflow-y-auto scrollbar-hide">
-                          {gapData.reps.map((rep, i) => (
+                          {activeReps.map((rep, i) => (
                             <GapRepRowAccordion
                               key={rep.aircall_user_id}
                               rep={rep}
@@ -3126,7 +3312,7 @@ export default function CallsPage() {
                         </div>
                         <div className="p-1.5 max-h-[540px] overflow-y-auto scrollbar-hide">
                           {(() => {
-                            const sorted = [...gapData.reps]
+                            const sorted = [...allReps]
                               .filter((r) => r.last_call_ended_at > 0)
                               .sort((a, b) => b.current_idle_seconds - a.current_idle_seconds);
                             return sorted.length > 0 ? (
@@ -3140,8 +3326,12 @@ export default function CallsPage() {
                         </div>
                       </motion.div>
                     </div>
+
+                    {/* ═══ Performance Chart (full width below columns) ═══ */}
+                    <PerformanceChart reps={activeReps} metric={perfMetric} onMetricChange={setPerfMetric} />
                   </>
-                )}
+                  );
+                })()}
               </motion.div>
             )}
           </AnimatePresence>
