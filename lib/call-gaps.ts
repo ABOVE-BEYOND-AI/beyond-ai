@@ -1,7 +1,9 @@
 // Call gap tracking — "Time Between Dials"
 // Stores gap data in Redis. Calculates idle time between consecutive calls per rep.
+// Falls back to computing gaps from Aircall API data when Redis has no webhook data.
 
 import { Redis } from '@upstash/redis'
+import type { AircallCall } from './aircall'
 
 // ── Types ──
 
@@ -451,6 +453,86 @@ export function computeTeamAvgGap(reps: LiveRepGap[]): { avg_gap_seconds: number
     total_reps: repsWithGaps.length,
     total_gaps: totalGaps,
   }
+}
+
+// ── Compute gaps from Aircall API data (fallback when no webhook data in Redis) ──
+
+/**
+ * Derive gap data from Aircall API calls. Used when Redis has no webhook data.
+ * Groups calls by rep, sorts chronologically, and computes gaps between consecutive calls.
+ */
+export function computeGapsFromCalls(calls: AircallCall[]): LiveRepGap[] {
+  // Group calls by user
+  const byUser = new Map<number, { name: string; calls: AircallCall[] }>()
+
+  for (const call of calls) {
+    if (!call.user) continue
+    const uid = call.user.id
+    if (!byUser.has(uid)) {
+      byUser.set(uid, { name: call.user.name, calls: [] })
+    }
+    byUser.get(uid)!.calls.push(call)
+  }
+
+  const now = Math.floor(Date.now() / 1000)
+  const results: LiveRepGap[] = []
+
+  for (const [userId, { name, calls: repCalls }] of Array.from(byUser)) {
+    // Sort ascending by started_at
+    repCalls.sort((a, b) => a.started_at - b.started_at)
+
+    let gapCount = 0
+    let totalIdleTime = 0
+    let maxGap = 0
+    let minGap = 0
+    let gapsOver5min = 0
+    let lastEndedAt = 0
+
+    for (let i = 0; i < repCalls.length; i++) {
+      const call = repCalls[i]
+
+      if (i > 0 && lastEndedAt > 0) {
+        const gap = call.started_at - lastEndedAt
+        if (gap > 0 && gap <= MAX_GAP_THRESHOLD) {
+          gapCount++
+          totalIdleTime += gap
+          maxGap = Math.max(maxGap, gap)
+          minGap = minGap === 0 ? gap : Math.min(minGap, gap)
+          if (gap > 300) gapsOver5min++
+        }
+      }
+
+      // Update lastEndedAt from this call
+      if (call.ended_at && call.ended_at > lastEndedAt) {
+        lastEndedAt = call.ended_at
+      }
+    }
+
+    const avgGap = gapCount > 0 ? Math.round(totalIdleTime / gapCount) : 0
+    const currentIdle = lastEndedAt > 0 ? Math.max(0, now - lastEndedAt) : 0
+
+    results.push({
+      aircall_user_id: userId,
+      rep_name: name,
+      last_call_ended_at: lastEndedAt,
+      current_idle_seconds: currentIdle > MAX_GAP_THRESHOLD ? 0 : currentIdle,
+      avg_gap_seconds: avgGap,
+      max_gap_seconds: maxGap,
+      min_gap_seconds: minGap,
+      gap_count: gapCount,
+      gaps_over_5min: gapsOver5min,
+      total_idle_time: totalIdleTime,
+      total_calls: repCalls.length,
+    })
+  }
+
+  // Sort by avg_gap ascending (fastest pace first), same as getGapsToday
+  return results.sort((a, b) => {
+    if (a.gap_count === 0 && b.gap_count === 0) return b.total_calls - a.total_calls
+    if (a.gap_count === 0) return 1
+    if (b.gap_count === 0) return -1
+    return a.avg_gap_seconds - b.avg_gap_seconds
+  })
 }
 
 // ── Helpers ──

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getGapsToday, computeTeamAvgGap, getLiveIdleData } from '@/lib/call-gaps'
+import { getGapsToday, computeTeamAvgGap, getLiveIdleData, computeGapsFromCalls } from '@/lib/call-gaps'
 import { apiErrorResponse, requireApiUser } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic'
  * GET /api/calls/gaps
  *
  * Returns today's gap data for all reps + team average.
+ * Falls back to computing gaps from Aircall API data when Redis has no webhook data.
  * Query params:
  *   ?view=live — returns only live idle data (lightweight, for polling)
  */
@@ -28,8 +29,22 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Fetch reps once, compute team avg from the same data (no double fetch)
-    const reps = await getGapsToday()
+    // Try Redis-based gap data first (from webhooks)
+    let reps = await getGapsToday()
+
+    // Fallback: compute gaps from Aircall API call data if no webhook data exists
+    if (reps.length === 0) {
+      try {
+        const { getCallsForPeriod } = await import('@/lib/aircall')
+        const calls = await getCallsForPeriod('today')
+        if (calls.length > 0) {
+          reps = computeGapsFromCalls(calls)
+        }
+      } catch (fallbackError) {
+        console.warn('Gap fallback from API calls failed:', fallbackError)
+      }
+    }
+
     const teamAvg = computeTeamAvgGap(reps)
 
     return NextResponse.json({
