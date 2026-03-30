@@ -96,7 +96,7 @@ export function GoogleAuthProvider({ children }: { children: React.ReactNode }) 
   // Keep ref in sync
   refreshTokenRef.current = refreshToken
 
-  const loadSession = useCallback(() => {
+  const loadSession = useCallback(async () => {
     try {
       // Read display cookie for user info (no tokens — they're server-side only)
       const displayData = readDisplayCookie()
@@ -106,22 +106,24 @@ export function GoogleAuthProvider({ children }: { children: React.ReactNode }) 
         return
       }
 
-      // Set user info from display cookie
-      setUser({
-        id: '',
-        email: displayData.email,
-        name: displayData.name,
-        picture: displayData.picture,
-      })
+      // Verify the server-side session is still valid BEFORE showing the user
+      // as logged in. The display cookie can outlive the httpOnly session cookie,
+      // so we must confirm the session is real before trusting client-side state.
+      const success = await refreshToken()
 
-      // Get access token from server (it reads from Redis, not cookies)
-      refreshToken().then(success => {
-        if (!success) {
-          clearCookies()
-          setUser(null)
-          setAccessToken(null)
-        }
-      })
+      if (success) {
+        setUser({
+          id: '',
+          email: displayData.email,
+          name: displayData.name,
+          picture: displayData.picture,
+        })
+      } else {
+        // Session expired — clear stale display cookie
+        clearCookies()
+        setUser(null)
+        setAccessToken(null)
+      }
     } catch (error) {
       console.error('Auth: Error loading session:', error)
       clearCookies()

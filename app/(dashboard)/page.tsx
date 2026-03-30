@@ -77,17 +77,6 @@ interface DashboardLead {
   Lead_Score__c?: number | null;
 }
 
-interface Itinerary {
-  id: string;
-  title: string;
-  destination: string;
-  guests: number;
-  start_date: string;
-  end_date: string;
-  status: "generating" | "generated" | "error";
-  created_at: string;
-}
-
 // ── Animation Variants ──
 
 const container = {
@@ -199,7 +188,6 @@ export default function DashboardPage() {
   const [financeData, setFinanceData] = useState<OverdueSummary | null>(null);
   const [leadsData, setLeadsData] = useState<DashboardLead[] | null>(null);
   const [eventsData, setEventsData] = useState<SalesforceEvent[] | null>(null);
-  const [itinerariesData, setItinerariesData] = useState<Itinerary[] | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
   const [salesPeriod, setSalesPeriod] = useState<string>("month");
 
@@ -217,10 +205,9 @@ export default function DashboardPage() {
       fetch("/api/xero/overview").then((r) => r.json()),
       fetch("/api/leads?view=hot").then((r) => r.json()),
       fetch("/api/events/inventory").then((r) => r.json()),
-      fetch("/api/itineraries?limit=5").then((r) => r.json()),
     ]);
 
-    const [sales, pipeline, calls, finance, leads, events, itineraries] = results;
+    const [sales, pipeline, calls, finance, leads, events] = results;
 
     if (sales.status === "fulfilled" && sales.value?.success) setSalesData(sales.value.data);
     if (pipeline.status === "fulfilled" && pipeline.value?.success) setPipelineData(pipeline.value.data);
@@ -228,10 +215,6 @@ export default function DashboardPage() {
     if (finance.status === "fulfilled" && finance.value?.success) setFinanceData(finance.value.data);
     if (leads.status === "fulfilled" && leads.value?.success) setLeadsData(leads.value.data);
     if (events.status === "fulfilled" && events.value?.success) setEventsData(events.value.data);
-    if (itineraries.status === "fulfilled") {
-      const iData = itineraries.value?.data || itineraries.value?.itineraries || itineraries.value;
-      if (Array.isArray(iData)) setItinerariesData(iData);
-    }
 
     setInitialLoading(false);
   }, []);
@@ -303,15 +286,10 @@ export default function DashboardPage() {
             <p className="text-sm text-muted-foreground mt-1">{formatDate()}</p>
           </div>
           <div className="flex gap-3">
-            <Link href="/itinerary">
-              <Button size="sm" className="group rounded-full px-5 h-9 shadow-soft bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-medium">
-                Create Itinerary
-                <ArrowRight className="ml-1.5 size-3.5 transition-transform group-hover:translate-x-0.5" strokeWidth={2} />
-              </Button>
-            </Link>
             <Link href="/leads">
-              <Button size="sm" variant="outline" className="rounded-full px-5 h-9 text-xs font-medium border-border/60">
+              <Button size="sm" className="group rounded-full px-5 h-9 shadow-soft bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-medium">
                 New Lead
+                <ArrowRight className="ml-1.5 size-3.5 transition-transform group-hover:translate-x-0.5" strokeWidth={2} />
               </Button>
             </Link>
             <Link href="/chat">
@@ -613,45 +591,49 @@ export default function DashboardPage() {
         <SectionSkeleton cols={3} />
       ) : (
         <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {/* Recent Itineraries */}
+          {/* Recent Calls */}
           <motion.div variants={item}>
             <Card className="rounded-[20px] shadow-soft border-border/40 overflow-hidden h-full">
               <CardContent className="p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-semibold text-foreground">Recent Itineraries</h3>
-                  <Link href="/itineraries" className="text-[11px] text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+                  <h3 className="text-sm font-semibold text-foreground">Recent Calls</h3>
+                  <Link href="/calls" className="text-[11px] text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
                     View all <ArrowUpRight className="size-3" />
                   </Link>
                 </div>
-                {itinerariesData && itinerariesData.length > 0 ? (
+                {callsData?.recentCalls && callsData.recentCalls.length > 0 ? (
                   <div className="space-y-3">
-                    {itinerariesData.slice(0, 4).map((it) => (
-                      <Link key={it.id} href={`/itinerary/${it.id}`} className="block group">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
-                              {it.destination || it.title || "Untitled"}
+                    {callsData.recentCalls.slice(0, 4).map((call) => (
+                      <div key={call.id} className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex items-center gap-2">
+                          {call.direction === "inbound" ? (
+                            <PhoneIncoming className="size-3.5 text-blue-500 flex-shrink-0" />
+                          ) : (
+                            <PhoneOutgoing className="size-3.5 text-green-500 flex-shrink-0" />
+                          )}
+                          <div>
+                            <p className="text-sm font-medium text-foreground truncate">
+                              {call.contact_name || call.agent_name || "Unknown"}
                             </p>
                             <p className="text-[11px] text-muted-foreground">
-                              {it.start_date ? new Date(it.start_date).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "--"}
-                              {it.guests ? ` · ${it.guests} guests` : ""}
+                              {call.started_at ? new Date(call.started_at * 1000).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "--"}
+                              {call.duration ? ` · ${Math.round(call.duration / 60)}m` : ""}
                             </p>
                           </div>
-                          <span className={`flex-shrink-0 text-[9px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                            it.status === "generated" ? "bg-green-500/15 text-green-500" :
-                            it.status === "generating" ? "bg-blue-500/15 text-blue-500" :
-                            "bg-red-500/15 text-red-500"
-                          }`}>
-                            {it.status}
-                          </span>
                         </div>
-                      </Link>
+                        <span className={`flex-shrink-0 text-[9px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                          call.status === "done" ? "bg-green-500/15 text-green-500" :
+                          call.status === "missed" ? "bg-red-500/15 text-red-500" :
+                          "bg-muted text-muted-foreground"
+                        }`}>
+                          {call.status === "done" ? "answered" : call.status}
+                        </span>
+                      </div>
                     ))}
                   </div>
                 ) : (
                   <div className="text-center py-6">
-                    <p className="text-sm text-muted-foreground">No itineraries yet</p>
-                    <Link href="/itinerary" className="text-xs text-primary hover:underline mt-1 inline-block">Create one</Link>
+                    <p className="text-sm text-muted-foreground">No recent calls</p>
                   </div>
                 )}
               </CardContent>

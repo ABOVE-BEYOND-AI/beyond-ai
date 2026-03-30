@@ -173,6 +173,8 @@ export interface SalesforceEvent {
   Event_Image_3__c: string | null
   Event_Image_4__c: string | null
   Event_Image_5__c: string | null
+  // Serper scraped image (from Redis cache, not Salesforce)
+  Serper_Image__c?: string | null
   // Content
   Description__c: string | null
   Event_Notes__c: string | null

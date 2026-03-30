@@ -20,13 +20,13 @@ const googleSans = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Above + Beyond AI - Premium Travel Itinerary Creator",
-  description: "Transform client briefs into luxury travel experiences with AI-powered research and beautiful Canva templates.",
-  keywords: "travel, itinerary, luxury, AI, Canva, travel consultant",
+  title: "Above + Beyond AI - Internal Tools",
+  description: "Sales, pipeline, finance, events and AI-powered tools for the Above + Beyond team.",
+  keywords: "travel, sales, pipeline, AI, CRM, finance, events",
   authors: [{ name: "Above + Beyond AI" }],
   openGraph: {
     title: "Above + Beyond AI",
-    description: "Premium Travel Itinerary Creator",
+    description: "Internal tools for the Above + Beyond team",
     type: "website",
   },
 };

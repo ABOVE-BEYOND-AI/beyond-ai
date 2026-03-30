@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
 
     console.log('🍪 OAuth Callback: Setting session cookies...')
 
-    const response = NextResponse.redirect(new URL('/itinerary', req.url))
+    const response = NextResponse.redirect(new URL('/', req.url))
     const isProduction = process.env.NODE_ENV === 'production'
 
     // Auth cookie: httpOnly, signed, contains no secrets

@@ -21,6 +21,9 @@ const PROTECTED_ROUTES = [
   '/chat',
 ]
 
+// The dashboard (/) needs exact-match protection — startsWith('/') would match everything
+const EXACT_PROTECTED_ROUTES = ['/']
+
 // Routes that should redirect to dashboard if already authenticated
 const AUTH_ROUTES = ['/auth/signin']
 // SECURITY: Be as specific as possible — startsWith matching means any sub-path is also public.
@@ -60,7 +63,9 @@ export async function middleware(request: NextRequest) {
   }
 
   // If visiting protected routes without session, redirect to sign in
-  if (PROTECTED_ROUTES.some(route => pathname.startsWith(route)) && !hasValidSession) {
+  const isProtected = PROTECTED_ROUTES.some(route => pathname.startsWith(route))
+    || EXACT_PROTECTED_ROUTES.includes(pathname)
+  if (isProtected && !hasValidSession) {
     const signInUrl = new URL('/auth/signin', request.url)
     signInUrl.searchParams.set('redirect', pathname)
     return NextResponse.redirect(signInUrl)

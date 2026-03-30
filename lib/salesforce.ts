@@ -671,6 +671,36 @@ export async function convertLead(id: string): Promise<{ contactId: string; acco
   }
 }
 
+// Get leads matched to a specific event by name or category interest
+export async function getLeadsForEvent(eventName: string, category: string | null): Promise<SalesforceLead[]> {
+  const { CATEGORY_TO_INTEREST_FIELD } = await import('@/lib/constants')
+
+  const orClauses: string[] = []
+
+  // Match by event of interest containing the event name
+  const safeName = sanitizeSoqlValue(eventName)
+  orClauses.push(`Event_of_Interest__c LIKE '%${safeName}%'`)
+
+  // Match by interest checkbox for the event's category
+  if (category) {
+    const interestField = CATEGORY_TO_INTEREST_FIELD[category.toLowerCase()]
+    if (interestField) {
+      orClauses.push(`${interestField} = true`)
+    }
+  }
+
+  const soql = `
+    SELECT ${LEAD_SELECT_FIELDS}
+    FROM Lead
+    WHERE IsConverted = false
+      AND (${orClauses.join(' OR ')})
+    ORDER BY Score__c DESC NULLS LAST, LastActivityDate DESC NULLS LAST
+    LIMIT 200
+  `
+  const result = await query<SalesforceLead>(soql)
+  return result.records
+}
+
 // ──────────────────────────────────────────────
 // PIPELINE (Open Opportunities)
 // ──────────────────────────────────────────────

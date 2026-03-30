@@ -57,7 +57,7 @@ function GoogleCallbackContent() {
       // Force a reload of the auth context before redirecting
       setTimeout(() => {
         console.log('🔄 Google Callback: Refreshing page to ensure auth state is loaded...')
-        window.location.href = '/itinerary'
+        window.location.href = '/'
       }, 1500)
 
     } catch (error) {
@@ -94,7 +94,7 @@ function GoogleCallbackContent() {
             </svg>
           </div>
           <p className="text-white text-lg">Authentication successful!</p>
-          <p className="text-gray-400 text-sm mt-2">Redirecting to your itineraries...</p>
+          <p className="text-gray-400 text-sm mt-2">Redirecting to your dashboard...</p>
         </div>
       </div>
     )

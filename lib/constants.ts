@@ -100,6 +100,48 @@ export const EVENT_CATEGORY_COLORS: Record<string, { bg: string; text: string }>
   'multi-sport': { bg: 'bg-sky-500/15', text: 'text-sky-400' },
 }
 
+// Map event categories to lead interest checkbox fields
+export const CATEGORY_TO_INTEREST_FIELD: Record<string, string> = {
+  'formula 1': 'Formula_1__c',
+  'formula-1': 'Formula_1__c',
+  'f1': 'Formula_1__c',
+  'racing': 'Formula_1__c',
+  'motorsport': 'Formula_1__c',
+  'motogp': 'Formula_1__c',
+  'formula e': 'Formula_1__c',
+  'formula-e': 'Formula_1__c',
+  'football': 'Football__c',
+  'american sports': 'Football__c',
+  'rugby': 'Rugby__c',
+  'tennis': 'Tennis__c',
+  'live music': 'Live_Music__c',
+  'live-music': 'Live_Music__c',
+  'music': 'Live_Music__c',
+  'festival': 'Live_Music__c',
+  'culinary': 'Culinary__c',
+  'luxury': 'Luxury_Lifestyle_Celebrity__c',
+  'fashion': 'Luxury_Lifestyle_Celebrity__c',
+  'awards': 'Luxury_Lifestyle_Celebrity__c',
+  'theatre': 'Unique_Experiences__c',
+  'theatre/ performing arts': 'Unique_Experiences__c',
+  'film': 'Unique_Experiences__c',
+  'art': 'Unique_Experiences__c',
+  'arts & music': 'Unique_Experiences__c',
+  'golf': 'Unique_Experiences__c',
+  'horse racing': 'Unique_Experiences__c',
+  'horse-racing': 'Unique_Experiences__c',
+  'boxing': 'Unique_Experiences__c',
+  'combat sports': 'Unique_Experiences__c',
+  'cricket': 'Unique_Experiences__c',
+  'darts': 'Unique_Experiences__c',
+  'basketball': 'Unique_Experiences__c',
+  'athletics': 'Unique_Experiences__c',
+  'sailing': 'Unique_Experiences__c',
+  'rowing': 'Unique_Experiences__c',
+  'cycling': 'Unique_Experiences__c',
+  'multi-sport': 'Unique_Experiences__c',
+}
+
 // Formatting helpers
 export function formatCurrency(amount: number): string {
   return `£${amount.toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
