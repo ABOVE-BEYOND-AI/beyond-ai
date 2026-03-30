@@ -79,7 +79,7 @@ function mapCall(call: AircallCall): CallListItem {
   }
 }
 
-function buildCallDashboardData(period: CallPeriod, calls: AircallCall[]): CallDashboardData {
+export function buildCallDashboardData(period: CallPeriod, calls: AircallCall[]): CallDashboardData {
   const stats = computeCallStats(calls)
   const repStats = computeRepStats(calls)
   const meaningfulCalls = calls.filter(
