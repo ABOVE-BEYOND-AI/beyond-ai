@@ -458,6 +458,70 @@ export function computeTeamAvgGap(reps: LiveRepGap[]): { avg_gap_seconds: number
 // ── Compute gaps from Aircall API data (fallback when no webhook data in Redis) ──
 
 /**
+ * Resolve end time for a call. Falls back to started_at + duration when ended_at is null.
+ */
+function resolveEndedAt(call: AircallCall): number {
+  if (call.ended_at) return call.ended_at
+  if (call.duration > 0) return call.started_at + call.duration
+  return 0
+}
+
+/**
+ * Compute gaps between consecutive calls for a sorted array of calls.
+ * Returns individual CallGap objects and summary stats.
+ */
+function computeGapsBetweenCalls(repCalls: AircallCall[]): {
+  gaps: CallGap[]
+  gapCount: number
+  totalIdleTime: number
+  maxGap: number
+  minGap: number
+  gapsOver5min: number
+  lastEndedAt: number
+} {
+  let gapCount = 0
+  let totalIdleTime = 0
+  let maxGap = 0
+  let minGap = 0
+  let gapsOver5min = 0
+  let lastEndedAt = 0
+  const gaps: CallGap[] = []
+
+  for (let i = 0; i < repCalls.length; i++) {
+    const call = repCalls[i]
+
+    if (i > 0 && lastEndedAt > 0) {
+      const gapSeconds = call.started_at - lastEndedAt
+      if (gapSeconds > 0 && gapSeconds <= MAX_GAP_THRESHOLD) {
+        gapCount++
+        totalIdleTime += gapSeconds
+        maxGap = Math.max(maxGap, gapSeconds)
+        minGap = minGap === 0 ? gapSeconds : Math.min(minGap, gapSeconds)
+        if (gapSeconds > 300) gapsOver5min++
+
+        gaps.push({
+          previous_call_id: repCalls[i - 1].id,
+          previous_call_ended_at: lastEndedAt,
+          previous_call_direction: repCalls[i - 1].direction,
+          current_call_id: call.id,
+          current_call_started_at: call.started_at,
+          current_call_direction: call.direction,
+          gap_seconds: gapSeconds,
+        })
+      }
+    }
+
+    // Update lastEndedAt — fall back to started_at + duration when ended_at is null
+    const endedAt = resolveEndedAt(call)
+    if (endedAt > lastEndedAt) {
+      lastEndedAt = endedAt
+    }
+  }
+
+  return { gaps, gapCount, totalIdleTime, maxGap, minGap, gapsOver5min, lastEndedAt }
+}
+
+/**
  * Derive gap data from Aircall API calls. Used when Redis has no webhook data.
  * Groups calls by rep, sorts chronologically, and computes gaps between consecutive calls.
  */
@@ -478,35 +542,8 @@ export function computeGapsFromCalls(calls: AircallCall[]): LiveRepGap[] {
   const results: LiveRepGap[] = []
 
   for (const [userId, { name, calls: repCalls }] of Array.from(byUser)) {
-    // Sort ascending by started_at
     repCalls.sort((a, b) => a.started_at - b.started_at)
-
-    let gapCount = 0
-    let totalIdleTime = 0
-    let maxGap = 0
-    let minGap = 0
-    let gapsOver5min = 0
-    let lastEndedAt = 0
-
-    for (let i = 0; i < repCalls.length; i++) {
-      const call = repCalls[i]
-
-      if (i > 0 && lastEndedAt > 0) {
-        const gap = call.started_at - lastEndedAt
-        if (gap > 0 && gap <= MAX_GAP_THRESHOLD) {
-          gapCount++
-          totalIdleTime += gap
-          maxGap = Math.max(maxGap, gap)
-          minGap = minGap === 0 ? gap : Math.min(minGap, gap)
-          if (gap > 300) gapsOver5min++
-        }
-      }
-
-      // Update lastEndedAt from this call
-      if (call.ended_at && call.ended_at > lastEndedAt) {
-        lastEndedAt = call.ended_at
-      }
-    }
+    const { gapCount, totalIdleTime, maxGap, minGap, gapsOver5min, lastEndedAt } = computeGapsBetweenCalls(repCalls)
 
     const avgGap = gapCount > 0 ? Math.round(totalIdleTime / gapCount) : 0
     const currentIdle = lastEndedAt > 0 ? Math.max(0, now - lastEndedAt) : 0
@@ -533,6 +570,47 @@ export function computeGapsFromCalls(calls: AircallCall[]): LiveRepGap[] {
     if (b.gap_count === 0) return -1
     return a.avg_gap_seconds - b.avg_gap_seconds
   })
+}
+
+/**
+ * Compute gap detail for a single rep from Aircall API calls.
+ * Returns the same shape as getRepGapDetail for the detail endpoint fallback.
+ */
+export function computeGapDetailFromCalls(
+  calls: AircallCall[],
+  aircallUserId: number
+): { gaps: CallGap[]; summary: RepDailySummary | null } {
+  const repCalls = calls
+    .filter(c => c.user?.id === aircallUserId)
+    .sort((a, b) => a.started_at - b.started_at)
+
+  if (repCalls.length === 0) return { gaps: [], summary: null }
+
+  const { gaps, gapCount, totalIdleTime, maxGap, minGap, gapsOver5min } = computeGapsBetweenCalls(repCalls)
+  const repName = repCalls[0].user?.name || 'Unknown'
+  const date = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' })
+
+  const totalTalkTime = repCalls.reduce((sum, c) => sum + (c.duration || 0), 0)
+  const outbound = repCalls.filter(c => c.direction === 'outbound').length
+
+  const summary: RepDailySummary = {
+    aircall_user_id: aircallUserId,
+    rep_name: repName,
+    date,
+    total_calls: repCalls.length,
+    outbound_calls: outbound,
+    inbound_calls: repCalls.length - outbound,
+    total_talk_time: totalTalkTime,
+    total_idle_time: totalIdleTime,
+    avg_gap_seconds: gapCount > 0 ? Math.round(totalIdleTime / gapCount) : 0,
+    max_gap_seconds: maxGap,
+    min_gap_seconds: minGap,
+    gap_count: gapCount,
+    gaps_over_5min: gapsOver5min,
+    updated_at: new Date().toISOString(),
+  }
+
+  return { gaps, summary }
 }
 
 // ── Helpers ──

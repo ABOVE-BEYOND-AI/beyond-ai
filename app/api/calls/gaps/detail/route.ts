@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getRepGapDetail } from '@/lib/call-gaps'
+import { getRepGapDetail, computeGapDetailFromCalls } from '@/lib/call-gaps'
 import { apiErrorResponse, requireApiUser } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic'
  * GET /api/calls/gaps/detail?user_id=12345&date=2026-03-27
  *
  * Returns individual gaps for a specific rep on a given date.
+ * Falls back to computing gaps from Aircall API data when Redis has no webhook data.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -29,7 +30,22 @@ export async function GET(request: NextRequest) {
     // Default to today if no date specified
     const targetDate = date || new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' })
 
-    const { gaps, summary } = await getRepGapDetail(parsedId, targetDate)
+    let { gaps, summary } = await getRepGapDetail(parsedId, targetDate)
+
+    // Fallback: compute from Aircall API if Redis has no data
+    if (gaps.length === 0) {
+      try {
+        const { getCallsForPeriod } = await import('@/lib/aircall')
+        const calls = await getCallsForPeriod('today')
+        if (calls.length > 0) {
+          const fallback = computeGapDetailFromCalls(calls, parsedId)
+          gaps = fallback.gaps
+          summary = fallback.summary
+        }
+      } catch (fallbackError) {
+        console.warn('Gap detail fallback from API calls failed:', fallbackError)
+      }
+    }
 
     return NextResponse.json({
       success: true,
