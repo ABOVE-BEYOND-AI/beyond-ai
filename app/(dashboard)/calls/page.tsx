@@ -1500,7 +1500,7 @@ export default function CallsPage() {
     if (activeTab === "dial-pace") {
       setGapLoading(true);
       fetchGapData().finally(() => setGapLoading(false));
-      gapPollRef.current = setInterval(fetchGapData, 30_000);
+      gapPollRef.current = setInterval(fetchGapData, 60_000);
       return () => {
         if (gapPollRef.current) clearInterval(gapPollRef.current);
       };

@@ -255,7 +255,7 @@ export default function TVSalesClient({ initialData }: { initialData: DashboardR
       } catch {}
     };
     fetchGaps();
-    const interval = setInterval(fetchGaps, 30_000);
+    const interval = setInterval(fetchGaps, 60_000);
     return () => clearInterval(interval);
   }, []);
 

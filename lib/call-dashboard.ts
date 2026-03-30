@@ -2,7 +2,7 @@ import { Redis } from '@upstash/redis'
 import {
   computeCallStats,
   computeRepStats,
-  getCallsForPeriod,
+  getCachedCallsForPeriod,
   type AircallCall,
   type CallStats,
   type RepCallStats,
@@ -153,7 +153,7 @@ export async function getCallDashboardData(period: CallPeriod): Promise<{
   }
 
   try {
-    const calls = await getCallsForPeriod(period)
+    const calls = await getCachedCallsForPeriod(period)
     const data = buildCallDashboardData(period, calls)
 
     if (redis) {

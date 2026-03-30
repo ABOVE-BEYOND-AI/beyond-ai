@@ -1,6 +1,8 @@
 // Aircall REST API integration using Basic Auth
 // Docs: https://developer.aircall.io/api-references/
 
+import { Redis } from '@upstash/redis'
+
 export interface AircallUser {
   id: number
   name: string
@@ -404,4 +406,101 @@ export function formatTranscriptForAI(transcript: AircallTranscription, call: Ai
       return `[${time}] ${speaker}: ${u.text}`
     })
     .join('\n')
+}
+
+// ── Cached call fetching (shared across all endpoints) ──
+// Prevents duplicate Aircall API calls from gap polling, dashboard polling, etc.
+// Uses the same lock/stale pattern as call-dashboard.ts.
+
+type CachePeriod = 'today' | 'week' | 'month'
+
+const RAW_CACHE_TTL: Record<CachePeriod, number> = { today: 90, week: 300, month: 900 }
+const RAW_STALE_TTL: Record<CachePeriod, number> = { today: 600, week: 3600, month: 7200 }
+
+function rawCacheKey(period: CachePeriod): string {
+  const date = new Date().toISOString().slice(0, 10)
+  return `aircall_raw:${period}:${date}`
+}
+function rawStaleKey(period: CachePeriod): string {
+  const date = new Date().toISOString().slice(0, 10)
+  return `aircall_raw_stale:${period}:${date}`
+}
+function rawLockKey(period: CachePeriod): string {
+  return `aircall_raw_lock:${period}`
+}
+
+let _redis: Redis | null = null
+function getCacheRedis(): Redis | null {
+  if (_redis) return _redis
+  const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN
+  if (!url || !token) return null
+  _redis = new Redis({ url, token })
+  return _redis
+}
+
+/**
+ * Cached version of getCallsForPeriod — all endpoints should use this.
+ * Returns raw AircallCall[] from Redis cache (90s TTL for today).
+ * On cache miss, fetches from Aircall API with lock to prevent thundering herd.
+ * Falls through to uncached getCallsForPeriod() if Redis is unavailable.
+ */
+export async function getCachedCallsForPeriod(period: CachePeriod): Promise<AircallCall[]> {
+  const redis = getCacheRedis()
+
+  // No Redis — fall through to direct API call
+  if (!redis) return getCallsForPeriod(period)
+
+  // Try hot cache
+  try {
+    const cached = await redis.get<AircallCall[]>(rawCacheKey(period))
+    if (cached) return cached
+  } catch (err) {
+    console.warn('Redis raw call cache read failed:', err)
+  }
+
+  // Try to acquire lock
+  try {
+    const lockAcquired = await redis.set(rawLockKey(period), '1', { nx: true, ex: 120 })
+
+    if (!lockAcquired) {
+      // Another instance is fetching — return stale data or wait
+      const stale = await redis.get<AircallCall[]>(rawStaleKey(period))
+      if (stale) return stale
+
+      // No stale data — wait briefly for the other instance to finish
+      await new Promise(resolve => setTimeout(resolve, 3000))
+      const retried = await redis.get<AircallCall[]>(rawCacheKey(period))
+      if (retried) return retried
+
+      // Still nothing — fetch directly (rare edge case)
+      return getCallsForPeriod(period)
+    }
+  } catch (err) {
+    console.warn('Redis raw call lock failed:', err)
+    return getCallsForPeriod(period)
+  }
+
+  // Lock acquired — fetch from Aircall API
+  try {
+    const calls = await getCallsForPeriod(period)
+
+    const pipeline = redis.pipeline()
+    pipeline.set(rawCacheKey(period), calls, { ex: RAW_CACHE_TTL[period] })
+    pipeline.set(rawStaleKey(period), calls, { ex: RAW_STALE_TTL[period] })
+    pipeline.del(rawLockKey(period))
+    pipeline.exec().catch(err => console.warn('Redis raw call cache write failed:', err))
+
+    return calls
+  } catch (err) {
+    // Fetch failed — clean up lock, try stale
+    try {
+      await redis.del(rawLockKey(period))
+      const stale = await redis.get<AircallCall[]>(rawStaleKey(period))
+      if (stale) return stale
+    } catch (staleErr) {
+      console.warn('Redis stale raw call read failed:', staleErr)
+    }
+    throw err
+  }
 }

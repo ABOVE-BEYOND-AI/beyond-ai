@@ -35,8 +35,8 @@ export async function GET(request: NextRequest) {
     // Fallback: compute gaps from Aircall API call data if no webhook data exists
     if (reps.length === 0) {
       try {
-        const { getCallsForPeriod } = await import('@/lib/aircall')
-        const calls = await getCallsForPeriod('today')
+        const { getCachedCallsForPeriod } = await import('@/lib/aircall')
+        const calls = await getCachedCallsForPeriod('today')
         if (calls.length > 0) {
           reps = computeGapsFromCalls(calls)
         }

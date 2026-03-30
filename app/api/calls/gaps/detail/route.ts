@@ -35,8 +35,8 @@ export async function GET(request: NextRequest) {
     // Fallback: compute from Aircall API if Redis has no data
     if (gaps.length === 0) {
       try {
-        const { getCallsForPeriod } = await import('@/lib/aircall')
-        const calls = await getCallsForPeriod('today')
+        const { getCachedCallsForPeriod } = await import('@/lib/aircall')
+        const calls = await getCachedCallsForPeriod('today')
         if (calls.length > 0) {
           const fallback = computeGapDetailFromCalls(calls, parsedId)
           gaps = fallback.gaps
