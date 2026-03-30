@@ -504,3 +504,40 @@ export async function getCachedCallsForPeriod(period: CachePeriod): Promise<Airc
     throw err
   }
 }
+
+/**
+ * Fetch calls for a specific date (e.g. yesterday). Cached for 15 minutes.
+ * Used for historical comparisons — does not need frequent refresh.
+ */
+export async function getCachedCallsForDate(date: Date): Promise<AircallCall[]> {
+  const dateStr = date.toISOString().slice(0, 10)
+  const cacheKey = `aircall_raw:date:${dateStr}`
+  const staleKey = `aircall_raw_stale:date:${dateStr}`
+
+  const redis = getCacheRedis()
+  if (redis) {
+    try {
+      const cached = await redis.get<AircallCall[]>(cacheKey)
+      if (cached) return cached
+    } catch {}
+  }
+
+  // Fetch from Aircall API — full day range
+  const from = new Date(date)
+  from.setHours(0, 0, 0, 0)
+  const to = new Date(date)
+  to.setHours(23, 59, 59, 999)
+
+  const calls = await fetchAllCallsInRange(from, to)
+
+  if (redis) {
+    try {
+      const pipeline = redis.pipeline()
+      pipeline.set(cacheKey, calls, { ex: 900 }) // 15 min cache
+      pipeline.set(staleKey, calls, { ex: 7200 }) // 2 hour stale
+      pipeline.exec().catch(() => {})
+    } catch {}
+  }
+
+  return calls
+}

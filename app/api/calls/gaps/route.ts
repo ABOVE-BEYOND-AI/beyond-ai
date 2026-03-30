@@ -47,6 +47,31 @@ export async function GET(request: NextRequest) {
 
     const teamAvg = computeTeamAvgGap(reps)
 
+    // Fetch yesterday's data for comparison (non-blocking — don't fail if unavailable)
+    let yesterday: { team_avg_gap_seconds: number; reps: Record<string, number> } | null = null
+    try {
+      const { getCachedCallsForDate } = await import('@/lib/aircall')
+      const yd = new Date()
+      yd.setDate(yd.getDate() - 1)
+      // Skip weekends — if yesterday is Sunday go to Friday, Saturday go to Thursday
+      const day = yd.getDay()
+      if (day === 0) yd.setDate(yd.getDate() - 2) // Sunday → Friday
+      else if (day === 6) yd.setDate(yd.getDate() - 1) // Saturday → Friday
+
+      const ydCalls = await getCachedCallsForDate(yd)
+      if (ydCalls.length > 0) {
+        const ydReps = computeGapsFromCalls(ydCalls)
+        const ydTeam = computeTeamAvgGap(ydReps)
+        const repMap: Record<string, number> = {}
+        for (const r of ydReps) {
+          if (r.gap_count > 0) repMap[r.aircall_user_id.toString()] = r.avg_gap_seconds
+        }
+        yesterday = { team_avg_gap_seconds: ydTeam.avg_gap_seconds, reps: repMap }
+      }
+    } catch {
+      // Yesterday comparison is optional — don't fail the response
+    }
+
     return NextResponse.json({
       success: true,
       data: {
@@ -54,6 +79,7 @@ export async function GET(request: NextRequest) {
         team_avg_gap_seconds: teamAvg.avg_gap_seconds,
         team_total_reps: teamAvg.total_reps,
         team_total_gaps: teamAvg.total_gaps,
+        yesterday,
       },
     }, {
       headers: { 'Cache-Control': 'no-store' },

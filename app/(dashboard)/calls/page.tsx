@@ -1073,6 +1073,26 @@ function MetricChip({ label, value, colorClass }: { label: string; value: string
 
 // ── Accordion Rep Row (Leaderboard + inline drill-down) ──
 
+function GapSparkline({ gaps, avgGap }: { gaps: { gap_seconds: number }[]; avgGap: number }) {
+  if (gaps.length < 2) return null;
+  const maxGap = Math.max(...gaps.map(g => g.gap_seconds), avgGap * 1.5);
+  const barW = Math.max(2, Math.min(8, Math.floor(200 / gaps.length)));
+  const totalW = gaps.length * (barW + 1);
+  const h = 28;
+  const avgY = maxGap > 0 ? h - (avgGap / maxGap) * h : h;
+
+  return (
+    <svg width="100%" height={h} viewBox={`0 0 ${totalW} ${h}`} preserveAspectRatio="none" className="mb-2">
+      <line x1={0} y1={avgY} x2={totalW} y2={avgY} stroke="currentColor" strokeOpacity={0.15} strokeDasharray="3 2" />
+      {gaps.map((g, i) => {
+        const barH = maxGap > 0 ? Math.max(1, (g.gap_seconds / maxGap) * h) : 1;
+        const fill = g.gap_seconds <= 120 ? "#10b981" : g.gap_seconds <= 300 ? "#f59e0b" : "#ef4444";
+        return <rect key={i} x={i * (barW + 1)} y={h - barH} width={barW} height={barH} fill={fill} rx={1} opacity={0.8} />;
+      })}
+    </svg>
+  );
+}
+
 function GapRepRowAccordion({
   rep,
   index,
@@ -1080,6 +1100,7 @@ function GapRepRowAccordion({
   onToggle,
   gapDetail,
   gapDetailLoading,
+  yesterdayAvg,
 }: {
   rep: {
     aircall_user_id: number;
@@ -1092,6 +1113,9 @@ function GapRepRowAccordion({
     gaps_over_5min: number;
     total_calls: number;
     total_idle_time: number;
+    total_talk_time: number;
+    avg_call_duration: number;
+    efficiency_pct: number;
     last_call_ended_at: number;
   };
   index: number;
@@ -1102,6 +1126,7 @@ function GapRepRowAccordion({
     summary: { avg_gap_seconds: number; max_gap_seconds: number; min_gap_seconds: number } | null;
   } | null;
   gapDetailLoading: boolean;
+  yesterdayAvg?: number;
 }) {
   const [liveIdle, setLiveIdle] = useState(rep.current_idle_seconds);
 
@@ -1139,6 +1164,7 @@ function GapRepRowAccordion({
           <p className="text-[10px] text-muted-foreground/60 tabular-nums">
             {rep.total_calls} calls · {rep.gap_count} gaps
             {rep.gaps_over_5min > 0 && <span className="text-red-500 ml-1">{rep.gaps_over_5min} over 5m</span>}
+            {rep.total_talk_time > 0 && <span className="text-muted-foreground/40 ml-1">· {formatGapShort(rep.total_talk_time)} talk</span>}
           </p>
         </div>
         {showIdle && (
@@ -1146,10 +1172,20 @@ function GapRepRowAccordion({
             {formatGapShort(liveIdle)}
           </span>
         )}
-        <div className="text-right shrink-0 w-14">
+        <div className="text-right shrink-0">
           <p className={`text-sm font-bold tabular-nums ${rep.gap_count > 0 ? gapColorClass(rep.avg_gap_seconds) : "text-muted-foreground"}`}>
             {rep.gap_count > 0 ? formatGapShort(rep.avg_gap_seconds) : "—"}
           </p>
+          {yesterdayAvg !== undefined && rep.gap_count > 0 && (() => {
+            const delta = rep.avg_gap_seconds - yesterdayAvg;
+            if (Math.abs(delta) < 5) return null; // ignore trivial changes
+            const improved = delta < 0;
+            return (
+              <p className={`text-[9px] tabular-nums ${improved ? "text-emerald-500" : "text-red-400"}`}>
+                {improved ? "↓" : "↑"}{formatGapShort(Math.abs(delta))}
+              </p>
+            );
+          })()}
         </div>
         <CaretDown className={`size-3.5 text-muted-foreground/40 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
       </button>
@@ -1169,6 +1205,26 @@ function GapRepRowAccordion({
                 </div>
               ) : gapDetail && gapDetail.gaps.length > 0 ? (
                 <>
+                  {/* Efficiency strip */}
+                  {rep.total_talk_time > 0 && (
+                    <div className="mb-2 py-1.5">
+                      <div className="flex items-center gap-3 text-[10px] tabular-nums mb-1.5">
+                        <span className="text-muted-foreground">Talk <span className="font-semibold text-foreground">{formatGapShort(rep.total_talk_time)}</span></span>
+                        <span className="text-muted-foreground">Idle <span className="font-semibold text-foreground">{formatGapShort(rep.total_idle_time)}</span></span>
+                        <span className="text-muted-foreground">Avg call <span className="font-semibold text-foreground">{formatGapShort(rep.avg_call_duration)}</span></span>
+                        <span className={`ml-auto font-bold text-xs ${rep.efficiency_pct >= 70 ? "text-emerald-500" : rep.efficiency_pct >= 40 ? "text-amber-500" : "text-red-500"}`}>
+                          {rep.efficiency_pct}%
+                        </span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-muted/40 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${rep.efficiency_pct >= 70 ? "bg-emerald-500" : rep.efficiency_pct >= 40 ? "bg-amber-500" : "bg-red-500"}`}
+                          style={{ width: `${Math.min(100, rep.efficiency_pct)}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  {/* Gap stats */}
                   {gapDetail.summary && (
                     <div className="flex items-center gap-4 mb-2 py-1.5">
                       <div className="flex items-baseline gap-1">
@@ -1185,6 +1241,9 @@ function GapRepRowAccordion({
                       </div>
                     </div>
                   )}
+                  {/* Sparkline */}
+                  <GapSparkline gaps={gapDetail.gaps} avgGap={rep.avg_gap_seconds} />
+                  {/* Individual gaps */}
                   <div className="space-y-0.5">
                     {gapDetail.gaps.map((gap, i) => (
                       <div key={i} className="flex items-center gap-2 py-0.5 text-xs">
@@ -1379,11 +1438,15 @@ export default function CallsPage() {
       gaps_over_5min: number;
       total_idle_time: number;
       total_calls: number;
+      total_talk_time: number;
+      avg_call_duration: number;
+      efficiency_pct: number;
       gaps?: { previous_call_id: number; previous_call_ended_at: number; previous_call_direction: string; current_call_id: number; current_call_started_at: number; current_call_direction: string; gap_seconds: number }[];
     }[];
     team_avg_gap_seconds: number;
     team_total_reps: number;
     team_total_gaps: number;
+    yesterday?: { team_avg_gap_seconds: number; reps: Record<string, number> } | null;
   } | null>(null);
   const [gapLoading, setGapLoading] = useState(false);
   const [selectedGapRep, setSelectedGapRep] = useState<number | null>(null);
@@ -2903,7 +2966,19 @@ export default function CallsPage() {
                             <p className={`text-lg font-bold tabular-nums ${gapColorClass(gapData.team_avg_gap_seconds)}`}>
                               {formatGapShort(gapData.team_avg_gap_seconds)}
                             </p>
-                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider mt-0.5">Team Avg</p>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Team Avg</p>
+                              {gapData.yesterday && gapData.yesterday.team_avg_gap_seconds > 0 && (() => {
+                                const delta = gapData.team_avg_gap_seconds - gapData.yesterday.team_avg_gap_seconds;
+                                if (Math.abs(delta) < 5) return null;
+                                const improved = delta < 0;
+                                return (
+                                  <span className={`text-[9px] font-bold tabular-nums ${improved ? "text-emerald-500" : "text-red-400"}`}>
+                                    {improved ? "↓" : "↑"}{formatGapShort(Math.abs(delta))}
+                                  </span>
+                                );
+                              })()}
+                            </div>
                           </div>
                           <div className="bg-card p-3.5">
                             <p className="text-lg font-bold tabular-nums">{gapData.team_total_gaps}</p>
@@ -2979,6 +3054,7 @@ export default function CallsPage() {
                               }}
                               gapDetail={selectedGapRep === rep.aircall_user_id ? gapDetail : null}
                               gapDetailLoading={selectedGapRep === rep.aircall_user_id && gapDetailLoading}
+                              yesterdayAvg={gapData.yesterday?.reps?.[rep.aircall_user_id.toString()]}
                             />
                           ))}
                         </div>

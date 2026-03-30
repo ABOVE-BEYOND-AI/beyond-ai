@@ -53,6 +53,9 @@ export interface LiveRepGap {
   gaps_over_5min: number
   total_idle_time: number
   total_calls: number
+  total_talk_time: number // seconds — sum of all call durations
+  avg_call_duration: number // seconds — average call length
+  efficiency_pct: number // talk time / (talk time + idle time) × 100
   gaps?: CallGap[] // Individual gaps — included when computed from API fallback
 }
 
@@ -335,6 +338,11 @@ export async function getGapsToday(): Promise<LiveRepGap[]> {
       const repName = storedName || summary?.rep_name || lastEnded?.rep_name || 'Unknown'
       const currentIdleSeconds = lastEnded ? Math.max(0, now - lastEnded.ended_at) : 0
 
+      const totalTalkTime = summary?.total_talk_time || 0
+      const totalCalls = summary?.total_calls || 0
+      const totalIdleTime = summary?.total_idle_time || 0
+      const productiveTime = totalTalkTime + totalIdleTime
+
       results.push({
         aircall_user_id: userId,
         rep_name: repName,
@@ -345,8 +353,11 @@ export async function getGapsToday(): Promise<LiveRepGap[]> {
         min_gap_seconds: summary?.min_gap_seconds || 0,
         gap_count: summary?.gap_count || 0,
         gaps_over_5min: summary?.gaps_over_5min || 0,
-        total_idle_time: summary?.total_idle_time || 0,
-        total_calls: summary?.total_calls || 0,
+        total_idle_time: totalIdleTime,
+        total_calls: totalCalls,
+        total_talk_time: totalTalkTime,
+        avg_call_duration: totalCalls > 0 ? Math.round(totalTalkTime / totalCalls) : 0,
+        efficiency_pct: productiveTime > 0 ? Math.round((totalTalkTime / productiveTime) * 100) : 0,
       })
     }
 
@@ -549,6 +560,12 @@ export function computeGapsFromCalls(calls: AircallCall[]): LiveRepGap[] {
     const avgGap = gapCount > 0 ? Math.round(totalIdleTime / gapCount) : 0
     const currentIdle = lastEndedAt > 0 ? Math.max(0, now - lastEndedAt) : 0
 
+    // Talk time stats
+    const totalTalkTime = repCalls.reduce((sum, c) => sum + (c.duration || 0), 0)
+    const avgCallDuration = repCalls.length > 0 ? Math.round(totalTalkTime / repCalls.length) : 0
+    const productiveTime = totalTalkTime + totalIdleTime
+    const efficiencyPct = productiveTime > 0 ? Math.round((totalTalkTime / productiveTime) * 100) : 0
+
     results.push({
       aircall_user_id: userId,
       rep_name: name,
@@ -561,7 +578,10 @@ export function computeGapsFromCalls(calls: AircallCall[]): LiveRepGap[] {
       gaps_over_5min: gapsOver5min,
       total_idle_time: totalIdleTime,
       total_calls: repCalls.length,
-      gaps, // Include individual gaps so client can show detail without extra fetch
+      total_talk_time: totalTalkTime,
+      avg_call_duration: avgCallDuration,
+      efficiency_pct: efficiencyPct,
+      gaps,
     })
   }
 
