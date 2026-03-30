@@ -43,6 +43,16 @@ import { useGoogleAuth } from "@/components/google-auth-provider-clean";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback, useRef } from "react";
 import NumberFlow from "@number-flow/react";
+import { BarChart, SparkAreaChart, CategoryBar } from "@tremor/react";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow as ShadcnTableRow,
+} from "@/components/ui/table";
 
 // ── Types ──
 
@@ -288,57 +298,47 @@ function highlightExcerpt(excerpt: string, keyword: string): React.ReactNode {
   );
 }
 
-// ── Activity Bar Chart (full-width, taller, colored) ──
+// ── Activity Bar Chart (Tremor) ──
 
 function ActivityChart({ data }: { data: HourlyData }) {
-  const hours = Object.keys(data)
-    .map(Number)
-    .sort((a, b) => a - b);
-  const maxVal = Math.max(
-    ...hours.map((h) => (data[h]?.inbound || 0) + (data[h]?.outbound || 0)),
-    1
-  );
+  const hours = Object.keys(data).map(Number).sort((a, b) => a - b);
+  const chartData = hours.map((h) => ({
+    hour: `${h.toString().padStart(2, "0")}:00`,
+    Outbound: data[h]?.outbound || 0,
+    Inbound: data[h]?.inbound || 0,
+  }));
+
+  // Trend summary
+  const totalOut = chartData.reduce((s, d) => s + d.Outbound, 0);
+  const totalIn = chartData.reduce((s, d) => s + d.Inbound, 0);
+  const totalAll = totalOut + totalIn;
+  const peakHour = chartData.reduce((peak, d, _i, arr) => {
+    const total = d.Outbound + d.Inbound;
+    const peakTotal = peak.Outbound + peak.Inbound;
+    return total > peakTotal ? d : peak;
+  }, chartData[0] || { hour: "—", Outbound: 0, Inbound: 0 });
 
   return (
-    <div className="flex items-end gap-1 h-44 px-1">
-      {hours.map((hour) => {
-        const inbound = data[hour]?.inbound || 0;
-        const outbound = data[hour]?.outbound || 0;
-        const total = inbound + outbound;
-        const barH = 160;
-
-        return (
-          <div key={hour} className="flex-1 flex flex-col items-center gap-1.5 group relative">
-            <div className="w-full flex flex-col items-stretch">
-              {/* Outbound: blue */}
-              <motion.div
-                initial={{ height: 0 }}
-                animate={{ height: `${(outbound / maxVal) * barH}px` }}
-                transition={{ duration: 0.6, delay: hour * 0.025, ease: [0.25, 0.46, 0.45, 0.94] }}
-                className="bg-blue-500/60 dark:bg-blue-400/50 rounded-t-sm min-h-0"
-                style={{ minHeight: outbound > 0 ? 2 : 0 }}
-              />
-              {/* Inbound: violet */}
-              <motion.div
-                initial={{ height: 0 }}
-                animate={{ height: `${(inbound / maxVal) * barH}px` }}
-                transition={{ duration: 0.6, delay: hour * 0.025 + 0.08, ease: [0.25, 0.46, 0.45, 0.94] }}
-                className="bg-violet-500/40 dark:bg-violet-400/35 rounded-b-sm min-h-0"
-                style={{ minHeight: inbound > 0 ? 2 : 0 }}
-              />
-            </div>
-            <span className="text-[10px] text-muted-foreground/40 tabular-nums font-medium">
-              {hour.toString().padStart(2, "0")}
-            </span>
-            {total > 0 && (
-              <div className="absolute bottom-full mb-2 px-2.5 py-1.5 bg-card border border-border rounded-lg text-xs shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 whitespace-nowrap">
-                <span className="font-semibold">{total}</span>
-                <span className="text-muted-foreground ml-1">({outbound} out · {inbound} in)</span>
-              </div>
-            )}
-          </div>
-        );
-      })}
+    <div>
+      <BarChart
+        data={chartData}
+        index="hour"
+        categories={["Outbound", "Inbound"]}
+        colors={["blue", "violet"]}
+        stack={true}
+        showLegend={false}
+        showGridLines={false}
+        showYAxis={false}
+        className="h-44"
+        barCategoryGap="20%"
+      />
+      {totalAll > 0 && (
+        <p className="text-[10px] text-muted-foreground/50 px-1 mt-1 tabular-nums">
+          Peak: {peakHour.hour} ({peakHour.Outbound + peakHour.Inbound} calls)
+          {" · "}
+          {totalAll > 0 && `${Math.round((totalOut / totalAll) * 100)}% outbound`}
+        </p>
+      )}
     </div>
   );
 }
@@ -399,7 +399,23 @@ function RepRow({
           <span className={`text-muted-foreground/40 tabular-nums ${large ? "text-sm" : "text-xs"}`}>
             {formatDurationShort(Math.round(rep.avg_duration))} avg
           </span>
+          {rep.total_calls > 0 && (
+            <span className={`text-muted-foreground/40 tabular-nums ${large ? "text-sm" : "text-xs"}`}>
+              {Math.round((rep.answered_calls / rep.total_calls) * 100)}% ans
+            </span>
+          )}
         </div>
+        {rep.total_calls > 2 && (
+          <CategoryBar
+            values={[
+              Math.round((rep.answered_calls / rep.total_calls) * 100),
+              Math.round(((rep.total_calls - rep.answered_calls) / rep.total_calls) * 100),
+            ]}
+            colors={["emerald", "red"]}
+            showLabels={false}
+            className="mt-1.5 h-1"
+          />
+        )}
       </div>
     </motion.div>
   );
@@ -493,25 +509,57 @@ function FullscreenModal({
             <span className="text-xl text-muted-foreground">{periodLabel(period)}</span>
           </div>
 
-          <div className="max-w-4xl space-y-2">
+          <div className="max-w-5xl">
             {view === "reps" ? (
-              repStats.map((rep, index) => (
-                <RepRow key={rep.user_id} rep={rep} index={index} maxCalls={maxRepCalls} large />
-              ))
+              <div className="space-y-2">
+                {repStats.map((rep, index) => (
+                  <RepRow key={rep.user_id} rep={rep} index={index} maxCalls={maxRepCalls} large />
+                ))}
+              </div>
             ) : (
-              recentCalls.map((call) => (
-                <CallRow
-                  key={call.id}
-                  call={call}
-                  large
-                  onClick={() => {
-                    if (call.has_recording) {
-                      onClose();
-                      onCallClick(call.id);
-                    }
-                  }}
-                />
-              ))
+              <div className="rounded-xl border border-border/50 overflow-hidden bg-card">
+                <Table>
+                  <TableHeader>
+                    <ShadcnTableRow className="border-border/50 hover:bg-transparent">
+                      <TableHead className="w-10"></TableHead>
+                      <TableHead>Contact</TableHead>
+                      <TableHead>Agent</TableHead>
+                      <TableHead className="text-right">Duration</TableHead>
+                      <TableHead className="text-right">Time</TableHead>
+                      <TableHead className="w-12"></TableHead>
+                    </ShadcnTableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {recentCalls.map((call) => (
+                      <ShadcnTableRow
+                        key={call.id}
+                        className={`border-border/30 ${call.has_recording ? "cursor-pointer hover:bg-foreground/[0.03]" : ""}`}
+                        onClick={() => {
+                          if (call.has_recording) {
+                            onClose();
+                            onCallClick(call.id);
+                          }
+                        }}
+                      >
+                        <TableCell className="py-3">
+                          <div className="size-8 rounded-full flex items-center justify-center bg-foreground/[0.05] text-muted-foreground">
+                            {call.direction === "inbound" ? <PhoneIncoming className="size-4" /> : <PhoneOutgoing className="size-4" />}
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-medium">{call.contact_name}</TableCell>
+                        <TableCell className="text-muted-foreground">{call.agent_name}</TableCell>
+                        <TableCell className="text-right tabular-nums">{formatDuration(call.duration)}</TableCell>
+                        <TableCell className="text-right text-muted-foreground">{timeAgo(call.started_at)}</TableCell>
+                        <TableCell>
+                          {call.has_recording && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 font-medium">AI</span>
+                          )}
+                        </TableCell>
+                      </ShadcnTableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </div>
         </div>
@@ -1317,6 +1365,8 @@ function MetricCard({
   isText,
   highlight,
   highlightColor,
+  sparkData,
+  sparkColor,
   loading,
   delay = 0,
 }: {
@@ -1326,6 +1376,8 @@ function MetricCard({
   isText?: string;
   highlight?: string;
   highlightColor?: "green" | "red";
+  sparkData?: { value: number }[];
+  sparkColor?: string;
   loading: boolean;
   delay?: number;
 }) {
@@ -1334,12 +1386,12 @@ function MetricCard({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay }}
-      className="rounded-xl bg-card border border-border/50 p-4"
+      className="rounded-xl bg-card border border-border/50 p-4 overflow-hidden"
     >
       {loading ? (
-        <div>
-          <div className="animate-pulse bg-muted/40 h-9 w-16 rounded-lg mb-2" />
-          <div className="animate-pulse bg-muted/30 h-3 w-14 rounded" />
+        <div className="space-y-2">
+          <Skeleton className="h-9 w-20" />
+          <Skeleton className="h-3 w-14" />
         </div>
       ) : (
         <div>
@@ -1357,7 +1409,7 @@ function MetricCard({
               </>
             )}
           </div>
-          <p className="text-xs text-muted-foreground uppercase tracking-wider mt-1.5 font-medium">{label}</p>
+          <p className="text-xs text-muted-foreground uppercase tracking-wider mt-1 font-medium">{label}</p>
           {highlight && (
             <p
               className={`text-sm font-semibold mt-0.5 ${
@@ -1370,6 +1422,16 @@ function MetricCard({
             >
               {highlight}
             </p>
+          )}
+          {sparkData && sparkData.length > 1 && (
+            <SparkAreaChart
+              data={sparkData}
+              categories={["value"]}
+              index="value"
+              colors={[sparkColor || "blue"]}
+              className="h-8 w-full mt-2"
+              curveType="monotone"
+            />
           )}
         </div>
       )}
@@ -1978,6 +2040,8 @@ export default function CallsPage() {
                     value={stats?.total_calls || 0}
                     loading={initialLoading}
                     delay={0.15}
+                    sparkData={Object.keys(hourlyData).sort().map(h => ({ value: (hourlyData[Number(h)]?.inbound || 0) + (hourlyData[Number(h)]?.outbound || 0) }))}
+                    sparkColor="blue"
                   />
                   <MetricCard
                     label="Answered"
@@ -1986,6 +2050,7 @@ export default function CallsPage() {
                     highlightColor="green"
                     loading={initialLoading}
                     delay={0.2}
+                    sparkColor="emerald"
                   />
                   <MetricCard
                     label="Missed"
@@ -2045,26 +2110,10 @@ export default function CallsPage() {
                   </div>
                   <div className="p-5">
                     {initialLoading ? (
-                      <div className="h-44 flex items-end gap-1 px-1">
-                        {Array.from({ length: 12 }).map((_, i) => {
-                          const h1 = 20 + Math.floor(Math.random() * 70);
-                          const h2 = 10 + Math.floor(Math.random() * 50);
-                          return (
-                            <div key={i} className="flex-1 flex flex-col items-center gap-1.5">
-                              <div className="w-full flex flex-col items-stretch">
-                                <div
-                                  className="w-full animate-pulse bg-blue-500/15 rounded-t-sm"
-                                  style={{ height: `${h1}px` }}
-                                />
-                                <div
-                                  className="w-full animate-pulse bg-violet-500/10 rounded-b-sm"
-                                  style={{ height: `${h2}px` }}
-                                />
-                              </div>
-                              <div className="animate-pulse bg-muted/20 h-2 w-4 rounded" />
-                            </div>
-                          );
-                        })}
+                      <div className="h-44 flex items-end gap-2 px-1">
+                        {Array.from({ length: 11 }).map((_, i) => (
+                          <Skeleton key={i} className="flex-1" style={{ height: `${30 + (i % 3) * 25 + (i % 5) * 10}px` }} />
+                        ))}
                       </div>
                     ) : (
                       <ActivityChart data={hourlyData} />
@@ -2100,10 +2149,10 @@ export default function CallsPage() {
                         <div className="space-y-2 p-1">
                           {[1, 2, 3, 4].map((i) => (
                             <div key={i} className="flex items-center gap-3 p-3 rounded-xl">
-                              <div className="animate-pulse bg-muted/40 size-8 rounded-full" />
-                              <div className="flex-1">
-                                <div className="animate-pulse bg-muted/40 h-3 w-24 rounded mb-2" />
-                                <div className="animate-pulse bg-muted/30 h-1.5 w-full rounded" />
+                              <Skeleton className="size-8 rounded-full" />
+                              <div className="flex-1 space-y-2">
+                                <Skeleton className="h-3 w-24" />
+                                <Skeleton className="h-1.5 w-full" />
                               </div>
                             </div>
                           ))}
@@ -2151,10 +2200,10 @@ export default function CallsPage() {
                         <div className="space-y-1 p-1">
                           {[1, 2, 3, 4, 5].map((i) => (
                             <div key={i} className="flex items-center gap-3 p-3 rounded-xl">
-                              <div className="animate-pulse bg-muted/40 size-9 rounded-full" />
-                              <div className="flex-1">
-                                <div className="animate-pulse bg-muted/40 h-3 w-28 rounded mb-2" />
-                                <div className="animate-pulse bg-muted/30 h-2.5 w-20 rounded" />
+                              <Skeleton className="size-9 rounded-full" />
+                              <div className="flex-1 space-y-2">
+                                <Skeleton className="h-3 w-28" />
+                                <Skeleton className="h-2.5 w-20" />
                               </div>
                             </div>
                           ))}
