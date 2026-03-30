@@ -1379,6 +1379,7 @@ export default function CallsPage() {
       gaps_over_5min: number;
       total_idle_time: number;
       total_calls: number;
+      gaps?: { previous_call_id: number; previous_call_ended_at: number; previous_call_direction: string; current_call_id: number; current_call_started_at: number; current_call_direction: string; gap_seconds: number }[];
     }[];
     team_avg_gap_seconds: number;
     team_total_reps: number;
@@ -1516,8 +1517,29 @@ export default function CallsPage() {
 
   const fetchGapDetail = useCallback(async (userId: number) => {
     setSelectedGapRep(userId);
-    setGapDetailLoading(true);
     setGapDetail(null);
+
+    // Use embedded gap data from the main response if available (instant, no API call)
+    const rep = gapData?.reps.find(r => r.aircall_user_id === userId);
+    if (rep?.gaps && rep.gaps.length > 0) {
+      setGapDetail({
+        gaps: rep.gaps,
+        summary: {
+          rep_name: rep.rep_name,
+          avg_gap_seconds: rep.avg_gap_seconds,
+          max_gap_seconds: rep.max_gap_seconds,
+          min_gap_seconds: rep.min_gap_seconds,
+          gap_count: rep.gap_count,
+          total_idle_time: rep.total_idle_time,
+          total_calls: rep.total_calls,
+        },
+      });
+      setGapDetailLoading(false);
+      return;
+    }
+
+    // Fallback to API if no embedded data (e.g. webhook-only mode)
+    setGapDetailLoading(true);
     try {
       const res = await fetch(`/api/calls/gaps/detail?user_id=${userId}`);
       if (!res.ok) return;
@@ -1530,7 +1552,7 @@ export default function CallsPage() {
     } finally {
       setGapDetailLoading(false);
     }
-  }, []);
+  }, [gapData]);
 
   // ── Analyse a single call ──
 

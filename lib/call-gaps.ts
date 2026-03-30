@@ -53,6 +53,7 @@ export interface LiveRepGap {
   gaps_over_5min: number
   total_idle_time: number
   total_calls: number
+  gaps?: CallGap[] // Individual gaps — included when computed from API fallback
 }
 
 // ── Config ──
@@ -543,7 +544,7 @@ export function computeGapsFromCalls(calls: AircallCall[]): LiveRepGap[] {
 
   for (const [userId, { name, calls: repCalls }] of Array.from(byUser)) {
     repCalls.sort((a, b) => a.started_at - b.started_at)
-    const { gapCount, totalIdleTime, maxGap, minGap, gapsOver5min, lastEndedAt } = computeGapsBetweenCalls(repCalls)
+    const { gaps, gapCount, totalIdleTime, maxGap, minGap, gapsOver5min, lastEndedAt } = computeGapsBetweenCalls(repCalls)
 
     const avgGap = gapCount > 0 ? Math.round(totalIdleTime / gapCount) : 0
     const currentIdle = lastEndedAt > 0 ? Math.max(0, now - lastEndedAt) : 0
@@ -560,6 +561,7 @@ export function computeGapsFromCalls(calls: AircallCall[]): LiveRepGap[] {
       gaps_over_5min: gapsOver5min,
       total_idle_time: totalIdleTime,
       total_calls: repCalls.length,
+      gaps, // Include individual gaps so client can show detail without extra fetch
     })
   }
 
