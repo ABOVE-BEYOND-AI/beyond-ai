@@ -1533,8 +1533,7 @@ function GapRepRowAccordion({
                   )}
                 </>
                 );
-              })()
-              ) : (
+              })() : (
                 <p className="text-xs text-muted-foreground py-2">No gaps recorded</p>
               )}
             </div>
