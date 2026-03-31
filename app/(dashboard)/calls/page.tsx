@@ -352,7 +352,7 @@ function ActivityChart({ data }: { data: HourlyData }) {
           />
           <ChartTooltip
             content={<ChartTooltipContent indicator="dot" />}
-            cursor={{ stroke: "hsl(var(--muted-foreground))", strokeWidth: 1, strokeOpacity: 0.3 }}
+            cursor={{ stroke: "hsl(var(--foreground))", strokeWidth: 1, strokeOpacity: 0.15 }}
           />
           <Area
             type="monotone"
@@ -361,7 +361,7 @@ function ActivityChart({ data }: { data: HourlyData }) {
             strokeWidth={2}
             fill="url(#fillOutbound)"
             dot={false}
-            activeDot={{ r: 4, strokeWidth: 2, fill: "hsl(var(--card))" }}
+            activeDot={{ r: 4, strokeWidth: 2, fill: "hsl(var(--background))" }}
           />
           <Area
             type="monotone"
@@ -371,7 +371,7 @@ function ActivityChart({ data }: { data: HourlyData }) {
             strokeOpacity={0.5}
             fill="url(#fillInbound)"
             dot={false}
-            activeDot={{ r: 3, strokeWidth: 2, fill: "hsl(var(--card))" }}
+            activeDot={{ r: 3, strokeWidth: 2, fill: "hsl(var(--background))" }}
           />
         </AreaChart>
       </ChartContainer>
@@ -1178,6 +1178,8 @@ const EXCLUDED_REPS = new Set([
   "Rebecca Rayment",
   "Molly Quelch",
   "Lucy Wood",
+  "Scarlett Mayatt",
+  "Emily Sherlock",
 ]);
 
 // ── Line colours for multi-rep chart ──
@@ -1243,9 +1245,10 @@ function PerformanceChart({
   const activeReps = reps.filter(r => r.gaps && r.gaps.length >= 2);
   if (activeReps.length === 0) return null;
 
-  // Build hourly cumulative data per rep
+  // Build hourly cumulative data per rep (only up to current hour)
+  const currentHour = new Date().getHours();
   const hours: number[] = [];
-  for (let h = 8; h <= 18; h++) hours.push(h);
+  for (let h = 8; h <= Math.min(18, currentHour); h++) hours.push(h);
 
   const chartData = hours.map(h => {
     const point: Record<string, string | number> = { hour: `${h.toString().padStart(2, "0")}:00` };
@@ -1314,7 +1317,7 @@ function PerformanceChart({
             />
             <ChartTooltip
               content={<PerfTooltip metric={metric} />}
-              cursor={{ stroke: "hsl(var(--muted-foreground))", strokeWidth: 1, strokeOpacity: 0.2 }}
+              cursor={{ stroke: "hsl(var(--foreground))", strokeWidth: 1, strokeOpacity: 0.15 }}
             />
             {repNames.map((name, i) => (
               <Area
@@ -1325,7 +1328,7 @@ function PerformanceChart({
                 strokeWidth={2}
                 fill="none"
                 dot={false}
-                activeDot={{ r: 4, strokeWidth: 2, fill: "hsl(var(--card))" }}
+                activeDot={{ r: 4, strokeWidth: 2, fill: "hsl(var(--background))" }}
               />
             ))}
           </AreaChart>
@@ -1454,63 +1457,83 @@ function GapRepRowAccordion({
                 <div className="py-3 flex justify-center">
                   <SpinnerGap className="size-4 text-primary animate-spin" />
                 </div>
-              ) : gapDetail && gapDetail.gaps.length > 0 ? (
+              ) : gapDetail && gapDetail.gaps.length > 0 ? (() => {
+                const greenCount = gapDetail.gaps.filter(g => g.gap_seconds <= 120).length;
+                const amberCount = gapDetail.gaps.filter(g => g.gap_seconds > 120 && g.gap_seconds <= 300).length;
+                const redCount = gapDetail.gaps.filter(g => g.gap_seconds > 300).length;
+                const total = gapDetail.gaps.length;
+                const bigGaps = gapDetail.gaps.filter(g => g.gap_seconds > 60);
+
+                return (
                 <>
-                  {/* Efficiency strip */}
-                  {rep.total_talk_time > 0 && (
-                    <div className="mb-2 py-1.5">
-                      <div className="flex items-center gap-3 text-[10px] tabular-nums mb-1.5">
-                        <span className="text-muted-foreground">Talk <span className="font-semibold text-foreground">{formatGapShort(rep.total_talk_time)}</span></span>
-                        <span className="text-muted-foreground">Idle <span className="font-semibold text-foreground">{formatGapShort(rep.total_idle_time)}</span></span>
-                        <span className="text-muted-foreground">Avg call <span className="font-semibold text-foreground">{formatGapShort(rep.avg_call_duration)}</span></span>
-                        <span className={`ml-auto font-bold text-xs ${rep.efficiency_pct >= 70 ? "text-emerald-500" : rep.efficiency_pct >= 40 ? "text-amber-500" : "text-red-500"}`}>
-                          {rep.efficiency_pct}%
+                  {/* Summary stats row */}
+                  <div className="flex items-center gap-3 py-2 flex-wrap">
+                    {rep.total_talk_time > 0 && (
+                      <span className="text-[10px] text-muted-foreground tabular-nums">
+                        Talk <span className="font-semibold text-foreground">{formatGapShort(rep.total_talk_time)}</span>
+                      </span>
+                    )}
+                    {gapDetail.summary && (
+                      <>
+                        <span className="text-[10px] text-muted-foreground tabular-nums">
+                          Avg <span className={`font-semibold ${gapColorClass(gapDetail.summary.avg_gap_seconds)}`}>{formatGapShort(gapDetail.summary.avg_gap_seconds)}</span>
                         </span>
-                      </div>
-                      <div className="h-1.5 rounded-full bg-muted/40 overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all ${rep.efficiency_pct >= 70 ? "bg-emerald-500" : rep.efficiency_pct >= 40 ? "bg-amber-500" : "bg-red-500"}`}
-                          style={{ width: `${Math.min(100, rep.efficiency_pct)}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                  {/* Gap stats */}
-                  {gapDetail.summary && (
-                    <div className="flex items-center gap-4 mb-2 py-1.5">
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-[10px] text-muted-foreground">Avg</span>
-                        <span className={`text-xs font-bold tabular-nums ${gapColorClass(gapDetail.summary.avg_gap_seconds)}`}>{formatGapShort(gapDetail.summary.avg_gap_seconds)}</span>
-                      </div>
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-[10px] text-muted-foreground">Max</span>
-                        <span className="text-xs font-bold tabular-nums text-red-500">{formatGapShort(gapDetail.summary.max_gap_seconds)}</span>
-                      </div>
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-[10px] text-muted-foreground">Min</span>
-                        <span className="text-xs font-bold tabular-nums text-emerald-500">{formatGapShort(gapDetail.summary.min_gap_seconds)}</span>
-                      </div>
-                    </div>
-                  )}
-                  {/* Sparkline */}
-                  <GapSparkline gaps={gapDetail.gaps} avgGap={rep.avg_gap_seconds} />
-                  {/* Individual gaps */}
-                  <div className="space-y-0.5">
-                    {gapDetail.gaps.map((gap, i) => (
-                      <div key={i} className="flex items-center gap-2 py-0.5 text-xs">
-                        <div className={`size-1.5 rounded-full shrink-0 ${
-                          gap.gap_seconds <= 120 ? "bg-emerald-500" : gap.gap_seconds <= 300 ? "bg-amber-500" : "bg-red-500"
-                        }`} />
-                        <span className="text-muted-foreground/60 tabular-nums">
-                          {formatTime(gap.previous_call_ended_at)} → {formatTime(gap.current_call_started_at)}
+                        <span className="text-[10px] text-muted-foreground tabular-nums">
+                          Max <span className="font-semibold text-red-500">{formatGapShort(gapDetail.summary.max_gap_seconds)}</span>
                         </span>
-                        <span className={`font-bold tabular-nums ml-auto ${gapColorClass(gap.gap_seconds)}`}>
-                          {formatGapShort(gap.gap_seconds)}
+                        <span className="text-[10px] text-muted-foreground tabular-nums">
+                          Min <span className="font-semibold text-emerald-500">{formatGapShort(gapDetail.summary.min_gap_seconds)}</span>
                         </span>
-                      </div>
-                    ))}
+                      </>
+                    )}
+                    {rep.efficiency_pct > 0 && (
+                      <span className={`ml-auto text-[10px] font-bold tabular-nums ${rep.efficiency_pct >= 70 ? "text-emerald-500" : rep.efficiency_pct >= 40 ? "text-amber-500" : "text-red-500"}`}>
+                        {rep.efficiency_pct}% efficient
+                      </span>
+                    )}
                   </div>
+
+                  {/* Distribution bar */}
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="flex-1 flex h-2 rounded-full overflow-hidden">
+                      {greenCount > 0 && <div className="bg-emerald-500" style={{ width: `${(greenCount / total) * 100}%` }} />}
+                      {amberCount > 0 && <div className="bg-amber-500" style={{ width: `${(amberCount / total) * 100}%` }} />}
+                      {redCount > 0 && <div className="bg-red-500" style={{ width: `${(redCount / total) * 100}%` }} />}
+                    </div>
+                    <div className="flex items-center gap-2 text-[9px] text-muted-foreground tabular-nums shrink-0">
+                      <span className="flex items-center gap-1"><span className="size-1.5 rounded-full bg-emerald-500" />{greenCount}</span>
+                      <span className="flex items-center gap-1"><span className="size-1.5 rounded-full bg-amber-500" />{amberCount}</span>
+                      <span className="flex items-center gap-1"><span className="size-1.5 rounded-full bg-red-500" />{redCount}</span>
+                    </div>
+                  </div>
+
+                  {/* Sparkline chart */}
+                  <GapSparkline gaps={gapDetail.gaps} avgGap={rep.avg_gap_seconds} />
+
+                  {/* Only show gaps > 1 min (the notable ones) */}
+                  {bigGaps.length > 0 && (
+                    <div className="mt-1">
+                      <p className="text-[9px] text-muted-foreground/50 uppercase tracking-wider mb-1">Gaps over 1 min ({bigGaps.length})</p>
+                      <div className="space-y-0.5">
+                        {bigGaps.map((gap, i) => (
+                          <div key={i} className="flex items-center gap-2 py-0.5 text-xs">
+                            <div className={`size-1.5 rounded-full shrink-0 ${
+                              gap.gap_seconds <= 120 ? "bg-emerald-500" : gap.gap_seconds <= 300 ? "bg-amber-500" : "bg-red-500"
+                            }`} />
+                            <span className="text-muted-foreground/50 tabular-nums text-[10px]">
+                              {formatTime(gap.previous_call_ended_at)} → {formatTime(gap.current_call_started_at)}
+                            </span>
+                            <span className={`font-semibold tabular-nums ml-auto text-[11px] ${gapColorClass(gap.gap_seconds)}`}>
+                              {formatGapShort(gap.gap_seconds)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </>
+                );
+              })()
               ) : (
                 <p className="text-xs text-muted-foreground py-2">No gaps recorded</p>
               )}
@@ -3220,7 +3243,7 @@ export default function CallsPage() {
                   </motion.div>
                 ) : (() => {
                   const activeReps = gapData.reps.filter(r => !EXCLUDED_REPS.has(r.rep_name));
-                  const allReps = gapData.reps;
+                  const allReps = activeReps; // Live Status also excludes non-sales
                   return (
                   <>
                     {/* ═══ 3-Column Layout ═══ */}
