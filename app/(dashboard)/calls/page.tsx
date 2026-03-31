@@ -1167,142 +1167,77 @@ type RepCardData = {
   gaps?: { previous_call_ended_at: number; current_call_started_at: number; gap_seconds: number; current_call_direction: string }[];
 };
 
-const repCardChartConfig = {
-  calls: { label: "Calls", color: "hsl(217, 91%, 60%)" },
-  avg_gap: { label: "Avg Gap (s)", color: "hsl(var(--foreground))" },
+const repGapChartConfig = {
+  gap: { label: "Gap between calls", color: "hsl(var(--foreground))" },
 } satisfies ChartConfig;
 
 function RepPerformanceCard({ rep, teamAvg, rank }: { rep: RepCardData; teamAvg: number; rank: number }) {
   const gaps = rep.gaps || [];
   if (gaps.length < 2) return null;
 
-  // Build hourly data
-  const currentHour = new Date().getHours();
-  const hourlyMap: Record<number, { calls: number; totalGap: number; gapCount: number }> = {};
-
-  for (const g of gaps) {
-    const h = new Date(g.current_call_started_at * 1000).getHours();
-    if (!hourlyMap[h]) hourlyMap[h] = { calls: 0, totalGap: 0, gapCount: 0 };
-    hourlyMap[h].calls++;
-    hourlyMap[h].totalGap += g.gap_seconds;
-    hourlyMap[h].gapCount++;
-  }
-
-  const hours = Object.keys(hourlyMap).map(Number).sort((a, b) => a - b);
-  if (hours.length < 2) return null;
-
-  const chartData = hours.map(h => ({
-    hour: `${h.toString().padStart(2, "0")}:00`,
-    calls: hourlyMap[h].calls + (h === hours[0] ? 1 : 0), // +1 for first hour's initial call
-    avg_gap: hourlyMap[h].gapCount > 0 ? Math.round(hourlyMap[h].totalGap / hourlyMap[h].gapCount) : 0,
+  // Each gap becomes a bar — simple, clear, one thing
+  const barData = gaps.map((g, i) => ({
+    idx: i,
+    gap: g.gap_seconds,
+    time: new Date(g.current_call_started_at * 1000).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/London" }),
+    fill: g.gap_seconds <= 120 ? "#10b981" : g.gap_seconds <= 300 ? "#f59e0b" : "#ef4444",
   }));
-
-  const greenCount = gaps.filter(g => g.gap_seconds <= 120).length;
-  const amberCount = gaps.filter(g => g.gap_seconds > 120 && g.gap_seconds <= 300).length;
-  const redCount = gaps.filter(g => g.gap_seconds > 300).length;
-  const total = gaps.length;
-  const vsBetter = rep.avg_gap_seconds < teamAvg;
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.05 * rank }}
+      transition={{ delay: 0.03 * rank }}
       className="rounded-2xl bg-card border border-border/50 overflow-hidden"
     >
-      {/* Header */}
-      <div className="px-5 py-3.5 border-b border-border/50 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-muted-foreground/40 font-semibold tabular-nums w-4">{rank}</span>
-          <h3 className="text-sm font-semibold">{rep.rep_name}</h3>
-          {vsBetter ? (
-            <span className="text-[10px] font-medium text-emerald-500">faster than avg</span>
-          ) : (
-            <span className="text-[10px] font-medium text-muted-foreground/40">slower than avg</span>
-          )}
+      {/* Header — name + key metrics inline */}
+      <div className="px-5 py-3 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="text-xs text-muted-foreground/40 font-bold tabular-nums">{rank}</span>
+          <h3 className="text-sm font-semibold truncate">{rep.rep_name}</h3>
         </div>
-        <div className="flex items-center gap-4 text-[11px] text-muted-foreground tabular-nums">
-          <span>{rep.total_calls} calls</span>
-          <span>{formatGapShort(rep.total_talk_time)} talk</span>
-          <span className={`font-semibold ${rep.efficiency_pct >= 70 ? "text-emerald-500" : rep.efficiency_pct >= 40 ? "text-amber-500" : "text-red-500"}`}>
+        <div className="flex items-center gap-3 text-[11px] tabular-nums shrink-0">
+          <span className="text-muted-foreground">{rep.total_calls} calls</span>
+          <span className="text-muted-foreground">{formatGapShort(rep.total_talk_time)} talk</span>
+          <span className={`font-bold ${gapColorClass(rep.avg_gap_seconds)}`}>{formatGapShort(rep.avg_gap_seconds)} avg</span>
+          <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${
+            rep.efficiency_pct >= 70
+              ? "bg-emerald-500/10 text-emerald-600 ring-emerald-500/20 dark:text-emerald-400"
+              : rep.efficiency_pct >= 40
+                ? "bg-amber-500/10 text-amber-600 ring-amber-500/20 dark:text-amber-400"
+                : "bg-red-500/10 text-red-600 ring-red-500/20 dark:text-red-400"
+          }`}>
             {rep.efficiency_pct}%
           </span>
         </div>
       </div>
 
-      <div className="px-4 pt-3 pb-2">
-        {/* Stats row */}
-        <div className="grid grid-cols-6 gap-3 mb-3">
-          <div>
-            <p className="text-[9px] text-muted-foreground uppercase tracking-wider">Avg Gap</p>
-            <p className={`text-base font-bold tabular-nums ${gapColorClass(rep.avg_gap_seconds)}`}>{formatGapShort(rep.avg_gap_seconds)}</p>
-          </div>
-          <div>
-            <p className="text-[9px] text-muted-foreground uppercase tracking-wider">Max</p>
-            <p className="text-base font-bold tabular-nums text-red-500">{formatGapShort(rep.max_gap_seconds)}</p>
-          </div>
-          <div>
-            <p className="text-[9px] text-muted-foreground uppercase tracking-wider">Min</p>
-            <p className="text-base font-bold tabular-nums text-emerald-500">{formatGapShort(rep.min_gap_seconds)}</p>
-          </div>
-          <div>
-            <p className="text-[9px] text-muted-foreground uppercase tracking-wider">Avg Call</p>
-            <p className="text-base font-bold tabular-nums">{formatGapShort(rep.avg_call_duration)}</p>
-          </div>
-          <div>
-            <p className="text-[9px] text-muted-foreground uppercase tracking-wider">Idle</p>
-            <p className="text-base font-bold tabular-nums">{formatGapShort(rep.total_idle_time)}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-[9px] text-muted-foreground uppercase tracking-wider">&gt;5min</p>
-            <p className={`text-base font-bold tabular-nums ${rep.gaps_over_5min > 0 ? "text-red-500" : "text-muted-foreground/30"}`}>{rep.gaps_over_5min}</p>
-          </div>
-        </div>
-
-        {/* Distribution bar */}
-        <div className="flex items-center gap-2 mb-3">
-          <div className="flex-1 flex h-2 rounded-full overflow-hidden">
-            {greenCount > 0 && <div className="bg-emerald-500" style={{ width: `${(greenCount / total) * 100}%` }} />}
-            {amberCount > 0 && <div className="bg-amber-500" style={{ width: `${(amberCount / total) * 100}%` }} />}
-            {redCount > 0 && <div className="bg-red-500" style={{ width: `${(redCount / total) * 100}%` }} />}
-          </div>
-          <div className="flex items-center gap-2 text-[9px] text-muted-foreground tabular-nums shrink-0">
-            <span className="flex items-center gap-1"><span className="size-1.5 rounded-full bg-emerald-500" />{greenCount}</span>
-            <span className="flex items-center gap-1"><span className="size-1.5 rounded-full bg-amber-500" />{amberCount}</span>
-            <span className="flex items-center gap-1"><span className="size-1.5 rounded-full bg-red-500" />{redCount}</span>
-          </div>
-        </div>
-
-        {/* Chart: bars = calls per hour, line overlay = avg gap per hour */}
-        <ChartContainer config={repCardChartConfig} className="h-[140px] w-full">
-          <ComposedChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-            <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.3} />
-            <XAxis dataKey="hour" axisLine={false} tickLine={false} tickMargin={8} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
-            <YAxis yAxisId="calls" hide />
-            <YAxis yAxisId="gap" orientation="right" hide />
-            <ReferenceLine yAxisId="gap" y={teamAvg} stroke="hsl(var(--foreground))" strokeOpacity={0.15} strokeDasharray="4 3" />
+      {/* Chart — every gap as a colored bar. Green = fast, amber = ok, red = slow. That's it. */}
+      <div className="px-4 pb-3">
+        <ChartContainer config={repGapChartConfig} className="h-[80px] w-full">
+          <RechartsBarChart data={barData} margin={{ top: 4, right: 0, bottom: 0, left: 0 }} barCategoryGap="12%">
+            <YAxis hide />
+            <XAxis dataKey="idx" hide />
+            <ReferenceLine y={teamAvg} stroke="hsl(var(--foreground))" strokeOpacity={0.12} strokeDasharray="4 3" />
             <ChartTooltip
-              content={({ active, payload, label }) => {
+              content={({ active, payload }) => {
                 if (!active || !payload?.length) return null;
-                const calls = payload.find(p => p.dataKey === "calls")?.value as number || 0;
-                const avgG = payload.find(p => p.dataKey === "avg_gap")?.value as number || 0;
+                const d = payload[0].payload;
                 return (
-                  <div className="rounded-lg border border-border/50 bg-card px-3 py-2 text-xs shadow-xl">
-                    <p className="font-semibold mb-1">{label}</p>
-                    <p className="text-muted-foreground">{calls} calls · avg gap <span className={`font-semibold ${gapColorClass(avgG)}`}>{formatGapShort(avgG)}</span></p>
+                  <div className="rounded-lg border border-border/50 bg-card px-3 py-1.5 text-xs shadow-xl">
+                    <span className="text-muted-foreground">{d.time}</span>
+                    <span className={`ml-2 font-bold ${gapColorClass(d.gap)}`}>{formatGapShort(d.gap)}</span>
                   </div>
                 );
               }}
             />
-            <Bar yAxisId="calls" dataKey="calls" fill="hsl(217, 91%, 60%)" fillOpacity={0.2} radius={[3, 3, 0, 0]} />
-            <Line yAxisId="gap" type="monotone" dataKey="avg_gap" stroke="hsl(var(--foreground))" strokeWidth={1.5} strokeOpacity={0.4} dot={false} />
-          </ComposedChart>
+            <Bar dataKey="gap" radius={[2, 2, 0, 0]}>
+              {barData.map((entry, i) => (
+                <Cell key={i} fill={entry.fill} fillOpacity={0.75} />
+              ))}
+            </Bar>
+          </RechartsBarChart>
         </ChartContainer>
-        <div className="flex items-center gap-4 text-[9px] text-muted-foreground mt-1 px-1">
-          <span className="flex items-center gap-1.5"><span className="size-2 rounded-sm bg-blue-500/25" />calls/hour</span>
-          <span className="flex items-center gap-1.5"><span className="w-3 h-[1.5px] bg-foreground/50 rounded" />avg gap</span>
-          <span className="flex items-center gap-1.5"><span className="w-3 h-[1.5px] bg-foreground/15 rounded border-dashed" />team avg</span>
-        </div>
       </div>
     </motion.div>
   );
@@ -1313,7 +1248,7 @@ function RepPerformanceCards({ reps, teamAvg }: { reps: RepCardData[]; teamAvg: 
   if (activeReps.length === 0) return null;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {activeReps.map((rep, i) => (
         <RepPerformanceCard key={rep.aircall_user_id} rep={rep} teamAvg={teamAvg} rank={i + 1} />
       ))}
