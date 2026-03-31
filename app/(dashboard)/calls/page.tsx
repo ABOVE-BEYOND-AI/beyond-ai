@@ -1201,6 +1201,36 @@ const REP_COLORS = [
 
 type PerfMetric = "talk_time" | "dials";
 
+function formatMins(mins: number): string {
+  if (mins < 60) return `${mins} mins`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m > 0 ? `${h}hr ${m}mins` : `${h}hr`;
+}
+
+function PerfTooltip({ active, payload, label, metric }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string; metric: PerfMetric }) {
+  if (!active || !payload?.length) return null;
+  const sorted = [...payload].sort((a, b) => (b.value || 0) - (a.value || 0));
+  return (
+    <div className="rounded-xl border border-border/50 bg-card/95 backdrop-blur-sm px-4 py-3 text-xs shadow-2xl min-w-[180px]">
+      <p className="font-semibold text-[13px] mb-2">{label}</p>
+      <div className="space-y-1.5">
+        {sorted.map((p) => (
+          <div key={p.name} className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
+              <span className="text-muted-foreground truncate">{p.name}</span>
+            </div>
+            <span className="font-semibold tabular-nums shrink-0">
+              {metric === "talk_time" ? formatMins(p.value || 0) : `${p.value || 0} calls`}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function PerformanceChart({
   reps,
   metric,
@@ -1222,18 +1252,15 @@ function PerformanceChart({
     for (const rep of activeReps) {
       const gaps = rep.gaps || [];
       if (metric === "dials") {
-        // Count calls that started in or before this hour
         const callCount = gaps.filter(g => {
           const callHour = new Date(g.current_call_started_at * 1000).getHours();
           return callHour <= h;
-        }).length + 1; // +1 for the first call (which has no preceding gap)
+        }).length + 1;
         point[rep.rep_name] = callCount;
       } else {
-        // Cumulative talk time: sum gap_seconds subtracted from total elapsed gives talk time
-        // Simpler: count calls up to this hour × avg duration
         const callsUpToHour = gaps.filter(g => new Date(g.current_call_started_at * 1000).getHours() <= h).length + 1;
         const avgDuration = rep.total_calls > 0 ? rep.total_talk_time / rep.total_calls : 0;
-        point[rep.rep_name] = Math.round((callsUpToHour * avgDuration) / 60); // minutes
+        point[rep.rep_name] = Math.round((callsUpToHour * avgDuration) / 60);
       }
     }
     return point;
@@ -1253,7 +1280,12 @@ function PerformanceChart({
       className="rounded-2xl bg-card border border-border/50 overflow-hidden"
     >
       <div className="px-5 py-3.5 border-b border-border/50 flex items-center justify-between">
-        <h3 className="text-sm font-semibold">Performance</h3>
+        <div className="flex items-center gap-3">
+          <h3 className="text-sm font-semibold">Performance</h3>
+          <span className="text-[10px] text-muted-foreground">
+            {metric === "talk_time" ? "cumulative talk time" : "cumulative dials"}
+          </span>
+        </div>
         <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-0.5">
           <button
             onClick={() => onMetricChange("talk_time")}
@@ -1270,11 +1302,20 @@ function PerformanceChart({
         </div>
       </div>
       <div className="px-4 pt-4 pb-2">
-        <ChartContainer config={config} className="h-[280px] w-full">
-          <AreaChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
-            <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.4} />
-            <XAxis dataKey="hour" axisLine={false} tickLine={false} tickMargin={10} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-            <ChartTooltip content={<ChartTooltipContent indicator="line" />} />
+        <ChartContainer config={config} className="h-[420px] w-full">
+          <AreaChart data={chartData} margin={{ top: 12, right: 12, bottom: 0, left: 0 }}>
+            <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.3} />
+            <XAxis
+              dataKey="hour"
+              axisLine={false}
+              tickLine={false}
+              tickMargin={12}
+              tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+            />
+            <ChartTooltip
+              content={<PerfTooltip metric={metric} />}
+              cursor={{ stroke: "hsl(var(--muted-foreground))", strokeWidth: 1, strokeOpacity: 0.2 }}
+            />
             {repNames.map((name, i) => (
               <Area
                 key={name}
@@ -1284,16 +1325,16 @@ function PerformanceChart({
                 strokeWidth={2}
                 fill="none"
                 dot={false}
-                activeDot={{ r: 3, strokeWidth: 1.5, fill: "hsl(var(--card))" }}
+                activeDot={{ r: 4, strokeWidth: 2, fill: "hsl(var(--card))" }}
               />
             ))}
           </AreaChart>
         </ChartContainer>
         {/* Legend */}
-        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 px-1 pb-2">
+        <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 px-1 pb-2">
           {activeReps.map((rep, i) => (
-            <span key={rep.aircall_user_id} className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-              <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: REP_COLORS[i % REP_COLORS.length] }} />
+            <span key={rep.aircall_user_id} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <span className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: REP_COLORS[i % REP_COLORS.length] }} />
               {rep.rep_name}
             </span>
           ))}
