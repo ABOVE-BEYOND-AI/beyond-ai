@@ -61,6 +61,11 @@ export function GoogleAuthProvider({ children }: { children: React.ReactNode }) 
   const refreshToken = useCallback(async () => {
     try {
       const res = await fetch('/api/auth/refresh', { method: 'POST' })
+      // 401 means no valid session — stale display cookie must be cleared,
+      // otherwise the client treats us as logged-in and hides the signin UI.
+      if (!res.ok) {
+        return false
+      }
       const data = await res.json()
 
       if (data.refreshed && data.access_token) {
