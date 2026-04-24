@@ -16,22 +16,7 @@ function getRedisClient(): Redis {
     const redisUrl = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL || process.env.KV_URL;
     const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
 
-    // Debug logging for server-side execution
-    console.log('🔧 Redis Debug: URL exists:', !!redisUrl);
-    console.log('🔧 Redis Debug: Token exists:', !!redisToken);
-    console.log('🔧 Redis Debug: Available env vars:', {
-      UPSTASH_REDIS_REST_URL: !!process.env.UPSTASH_REDIS_REST_URL,
-      KV_REST_API_URL: !!process.env.KV_REST_API_URL,
-      KV_URL: !!process.env.KV_URL,
-      UPSTASH_REDIS_REST_TOKEN: !!process.env.UPSTASH_REDIS_REST_TOKEN,
-      KV_REST_API_TOKEN: !!process.env.KV_REST_API_TOKEN,
-    });
-
     if (!redisUrl || !redisToken) {
-      console.error('❌ Redis configuration missing:', {
-        url: !!redisUrl,
-        token: !!redisToken
-      });
       throw new Error('Redis configuration is incomplete. Check environment variables.');
     }
 
@@ -54,7 +39,6 @@ const KEYS = {
   user: (email: string) => `user:${email}`,
   userItineraries: (email: string) => `user:${email}:itineraries`,
   itinerary: (id: string) => `itinerary:${id}`,
-  userSession: (email: string) => `session:${email}`,
   userTokens: (email: string) => `tokens:${email}`,
   allUsers: 'all_users', // Set of all user emails for admin listing
 }
@@ -213,22 +197,6 @@ export async function getUserItineraryCount(userEmail: string): Promise<number> 
   return itineraryIds.length
 }
 
-// Session management
-export async function saveUserSession(email: string, sessionData: Record<string, unknown>): Promise<void> {
-  const redis = getRedisClient();
-  // Sessions expire in 7 days (matches cookie maxAge)
-  await redis.set(KEYS.userSession(email), sessionData, { ex: 60 * 60 * 24 * 7 })
-}
-
-export async function getUserSession(email: string): Promise<Record<string, unknown> | null> {
-  const redis = getRedisClient();
-  return await redis.get(KEYS.userSession(email))
-}
-
-export async function clearUserSession(email: string): Promise<void> {
-  const redis = getRedisClient();
-  await redis.del(KEYS.userSession(email))
-}
 
 // ── Persistent token storage ──
 // These persist independently of sessions so refresh tokens survive session expiry
@@ -271,7 +239,8 @@ export async function setUserRole(email: string, role: UserRole): Promise<User> 
 export async function deleteUserAccount(email: string): Promise<void> {
   const redis = getRedisClient();
   await redis.del(KEYS.user(email))
-  await redis.del(KEYS.userSession(email))
+  // Also delete any legacy session keys left over from the old auth flow.
+  await redis.del(`session:${email}`)
   await redis.del(KEYS.userTokens(email))
   await redis.srem(KEYS.allUsers, email)
 }

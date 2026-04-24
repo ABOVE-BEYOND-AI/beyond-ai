@@ -1,10 +1,21 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback, Suspense } from 'react'
 import { useGoogleAuth } from '@/components/google-auth-provider-clean'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { FallingPattern } from '@/components/ui/falling-pattern'
 import dynamic from 'next/dynamic'
+
+const ERROR_MESSAGES: Record<string, string> = {
+  not_authorized: 'This account is not authorized to access Above + Beyond.',
+  unverified_email: 'Your Google email address is not verified.',
+  invalid_workspace: 'You must sign in with your Above + Beyond Workspace account.',
+  misconfigured: 'Sign-in is not configured. Contact an administrator.',
+  invalid_state: 'Sign-in expired or was tampered with. Please try again.',
+  invalid_request: 'Sign-in request was malformed. Please try again.',
+  oauth_error: 'Google denied the sign-in request.',
+  auth_failed: 'Sign-in failed. Please try again.',
+}
 
 const UnicornScene = dynamic(() => import('unicornstudio-react/next'), { ssr: false })
 
@@ -17,9 +28,12 @@ const GoogleIcon = () => (
   </svg>
 )
 
-export default function SignInPage() {
+function SignInPageContent() {
   const { user, loading, signIn } = useGoogleAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const errorCode = searchParams.get('error')
+  const errorMessage = errorCode ? (ERROR_MESSAGES[errorCode] || ERROR_MESSAGES.auth_failed) : null
   const [mounted, setMounted] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
   const glowRef = useRef<HTMLDivElement>(null)
@@ -319,6 +333,14 @@ export default function SignInPage() {
                   </div>
                 </button>
               </div>
+              {errorMessage && (
+                <p
+                  role="alert"
+                  className="mt-4 text-[12px] leading-relaxed text-red-400/90"
+                >
+                  {errorMessage}
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -340,5 +362,19 @@ export default function SignInPage() {
         </div>
       </div>
     </>
+  )
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="h-screen bg-[#000000] flex items-center justify-center">
+          <div className="w-10 h-10 border-2 border-white/10 border-t-white/40 rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <SignInPageContent />
+    </Suspense>
   )
 }

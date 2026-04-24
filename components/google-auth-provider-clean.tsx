@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import { GoogleUser } from '@/lib/types'
-import { getGoogleAuthUrl } from '@/lib/google-oauth-clean'
 
 interface GoogleAuthContextType {
   user: GoogleUser | null
@@ -142,8 +141,8 @@ export function GoogleAuthProvider({ children }: { children: React.ReactNode }) 
   }, [loadSession])
 
   const signIn = () => {
-    const authUrl = getGoogleAuthUrl()
-    window.location.href = authUrl
+    // Server-side init route mints a CSRF state cookie before redirecting to Google.
+    window.location.href = '/api/auth/google'
   }
 
   const signOut = async () => {

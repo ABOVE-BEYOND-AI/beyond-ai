@@ -246,12 +246,6 @@ export interface GoogleTokens {
   scope: string
 }
 
-export interface AuthSession {
-  user: GoogleUser
-  tokens: GoogleTokens
-  expires_at: number
-}
-
 // Sales Dashboard Types
 export interface Deal {
   id: string

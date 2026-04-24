@@ -1,7 +1,8 @@
-// Clean Google OAuth implementation using standard web APIs
-import { GoogleUser, GoogleTokens } from './types'
+// Google OAuth implementation.
+// All sign-in begins server-side at /api/auth/google so we can attach a
+// state cookie before redirecting to Google (CSRF protection on OAuth login).
+import { GoogleTokens } from './types'
 
-// Google OAuth configuration
 export const GOOGLE_OAUTH_CONFIG = {
   clientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
   clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
@@ -18,54 +19,56 @@ export const GOOGLE_OAUTH_CONFIG = {
   ],
 }
 
-// Generate Google OAuth URL (standard approach)
-export function getGoogleAuthUrl(): string {
+export function getRedirectUri(): string {
   const isDevelopment = process.env.NODE_ENV === 'development'
-  const redirectUri = isDevelopment 
-    ? GOOGLE_OAUTH_CONFIG.redirectUri.development 
+  return isDevelopment
+    ? GOOGLE_OAUTH_CONFIG.redirectUri.development
     : GOOGLE_OAUTH_CONFIG.redirectUri.production
+}
 
+export interface GoogleAuthUrlOptions {
+  state: string
+  hd?: string
+  loginHint?: string
+}
+
+export function getGoogleAuthUrl(options: GoogleAuthUrlOptions): string {
   const params = new URLSearchParams({
     client_id: GOOGLE_OAUTH_CONFIG.clientId,
-    redirect_uri: redirectUri,
+    redirect_uri: getRedirectUri(),
     response_type: 'code',
     scope: GOOGLE_OAUTH_CONFIG.scopes.join(' '),
     access_type: 'offline',
     include_granted_scopes: 'true',
+    prompt: 'select_account',
+    state: options.state,
   })
+
+  if (options.hd) params.set('hd', options.hd)
+  if (options.loginHint) params.set('login_hint', options.loginHint)
 
   return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
 }
 
-// Exchange authorization code for tokens (server-side)
 export async function exchangeCodeForTokens(code: string): Promise<GoogleTokens> {
-  const isDevelopment = process.env.NODE_ENV === 'development'
-  const redirectUri = isDevelopment 
-    ? GOOGLE_OAUTH_CONFIG.redirectUri.development 
-    : GOOGLE_OAUTH_CONFIG.redirectUri.production
-
   const response = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
       code,
       client_id: GOOGLE_OAUTH_CONFIG.clientId,
       client_secret: GOOGLE_OAUTH_CONFIG.clientSecret,
-      redirect_uri: redirectUri,
+      redirect_uri: getRedirectUri(),
       grant_type: 'authorization_code',
     }),
   })
 
   if (!response.ok) {
-    const error = await response.text()
-    console.error('Token exchange failed:', error)
     throw new Error(`Token exchange failed: ${response.status}`)
   }
 
   const tokens = await response.json()
-  
+
   return {
     access_token: tokens.access_token,
     refresh_token: tokens.refresh_token,
@@ -75,82 +78,61 @@ export async function exchangeCodeForTokens(code: string): Promise<GoogleTokens>
   }
 }
 
-// Get user info from Google API
-export async function getUserInfo(accessToken: string): Promise<GoogleUser> {
+// Verified user info — captures email_verified and hd (hosted domain) so the
+// caller can enforce workspace membership and reject unverified emails.
+export interface VerifiedGoogleUser {
+  id: string
+  email: string
+  name: string
+  picture: string
+  email_verified: boolean
+  hd?: string
+}
+
+export async function getUserInfo(accessToken: string): Promise<VerifiedGoogleUser> {
   const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-    },
+    headers: { Authorization: `Bearer ${accessToken}` },
   })
 
   if (!response.ok) {
     throw new Error(`Failed to get user info: ${response.status}`)
   }
 
-  const userInfo = await response.json()
-  
+  const userInfo = await response.json() as {
+    sub: string
+    email: string
+    email_verified?: boolean
+    name?: string
+    picture?: string
+    hd?: string
+  }
+
   return {
     id: userInfo.sub,
     email: userInfo.email,
-    name: userInfo.name,
-    picture: userInfo.picture,
+    name: userInfo.name || '',
+    picture: userInfo.picture || '',
+    email_verified: userInfo.email_verified === true,
+    hd: userInfo.hd,
   }
 }
 
-// Simple session management using standard web APIs
-export interface UserSession {
-  user: GoogleUser
-  tokens: GoogleTokens
-  created_at: number
-}
-
-// Encode session (server-side only - uses Buffer)
-export function encodeSession(session: UserSession): string {
-  return Buffer.from(JSON.stringify(session)).toString('base64')
-}
-
-// Decode session (browser-safe - uses atob, no Node.js crypto)
-// NOTE: This does NOT verify the signature — use verifySecureSession() from
-// lib/session-security.ts for server-side authentication decisions.
-// This function is safe for client-side display of user info only.
-export function decodeSession(sessionToken: string): UserSession | null {
-  try {
-    // First URL-decode the session token (browsers URL-encode cookies automatically)
-    const urlDecodedToken = decodeURIComponent(sessionToken)
-    // Support signed format: base64payload.signature — strip the signature
-    const dotIndex = urlDecodedToken.lastIndexOf('.')
-    const payload = dotIndex !== -1 ? urlDecodedToken.substring(0, dotIndex) : urlDecodedToken
-    // Then base64 decode using standard web API - works everywhere
-    const sessionData = atob(payload)
-    const parsed = JSON.parse(sessionData)
-    // Check expiry if present
-    if (parsed.exp && Date.now() > parsed.exp) {
-      return null
-    }
-    return parsed as UserSession
-  } catch (error) {
-    console.error('Failed to decode session:', error)
-    return null
-  }
-}
-
-// Validate access token with Google
+// Validate an access token by calling Google's tokeninfo endpoint.
 export async function validateAccessToken(accessToken: string): Promise<boolean> {
   try {
-    const response = await fetch(`https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=${accessToken}`)
+    const response = await fetch(
+      `https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=${encodeURIComponent(accessToken)}`
+    )
     return response.ok
   } catch {
     return false
   }
 }
 
-// Refresh access token using refresh token (server-side)
 export async function refreshAccessToken(refreshToken: string): Promise<GoogleTokens> {
   const response = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
       client_id: GOOGLE_OAUTH_CONFIG.clientId,
       client_secret: GOOGLE_OAUTH_CONFIG.clientSecret,
@@ -160,8 +142,6 @@ export async function refreshAccessToken(refreshToken: string): Promise<GoogleTo
   })
 
   if (!response.ok) {
-    const error = await response.text()
-    console.error('Token refresh failed:', error)
     throw new Error(`Token refresh failed: ${response.status}`)
   }
 
@@ -169,7 +149,7 @@ export async function refreshAccessToken(refreshToken: string): Promise<GoogleTo
 
   return {
     access_token: tokens.access_token,
-    refresh_token: refreshToken, // Google doesn't return a new refresh token, keep the original
+    refresh_token: refreshToken,
     expires_at: tokens.expires_in ? Date.now() + (tokens.expires_in * 1000) : undefined,
     token_type: tokens.token_type || 'Bearer',
     scope: tokens.scope || GOOGLE_OAUTH_CONFIG.scopes.join(' '),

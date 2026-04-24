@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDriveClientOAuth } from "@/lib/googleOAuth";
-import { validateAccessToken } from "@/lib/google-auth";
+import { validateAccessToken } from "@/lib/google-oauth-clean";
 
 interface PDFRequestBody {
   presentationId: string;

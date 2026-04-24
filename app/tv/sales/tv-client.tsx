@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 
 // ── Types ──
 
@@ -193,6 +194,8 @@ export default function TVSalesClient({ initialData }: { initialData: DashboardR
   const pollRef = useRef<ReturnType<typeof setInterval>>(undefined);
   const cycleRef = useRef<ReturnType<typeof setInterval>>(undefined);
   const displayPeriodRef = useRef<SalesPeriod>("month");
+  // The kiosk has no session cookie — forward the TV access key on every API call.
+  const tvKey = useSearchParams().get("key") || "";
 
   // Force dark mode once
   useEffect(() => {
@@ -202,7 +205,7 @@ export default function TVSalesClient({ initialData }: { initialData: DashboardR
   // Stable fetch function — fetches a specific period and caches result
   const fetchPeriod = useRef(async (period: SalesPeriod) => {
     try {
-      const res = await fetch(`/api/sales/data?period=${period}`);
+      const res = await fetch(`/api/sales/data?period=${period}&key=${encodeURIComponent(tvKey)}`);
       if (!res.ok) return;
       const json = await res.json();
       if (json.success) {

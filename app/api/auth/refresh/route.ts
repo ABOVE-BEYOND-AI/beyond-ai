@@ -56,7 +56,8 @@ export async function POST(req: NextRequest) {
     return response
 
   } catch (error) {
-    console.error('❌ Token Refresh: Failed:', error)
+    // Don't leak details — refresh failures are noisy and email PII shouldn't enter logs.
+    console.error('Token refresh failed:', error instanceof Error ? error.message : 'unknown')
     return NextResponse.json({
       error: 'Token refresh failed',
       requireReauth: true,

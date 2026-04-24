@@ -1,19 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { timingSafeEqual } from 'crypto'
 import { runAllGenerators } from '@/lib/notification-generators'
 import { getAllUsers } from '@/lib/redis-database'
 import { apiErrorResponse, requireApiAdmin } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 
-// POST /api/notifications/generate — run notification generators
-// Body: { email: string } to run for one user, or empty to run for all users
+function isCronAuth(req: NextRequest): boolean {
+  const cronSecret = process.env.CRON_SECRET
+  if (!cronSecret) return false
+  const authHeader = req.headers.get('authorization') || ''
+  const expected = `Bearer ${cronSecret}`
+  const a = Buffer.from(authHeader)
+  const b = Buffer.from(expected)
+  if (a.length !== b.length) return false
+  try {
+    return timingSafeEqual(a, b)
+  } catch {
+    return false
+  }
+}
+
+// POST /api/notifications/generate — run notification generators.
+// Auth: either CRON_SECRET (Vercel Cron / scheduled trigger) OR an admin session.
+// Body: { email: string } to run for one user, or empty to run for all users.
 export async function POST(req: NextRequest) {
   try {
-    const cronSecret = process.env.CRON_SECRET
-    const authHeader = req.headers.get('authorization')
-    const isCronRequest = !!cronSecret && authHeader === `Bearer ${cronSecret}`
-
-    if (!isCronRequest) {
+    if (!isCronAuth(req)) {
       await requireApiAdmin(req)
     }
 

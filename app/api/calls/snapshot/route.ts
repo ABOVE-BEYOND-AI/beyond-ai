@@ -12,6 +12,7 @@ import {
   type SnapshotType,
 } from '@/lib/snapshot-store'
 import { apiErrorResponse, requireApiUser } from '@/lib/api-auth'
+import { timingSafeEqual } from 'crypto'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -23,21 +24,31 @@ function getRedis(): Redis | null {
   return new Redis({ url, token })
 }
 
+function isCronAuth(request: NextRequest): boolean {
+  const cronSecret = process.env.CRON_SECRET
+  if (!cronSecret) return false
+  const authHeader = request.headers.get('authorization') || ''
+  const expected = `Bearer ${cronSecret}`
+  const a = Buffer.from(authHeader)
+  const b = Buffer.from(expected)
+  if (a.length !== b.length) return false
+  try {
+    return timingSafeEqual(a, b)
+  } catch {
+    return false
+  }
+}
+
 /**
  * POST /api/calls/snapshot
  *
  * Vercel Cron endpoint — captures daily snapshots of Overview, Dial Pace, and AI Digest.
  * Runs at 1pm (midday) and 6pm (eod) UK time on weekdays.
- * Protected by CRON_SECRET.
+ * Auth: CRON_SECRET (cron) or signed-in session (manual trigger).
  */
 export async function POST(request: NextRequest) {
   try {
-    // Auth: CRON_SECRET (Vercel Cron) or authenticated user (manual trigger)
-    const cronSecret = process.env.CRON_SECRET
-    const authHeader = request.headers.get('authorization')
-    const isCronRequest = !!cronSecret && authHeader === `Bearer ${cronSecret}`
-
-    if (!isCronRequest) {
+    if (!isCronAuth(request)) {
       // Fall back to user auth for manual triggers
       await requireApiUser(request)
     }

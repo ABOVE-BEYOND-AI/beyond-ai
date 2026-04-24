@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSlidesClientOAuth, getDriveClientOAuth, PERSONAL_DRIVE_FOLDERS, OAUTH_TEMPLATE_IDS } from "@/lib/googleOAuth";
 import { refineItineraryWithGPT } from "@/lib/openai";
-import { validateAccessToken, getUserInfo } from "@/lib/google-auth";
+import { validateAccessToken, getUserInfo } from "@/lib/google-oauth-clean";
 import { publishToWebAndGetEmbedUrlOAuth } from "@/lib/googleSlides";
 
 interface SlidesRequestBody {
